@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Form, Depends, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app.models import Agent, TaskProgress, SubmittedForm, AgentSession  # ✅ Added AgentSession import
-from app.schemas import AgentStatusUpdateSchema
-from app.security import hash_password, verify_password
+from database import get_db
+from models import Agent, TaskProgress, SubmittedForm, AgentSession
+from schemas import AgentStatusUpdateSchema
+from security import hash_password, verify_password
 import os
 import secrets
 import string
