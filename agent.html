@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crime Records Agent Login</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        /* Animated background particles */
+        .particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        .particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        .particle:nth-child(1) { width: 4px; height: 4px; top: 20%; left: 10%; animation-delay: 0s; }
+        .particle:nth-child(2) { width: 6px; height: 6px; top: 40%; left: 80%; animation-delay: 1s; }
+        .particle:nth-child(3) { width: 3px; height: 3px; top: 60%; left: 20%; animation-delay: 2s; }
+        .particle:nth-child(4) { width: 5px; height: 5px; top: 80%; left: 70%; animation-delay: 3s; }
+        .particle:nth-child(5) { width: 4px; height: 4px; top: 30%; left: 50%; animation-delay: 4s; }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+        
+        /* Main container */
+        .container {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 1200px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Login section - attractive design */
+        .login-section {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .login-header {
+            margin-bottom: 30px;
+        }
+        
+        .login-header .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            color: white;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+        
+        .login-header h1 {
+            color: #2c3e50;
+            font-size: 1.8em;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+        
+        .login-header p {
+            color: #7f8c8d;
+            font-size: 1em;
+            font-weight: 400;
+        }
+        
+        .login-form {
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+            text-align: left;
+        }
+        
+        .form-group label {
+            display: block;
+            color: #2c3e50;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .input-container {
+            position: relative;
+        }
+        
+        .form-group input {
+            width: 100%;
+            height: 50px;
+            padding: 15px 50px 15px 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 12px;
+            font-size: 16px;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+            autocomplete: off;
+            autocapitalize: off;
+            autocorrect: off;
+            spellcheck: false;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .input-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #95a5a6;
+            font-size: 18px;
+        }
+        
+        .login-btn {
+            width: 100%;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+        }
+        
+        .login-btn:active {
+            transform: translateY(0);
+        }
+        
+        .login-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        /* Task section - same as before but hidden initially */
+        .task-section {
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            background: white;
+            border-radius: 15px;
+            margin: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            height: calc(100vh - 20px);
+        }
+        
+        .progress-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 20px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1em;
+            border-radius: 10px;
+            flex-shrink: 0;
+        }
+        
+        .form-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            flex-shrink: 0;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+        
+        .form-group-task {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group-task label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+        
+        .form-group-task input {
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            height: 32px;
+            autocomplete: off;
+            autocapitalize: off;
+            autocorrect: off;
+            spellcheck: false;
+        }
+        
+        .datetime-input {
+            font-family: monospace;
+            letter-spacing: 0.5px;
+        }
+        
+        .form-controls {
+            text-align: right;
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+        
+        .image-section {
+            flex: 1.5;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #ddd;
+            min-height: 0;
+        }
+        
+        .image-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 0;
+        }
+        
+        .image-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .image-info {
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            padding: 8px 0;
+            flex-shrink: 0;
+        }
+        
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 0 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .loading-spinner {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(255,255,255,0.95);
+            padding: 20px;
+            border-radius: 15px;
+            z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .alert {
+            padding: 12px 20px;
+            margin: 10px 0;
+            border-radius: 10px;
+            font-size: 14px;
+            border-left: 4px solid;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border-left-color: #28a745;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left-color: #dc3545;
+        }
+        
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left-color: #17a2b8;
+        }
+        
+        .hidden { 
+            display: none; 
+        }
+        
+        .completed-section {
+            text-align: center;
+            padding: 40px 20px;
+            background: white;
+            border-radius: 15px;
+            margin: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .completed-section h2 {
+            font-size: 2em;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+        
+        /* Enhanced responsive design for larger forms */
+        @media (max-width: 1400px) {
+            .form-grid {
+                grid-template-columns: repeat(5, 1fr);
+                gap: 22px;
+            }
+        }
+        
+        @media (max-width: 1200px) {
+            .form-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 20px;
+            }
+            
+            .form-group-task input {
+                height: 52px;
+                font-size: 15px;
+                padding: 14px 18px;
+            }
+            
+            .form-group-task label {
+                font-size: 15px;
+            }
+        }
+        
+        @media (max-width: 1024px) {
+            .form-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 18px;
+            }
+            
+            .form-group-task input {
+                height: 50px;
+                font-size: 14px;
+                padding: 12px 16px;
+            }
+            
+            .form-section {
+                padding: 30px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .login-card {
+                margin: 20px;
+                padding: 30px 25px;
+            }
+            
+            .form-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+            }
+            
+            .form-group-task input {
+                height: 48px;
+                font-size: 13px;
+                padding: 10px 14px;
+            }
+            
+            .form-group-task label {
+                font-size: 13px;
+            }
+            
+            .form-section {
+                padding: 25px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .form-grid {
+                grid-template-columns: repeat(1, 1fr);
+                gap: 12px;
+            }
+            
+            .login-card {
+                padding: 25px 20px;
+            }
+            
+            .form-group-task input {
+                height: 45px;
+                font-size: 12px;
+            }
+            
+            .form-section {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated background -->
+    <div class="particles">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
+
+    <div class="container">
+        <!-- Attractive Login Section -->
+        <div id="loginSection" class="login-section">
+            <div class="login-card">
+                <div class="login-header">
+                    <div class="logo">🏛️</div>
+                    <h1>Crime Records System</h1>
+                    <p>Agent Dashboard Login</p>
+                </div>
+                
+                <form id="loginForm" class="login-form" autocomplete="off" spellcheck="false">
+                    <div class="form-group">
+                        <label for="agent_id">Agent ID</label>
+                        <div class="input-container">
+                            <input type="text" 
+                                   id="agent_id" 
+                                   name="agent_id" 
+                                   placeholder="Enter your Agent ID"
+                                   autocomplete="off" 
+                                   autocapitalize="off" 
+                                   autocorrect="off" 
+                                   spellcheck="false" 
+                                   required>
+                            <div class="input-icon">👤</div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <div class="input-container">
+                            <input type="password" 
+                                   id="password" 
+                                   name="password" 
+                                   placeholder="Enter your password"
+                                   autocomplete="new-password" 
+                                   autocapitalize="off" 
+                                   autocorrect="off" 
+                                   spellcheck="false" 
+                                   required>
+                            <div class="input-icon">🔒</div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="login-btn" id="loginBtn">
+                        Sign In to Dashboard
+                    </button>
+                </form>
+                
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e1e8ed; color: #7f8c8d; font-size: 12px;">
+                    🔒 Secure login • Contact admin for credentials
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Section (same as before) -->
+        <div id="taskSection" class="task-section hidden">
+            <div class="progress-info">
+                <div>
+                    <strong>Welcome, <span id="agentName"></span>!</strong>
+                    <span id="progressInfo"></span>
+                </div>
+                <button type="button" class="btn btn-secondary" onclick="logout()">Logout</button>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div class="loading-spinner" id="loadingSpinner">
+                <div class="spinner"></div>
+                <p>Loading next task...</p>
+            </div>
+
+            <!-- FORM SECTION - TOP -->
+            <div class="form-section">
+                <form id="taskForm" autocomplete="off" spellcheck="false">
+                    <div class="form-grid">
+                        <!-- Row 1 -->
+                        <div class="form-group-task">
+                            <label>DR Number:</label>
+                            <input type="text" name="DR_NO" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" 
+                                   placeholder="Enter DR Number" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Date Reported (MM/DD/YYYY HH:MM AM/PM):</label>
+                            <input type="text" name="Date_Rptd" class="datetime-input"
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" 
+                                   >
+                        </div>
+                        <div class="form-group-task">
+                            <label>Date Occurred (MM/DD/YYYY HH:MM AM/PM):</label>
+                            <input type="text" name="DATE_OCC" class="datetime-input"
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" 
+                                   >
+                        </div>
+                        <div class="form-group-task">
+                            <label>Time Occurred (HH:MM AM/PM):</label>
+                            <input type="text" name="TIME_OCC" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" 
+                                   >
+                        </div>
+                        <div class="form-group-task">
+                            <label>Unique ID:</label>
+                            <input type="text" name="Unique_Identifier" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Area Name:</label>
+                            <input type="text" name="AREA_NAME" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        
+                        <!-- Row 2 -->
+                        <div class="form-group-task">
+                            <label>Report Dist No:</label>
+                            <input type="text" name="Rpt_Dist_No" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>VIN (1-10):</label>
+                            <input type="text" name="VIN" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Crime:</label>
+                            <input type="text" name="Crm" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Crime Code Desc:</label>
+                            <input type="text" name="Crm_Cd_Desc" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>MO Codes:</label>
+                            <input type="text" name="Mocodes" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Victim Age:</label>
+                            <input type="number" name="Vict_Age" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        
+                        <!-- Row 3 -->
+                        <div class="form-group-task">
+                            <label>Geolocation:</label>
+                            <input type="text" name="Geolocation" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Department:</label>
+                            <input type="text" name="DEPARTMENT" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Premise Code:</label>
+                            <input type="text" name="Premis_Cd" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Premise Desc:</label>
+                            <input type="text" name="Premis_Desc" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Arrest Key:</label>
+                            <input type="text" name="ARREST_KEY" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>PD Description:</label>
+                            <input type="text" name="PD_DESC" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        
+                        <!-- Row 4 -->
+                        <div class="form-group-task">
+                            <label>CCD LON Code:</label>
+                            <input type="text" name="CCD_LONCOD" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Status Desc:</label>
+                            <input type="text" name="Status_Desc" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Law Code:</label>
+                            <input type="text" name="LAW_CODE" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Sub Agency:</label>
+                            <input type="text" name="SubAgency" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Charge:</label>
+                            <input type="text" name="Charge" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Race:</label>
+                            <input type="text" name="Race" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        
+                        <!-- Row 5 -->
+                        <div class="form-group-task">
+                            <label>Location:</label>
+                            <input type="text" name="LOCATION" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Sequence ID:</label>
+                            <input type="text" name="SeqID" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Latitude:</label>
+                            <input type="text" name="LAT" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Longitude:</label>
+                            <input type="text" name="LON" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Point:</label>
+                            <input type="text" name="Point" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                        <div class="form-group-task">
+                            <label>Shape Area:</label>
+                            <input type="text" name="Shape__Area" 
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                        </div>
+                    </div>
+                </form>
+                
+                <!-- Submit Controls -->
+                <div class="form-controls">
+                    <button type="button" class="btn btn-secondary" onclick="clearForm()">Clear Form</button>
+                    <button type="button" class="btn btn-primary" id="submitBtn" onclick="submitAndNext()">Submit & Next</button>
+                </div>
+            </div>
+
+            <!-- IMAGE SECTION - BOTTOM -->
+            <div class="image-section">
+                <div class="image-container">
+                    <img id="taskImage" src="" alt="Task Image">
+                </div>
+                <div class="image-info">
+                    Image: <span id="imageName"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Completed Section -->
+        <div id="completedSection" class="completed-section hidden">
+            <h2>🎉 All Tasks Completed!</h2>
+            <p>Thank you for completing all assigned tasks.</p>
+            <p><strong>Total completed: <span id="totalCompleted"></span></strong></p>
+            <button type="button" class="btn btn-primary" onclick="checkForNewTasks()">Check for New Tasks</button>
+            <button type="button" class="btn btn-secondary" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        let currentAgentId = null;
+        let currentTaskIndex = 0;
+        let totalTasks = 0;
+
+        // Global configuration object for international deployment
+        const CONFIG = {
+            API_BASE_URL: window.location.origin,
+            LANGUAGE: 'en',
+            DATE_FORMAT: 'DD/MM/YYYY',
+            TIME_FORMAT: '24h',
+            PATTERNS: {
+                DATE_TIME: /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} (AM|PM)$/,
+                TIME: /^\d{2}:\d{2} (AM|PM)$/
+            },
+            MESSAGES: {
+                LOGIN_SUCCESS: 'Login successful',
+                LOGIN_FAILED: 'Invalid credentials. Please check your Agent ID and password.',
+                TASK_SUBMITTED: 'Task submitted successfully!',
+                LOADING_TASK: 'Loading next task...',
+                NETWORK_ERROR: 'Network error occurred. Please check your connection.',
+                ALL_COMPLETED: 'All Tasks Completed!',
+                LOGOUT_SUCCESS: 'Logged out successfully'
+            }
+        };
+
+        function getApiUrl(endpoint) {
+            return `${CONFIG.API_BASE_URL}${endpoint}`;
+        }
+
+        // NO AUTO-FORMATTING - Completely manual entry
+        document.addEventListener('DOMContentLoaded', function() {
+            // Disable autocomplete on all forms and inputs
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                form.setAttribute('autocomplete', 'off');
+                form.setAttribute('spellcheck', 'false');
+            });
+            
+            const inputs = document.querySelectorAll('input');
+            inputs.forEach(input => {
+                input.setAttribute('autocomplete', 'off');
+                input.setAttribute('autocapitalize', 'off');
+                input.setAttribute('autocorrect', 'off');
+                input.setAttribute('spellcheck', 'false');
+                
+                // Disable right-click context menu
+                input.addEventListener('contextmenu', function(e) {
+                    e.preventDefault();
+                });
+                
+                // Disable suggestion popups
+                input.addEventListener('focus', function() {
+                    this.setAttribute('autocomplete', 'off');
+                });
+            });
+            
+            // ONLY validation for datetime inputs - NO AUTO-FORMATTING
+            const dateTimeInputs = document.querySelectorAll('input[name="Date_Rptd"], input[name="DATE_OCC"]');
+            dateTimeInputs.forEach(input => {
+                input.addEventListener('blur', function(e) {
+                    const pattern = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} (AM|PM)$/;
+                    if (e.target.value && !pattern.test(e.target.value)) {
+                        e.target.style.borderColor = '#dc3545';
+                        e.target.title = 'Format: MM/DD/YYYY HH:MM AM/PM (e.g., 11/04/2021 12:30 PM)';
+                    } else {
+                        e.target.style.borderColor = '#667eea';
+                        e.target.title = '';
+                    }
+                });
+            });
+            
+            // Time field validation - AM/PM FORMAT
+            const timeInput = document.querySelector('input[name="TIME_OCC"]');
+            if (timeInput) {
+                timeInput.addEventListener('blur', function(e) {
+                    const pattern = /^\d{2}:\d{2} (AM|PM)$/;
+                    if (e.target.value && !pattern.test(e.target.value)) {
+                        e.target.style.borderColor = '#dc3545';
+                        e.target.title = 'Format: HH:MM AM/PM (e.g., 02:30 PM)';
+                    } else {
+                        e.target.style.borderColor = '#e1e8ed';
+                        e.target.title = '';
+                    }
+                });
+            }
+        });
+
+        // Login form handler - FIXED
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const loginBtn = document.getElementById('loginBtn');
+            const originalText = loginBtn.textContent;
+            loginBtn.textContent = 'Signing In...';
+            loginBtn.disabled = true;
+            
+            const formData = new FormData(this);
+            
+            try {
+                console.log('🔑 Attempting login...'); // Debug log
+                
+                const response = await fetch(getApiUrl('/api/agents/login'), {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                console.log('📡 Response status:', response.status); // Debug log
+                
+                const result = await response.json();
+                console.log('📝 Response data:', result); // Debug log
+                
+                if (response.ok) {
+                    currentAgentId = result.agent_id;
+                    document.getElementById('agentName').textContent = result.name || currentAgentId;
+                    showAlert(CONFIG.MESSAGES.LOGIN_SUCCESS, 'success');
+                    
+                    // Wait a moment then show task section
+                    setTimeout(() => {
+                        showTaskSection();
+                        loadCurrentTask();
+                    }, 1000);
+                    
+                } else {
+                    showAlert(result.detail || CONFIG.MESSAGES.LOGIN_FAILED, 'error');
+                }
+            } catch (error) {
+                console.error('❌ Login error:', error); // Debug log
+                showAlert(CONFIG.MESSAGES.NETWORK_ERROR, 'error');
+            } finally {
+                loginBtn.textContent = originalText;
+                loginBtn.disabled = false;
+            }
+        });
+
+        // Enhanced Submit function - using global config
+        async function submitAndNext() {
+            if (!currentAgentId) {
+                showAlert('Please login first', 'error');
+                return;
+            }
+            
+            const form = document.getElementById('taskForm');
+            if (!form) {
+                showAlert('Form not found', 'error');
+                return;
+            }
+            
+            // Check if form has data
+            const inputs = form.querySelectorAll('input');
+            let hasData = false;
+            inputs.forEach(input => {
+                if (input.value.trim() !== '') {
+                    hasData = true;
+                }
+            });
+            
+            if (!hasData) {
+                showAlert('Please fill at least one field before submitting', 'error');
+                return;
+            }
+            
+            // Create FormData
+            const formData = new FormData(form);
+            formData.append('agent_id', currentAgentId);
+            
+            // Show loading state
+            const submitBtn = document.getElementById('submitBtn');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Submitting...';
+            submitBtn.disabled = true;
+            
+            try {
+                const response = await fetch(getApiUrl(`/api/agents/${currentAgentId}/submit`), {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && (data.success || data.message.includes('success'))) {
+                    showAlert(CONFIG.MESSAGES.TASK_SUBMITTED, 'success');
+                    
+                    // Clear form
+                    form.reset();
+                    
+                    // Show loading spinner
+                    showLoadingSpinner(true);
+                    
+                    // Load next task
+                    setTimeout(async () => {
+                        await loadCurrentTask();
+                        showLoadingSpinner(false);
+                    }, 800);
+                    
+                } else {
+                    showAlert('Submission failed: ' + (data.detail || data.message || 'Unknown error'), 'error');
+                }
+                
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            } finally {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        }
+
+        async function loadCurrentTask() {
+            if (!currentAgentId) return;
+            
+            try {
+                const response = await fetch(getApiUrl(`/api/agents/${currentAgentId}/current-task`));
+                const result = await response.json();
+                
+                if (result.completed || result.message === 'All tasks completed') {
+                    document.getElementById('totalCompleted').textContent = result.total_completed || 'All';
+                    showCompletedSection();
+                } else if (result.image_url) {
+                    const imageUrl = result.image_url.startsWith('http') ? result.image_url : `${CONFIG.API_BASE_URL}${result.image_url}`;
+                    document.getElementById('taskImage').src = imageUrl;
+                    
+                    document.getElementById('imageName').textContent = result.image_name || 'Unknown';
+                    
+                    currentTaskIndex = result.current_index || 0;
+                    totalTasks = result.total_images || 0;
+                    const progressText = result.progress || `${currentTaskIndex + 1}/${totalTasks}`;
+                    document.getElementById('progressInfo').textContent = `Progress: ${progressText}`;
+                } else {
+                    showAlert('No tasks available', 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to load task', 'error');
+            }
+        }
+
+        function showLoadingSpinner(show) {
+            document.getElementById('loadingSpinner').style.display = show ? 'block' : 'none';
+        }
+
+        function showTaskSection() {
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('taskSection').classList.remove('hidden');
+            document.getElementById('completedSection').classList.add('hidden');
+        }
+
+        function showCompletedSection() {
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('taskSection').classList.add('hidden');
+            document.getElementById('completedSection').classList.remove('hidden');
+        }
+
+        function showLoginSection() {
+            document.getElementById('loginSection').classList.remove('hidden');
+            document.getElementById('taskSection').classList.add('hidden');
+            document.getElementById('completedSection').classList.add('hidden');
+        }
+
+        function clearForm() {
+            if (confirm('Are you sure you want to clear all form data?')) {
+                document.getElementById('taskForm').reset();
+            }
+        }
+
+        function logout() {
+            if (currentAgentId) {
+                fetch(getApiUrl(`/api/agents/${currentAgentId}/logout`), {
+                    method: 'POST'
+                }).then(response => response.json())
+                .then(data => {
+                    showAlert(`${CONFIG.MESSAGES.LOGOUT_SUCCESS}. Session: ${data.session_duration || 'Unknown'}`, 'success');
+                }).catch(error => {
+                    showAlert('Logged out locally', 'info');
+                });
+            }
+            
+            currentAgentId = null;
+            currentTaskIndex = 0;
+            totalTasks = 0;
+            showLoginSection();
+        }
+
+        async function checkForNewTasks() {
+            showLoadingSpinner(true);
+            await loadCurrentTask();
+            showLoadingSpinner(false);
+            
+            if (currentAgentId) {
+                showTaskSection();
+            }
+        }
+
+        function showAlert(message, type) {
+            // Remove existing alerts
+            const existingAlerts = document.querySelectorAll('.alert');
+            existingAlerts.forEach(alert => alert.remove());
+            
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            
+            // Insert alert in appropriate section
+            if (!document.getElementById('loginSection').classList.contains('hidden')) {
+                // Login section is visible - insert after login card
+                const loginCard = document.querySelector('.login-card');
+                loginCard.parentNode.insertBefore(alert, loginCard.nextSibling);
+            } else {
+                // Task section is visible - insert at top
+                const container = document.querySelector('.container');
+                container.insertBefore(alert, container.firstChild);
+            }
+            
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.remove();
+                }
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

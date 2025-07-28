@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Crime Records System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px 40px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.5em;
+        }
+        .content {
+            padding: 40px;
+        }
+        .section {
+            background: #f8f9fa;
+            margin-bottom: 30px;
+            padding: 30px;
+            border-radius: 10px;
+            border-left: 5px solid #667eea;
+        }
+        .section h2 {
+            color: #2c3e50;
+            margin-top: 0;
+            font-size: 1.8em;
+        }
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            background: white;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #5a67d8;
+            background: #f7faff;
+        }
+        .upload-area.dragover {
+            border-color: #4c51bf;
+            background: #edf2f7;
+        }
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+        }
+        .btn-info {
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+            color: white;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .stat-label {
+            color: #718096;
+            font-size: 1.1em;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #48bb78, #38a169);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+        .alert-success {
+            background: #f0fff4;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+        .alert-error {
+            background: #fff5f5;
+            color: #742a2a;
+            border: 1px solid #feb2b2;
+        }
+        .alert-info {
+            background: #ebf8ff;
+            color: #2a4365;
+            border: 1px solid #90cdf4;
+        }
+        .table-container {
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        tr:hover {
+            background: #f7faff;
+        }
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 14px;
+        }
+        form {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+        .credentials-container {
+            background: linear-gradient(135deg, #e8f5e8 0%, #f0fff0 100%);
+            border: 2px solid #4caf50;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2);
+        }
+        .credential-box {
+            background: white;
+            border: 1px solid #c8e6c9;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .credential-value {
+            font-size: 1.3em;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            padding: 10px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        .copy-btn {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .copy-btn:hover {
+            background: #1976d2;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Admin Dashboard</h1>
+            <p>Crime Records Data Entry System</p>
+        </div>
+
+        <div class="content">
+            <!-- Statistics Section -->
+            <div class="section">
+                <h2>📊 System Statistics</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalAgents">0</div>
+                        <div class="stat-label">Total Agents</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalTasks">0</div>
+                        <div class="stat-label">Total Tasks</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="completedTasks">0</div>
+                        <div class="stat-label">Completed Tasks</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="pendingTasks">0</div>
+                        <div class="stat-label">Pending Tasks</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload ZIP Section -->
+            <div class="section">
+                <h2>📁 Upload Task Images</h2>
+                <p>Upload a ZIP file containing up to 5000 images to assign tasks to agents.</p>
+                
+                <div class="form-group">
+                    <label for="agentSelect">Assign to Agent:</label>
+                    <select id="agentSelect" required>
+                        <option value="">Select an agent...</option>
+                    </select>
+                </div>
+
+                <div class="upload-area" id="uploadArea">
+                    <div>
+                        <h3>📎 Drop ZIP file here or click to upload</h3>
+                        <p>Supported formats: .zip (containing .jpg, .jpeg, .png images)</p>
+                        <input type="file" id="zipFile" accept=".zip" style="display: none;">
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('zipFile').click()">
+                            Choose ZIP File
+                        </button>
+                    </div>
+                </div>
+
+                <div id="uploadProgress" class="hidden">
+                    <h4>Upload Progress</h4>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div id="uploadStatus">Preparing upload...</div>
+                </div>
+
+                <button type="button" class="btn btn-success" id="uploadBtn" onclick="uploadZipFile()" disabled>
+                    🚀 Upload & Assign Tasks
+                </button>
+            </div>
+
+            <!-- Export Data Section -->
+            <div class="section">
+                <h2>📊 Export Submitted Data</h2>
+                <p>Download all submitted form data as Excel spreadsheet.</p>
+                
+                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="exportAgent">Filter by Agent (Optional):</label>
+                        <select id="exportAgent">
+                            <option value="">All Agents</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="dateFrom">From Date (Optional):</label>
+                        <input type="date" id="dateFrom">
+                    </div>
+                    
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="dateTo">To Date (Optional):</label>
+                        <input type="date" id="dateTo">
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button type="button" class="btn btn-info" onclick="exportToExcel()">
+                        📥 Download Excel Report
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="previewData()">
+                        👁️ Preview Data
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="testDataAvailability()">
+                        🔍 Test Data Availability
+                    </button>
+                </div>
+            </div>
+
+            <!-- Agent Registration Section -->
+            <div class="section">
+                <h2>👤 Register New Agent</h2>
+                <p>Create a new agent account with auto-generated credentials.</p>
+                
+                <form id="agentRegistrationForm">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                        <div class="form-group">
+                            <label for="agentName">Full Name:</label>
+                            <input type="text" id="agentName" name="name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="agentEmail">Email:</label>
+                            <input type="email" id="agentEmail" name="email" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="agentMobile">Mobile Number:</label>
+                            <input type="tel" id="agentMobile" name="mobile" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="agentDob">Date of Birth:</label>
+                            <input type="date" id="agentDob" name="dob" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="agentCountry">Country:</label>
+                            <input type="text" id="agentCountry" name="country" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="agentGender">Gender:</label>
+                            <select id="agentGender" name="gender" required>
+                                <option value="">Select Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 20px; text-align: center;">
+                        <button type="submit" class="btn btn-primary">
+                            🔑 Register Agent & Generate Credentials
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Agent Credentials Display -->
+                <div id="newAgentCredentials" class="hidden" style="margin-top: 30px; padding: 20px; background: #e8f5e8; border-radius: 10px; border: 2px solid #4caf50;">
+                    <h3 style="color: #2e7d32; margin-top: 0;">✅ Agent Registered Successfully!</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0;">
+                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
+                            <strong>Agent ID:</strong><br>
+                            <span id="newAgentId" style="font-size: 1.2em; color: #1976d2; font-family: monospace;"></span>
+                            <button onclick="copyToClipboard('newAgentId')" class="btn btn-info" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">Copy</button>
+                        </div>
+                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
+                            <strong>Password:</strong><br>
+                            <span id="newAgentPassword" style="font-size: 1.2em; color: #d32f2f; font-family: monospace;"></span>
+                            <button onclick="copyToClipboard('newAgentPassword')" class="btn btn-info" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">Copy</button>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <strong>⚠️ Important:</strong> Please save these credentials securely. The password cannot be recovered and will need to be shared with the agent.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Session Report Section -->
+            <div class="section">
+                <h2>⏰ Agent Session Report</h2>
+                <p>Track agent login/logout times and working hours.</p>
+                
+                <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="sessionAgent">Filter by Agent (Optional):</label>
+                        <select id="sessionAgent">
+                            <option value="">All Agents</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="sessionDateFrom">From Date:</label>
+                        <input type="date" id="sessionDateFrom">
+                    </div>
+                    
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="sessionDateTo">To Date:</label>
+                        <input type="date" id="sessionDateTo">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <button type="button" class="btn btn-primary" onclick="loadSessionReport()">
+                        📊 Load Session Report
+                    </button>
+                    <button type="button" class="btn btn-info" onclick="exportSessionReport()">
+                        📥 Export Sessions to Excel
+                    </button>
+                </div>
+
+                <!-- Session Report Table -->
+                <div class="table-container" id="sessionReportContainer" style="display: none;">
+                    <h3>Session Activity Report</h3>
+                    <table id="sessionReportTable">
+                        <thead>
+                            <tr>
+                                <th>Agent ID</th>
+                                <th>Agent Name</th>
+                                <th>Login Time</th>
+                                <th>Logout Time</th>
+                                <th>Duration (Minutes)</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessionReportBody">
+                            <!-- Session data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Agents Management Section -->
+            <div class="section">
+                <h2>👥 Agent Management</h2>
+                
+                <div class="table-container">
+                    <table id="agentsTable">
+                        <thead>
+                            <tr>
+                                <th>Agent ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Password</th>
+                                <th>Status</th>
+                                <th>Login Status</th>
+                                <th>Tasks Completed</th>
+                                <th>Last Login</th>
+                                <th>Last Logout</th>
+                                <th>Session Duration</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="agentsTableBody">
+                            <!-- Agent data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <button type="button" class="btn btn-primary" onclick="refreshAgents()">
+                    🔄 Refresh Agents
+                </button>
+            </div>
+
+            <!-- Data Preview Section -->
+            <div class="section hidden" id="dataPreviewSection">
+                <h2>📋 Data Preview</h2>
+                <div class="table-container">
+                    <table id="dataPreviewTable">
+                        <thead id="previewTableHead">
+                            <!-- Headers will be dynamically generated -->
+                        </thead>
+                        <tbody id="previewTableBody">
+                            <!-- Data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedZipFile = null;
+        let agents = [];
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboardData();
+            setupDragAndDrop();
+            setupAgentRegistration();
+        });
+
+        // Setup agent registration form
+        function setupAgentRegistration() {
+            document.getElementById('agentRegistrationForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await registerNewAgent();
+            });
+        }
+
+        // Register new agent
+        async function registerNewAgent() {
+            const formData = new FormData(document.getElementById('agentRegistrationForm'));
+            
+            // Disable submit button
+            const submitBtn = document.querySelector('#agentRegistrationForm button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Registering...';
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch('http://localhost:8000/api/agents/register', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Show credentials
+                    document.getElementById('newAgentId').textContent = result.agent_id;
+                    document.getElementById('newAgentPassword').textContent = result.password;
+                    document.getElementById('newAgentCredentials').classList.remove('hidden');
+                    
+                    // Clear form
+                    document.getElementById('agentRegistrationForm').reset();
+                    
+                    // Refresh agents list
+                    await loadAgents();
+                    populateAgentSelects();
+                    
+                    showAlert(`Agent registered successfully! ID: ${result.agent_id}`, 'success');
+                    
+                    // Scroll to credentials
+                    document.getElementById('newAgentCredentials').scrollIntoView({ behavior: 'smooth' });
+                    
+                } else {
+                    showAlert(`Registration failed: ${result.detail}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Registration error:', error);
+                showAlert('Network error during registration', 'error');
+            } finally {
+                // Re-enable submit button
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        }
+
+        // Copy to clipboard function
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                // Show temporary success message
+                const originalText = element.nextElementSibling.textContent;
+                element.nextElementSibling.textContent = 'Copied!';
+                element.nextElementSibling.style.background = '#4caf50';
+                
+                setTimeout(() => {
+                    element.nextElementSibling.textContent = originalText;
+                    element.nextElementSibling.style.background = '';
+                }, 2000);
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                showAlert('Credentials copied to clipboard!', 'success');
+            });
+        }
+
+        // Load all dashboard data
+        async function loadDashboardData() {
+            await Promise.all([
+                loadStatistics(),
+                loadAgents(),
+                populateAgentSelects()
+            ]);
+        }
+
+        // Load system statistics
+        async function loadStatistics() {
+            try {
+                const response = await fetch('http://localhost:8000/api/admin/statistics');
+                const stats = await response.json();
+                
+                document.getElementById('totalAgents').textContent = stats.total_agents || 0;
+                document.getElementById('totalTasks').textContent = stats.total_tasks || 0;
+                document.getElementById('completedTasks').textContent = stats.completed_tasks || 0;
+                document.getElementById('pendingTasks').textContent = stats.pending_tasks || 0;
+                
+            } catch (error) {
+                console.error('Failed to load statistics:', error);
+                showAlert('Failed to load statistics', 'error');
+            }
+        }
+
+        // Load agents list
+        async function loadAgents() {
+            try {
+                const response = await fetch('http://localhost:8000/api/agents');
+                agents = await response.json();
+                
+                updateAgentsTable();
+                
+            } catch (error) {
+                console.error('Failed to load agents:', error);
+                showAlert('Failed to load agents', 'error');
+            }
+        }
+
+        // Update agents table with password and session info
+        function updateAgentsTable() {
+            const tbody = document.getElementById('agentsTableBody');
+            tbody.innerHTML = '';
+            
+            agents.forEach(agent => {
+                const row = document.createElement('tr');
+                
+                // Calculate current session duration if logged in
+                let sessionDuration = 'N/A';
+                if (agent.is_currently_logged_in && agent.last_login) {
+                    const loginTime = new Date(agent.last_login);
+                    const now = new Date();
+                    const durationMs = now - loginTime;
+                    const hours = Math.floor(durationMs / (1000 * 60 * 60));
+                    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+                    sessionDuration = `${hours}h ${minutes}m`;
+                }
+                
+                row.innerHTML = `
+                    <td>${agent.agent_id}</td>
+                    <td>${agent.name}</td>
+                    <td>${agent.email}</td>
+                    <td>
+                        <span id="password-${agent.agent_id}" style="font-family: monospace; background: #f0f0f0; padding: 4px; border-radius: 4px;">
+                            ••••••••
+                        </span>
+                        <button class="btn btn-sm" style="padding: 2px 6px; margin-left: 5px;" 
+                                onclick="showPassword('${agent.agent_id}')" title="Show Password">
+                            👁️
+                        </button>
+                        <button class="btn btn-sm" style="padding: 2px 6px; margin-left: 2px;" 
+                                onclick="resetPassword('${agent.agent_id}')" title="Reset Password">
+                            🔄
+                        </button>
+                    </td>
+                    <td><span class="badge ${agent.status === 'active' ? 'badge-success' : 'badge-danger'}">${agent.status}</span></td>
+                    <td>
+                        <span class="badge ${agent.is_currently_logged_in ? 'badge-success' : 'badge-secondary'}" 
+                              title="${agent.is_currently_logged_in ? 'Currently logged in' : 'Not logged in'}">
+                            ${agent.is_currently_logged_in ? '🟢 Online' : '🔴 Offline'}
+                        </span>
+                    </td>
+                    <td>${agent.tasks_completed || 0}</td>
+                    <td>${agent.last_login || 'Never'}</td>
+                    <td>${agent.last_logout || 'Never'}</td>
+                    <td>${sessionDuration}</td>
+                    <td>
+                        <button class="btn btn-sm ${agent.status === 'active' ? 'btn-danger' : 'btn-success'}" 
+                                onclick="toggleAgentStatus('${agent.agent_id}', '${agent.status}')">
+                            ${agent.status === 'active' ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button class="btn btn-sm btn-info" 
+                                onclick="viewSessionHistory('${agent.agent_id}')" title="View Session History">
+                            📊
+                        </button>
+                        ${agent.is_currently_logged_in ? 
+                            `<button class="btn btn-sm btn-danger" 
+                                     onclick="forceLogout('${agent.agent_id}')" title="Force Logout">
+                                ⏹️
+                            </button>` : ''
+                        }
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Show agent password
+        async function showPassword(agentId) {
+            try {
+                const response = await fetch(`http://localhost:8000/api/admin/agent-password/${agentId}`);
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(result.message, 'info');
+                } else {
+                    showAlert(`Error: ${result.detail}`, 'error');
+                }
+            } catch (error) {
+                showAlert('Error retrieving password information', 'error');
+            }
+        }
+
+        // Reset agent password
+        async function resetPassword(agentId) {
+            if (!confirm('Are you sure you want to reset this agent\'s password? This will generate a new password.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`http://localhost:8000/api/admin/reset-password/${agentId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // Show new password in a modal or alert
+                    const passwordDisplay = `
+                        New Password for ${agentId}: 
+                        ${result.new_password}
+                        
+                        Please save this password securely and share it with the agent.
+                    `;
+                    
+                    alert(passwordDisplay);
+                    showAlert(`Password reset successfully for agent ${agentId}`, 'success');
+                    
+                    // Update the password display
+                    const passwordSpan = document.getElementById(`password-${agentId}`);
+                    if (passwordSpan) {
+                        passwordSpan.textContent = result.new_password;
+                        passwordSpan.style.background = '#e8f5e8';
+                        setTimeout(() => {
+                            passwordSpan.textContent = '••••••••';
+                            passwordSpan.style.background = '#f0f0f0';
+                        }, 10000); // Hide after 10 seconds
+                    }
+                    
+                } else {
+                    showAlert(`Password reset failed: ${result.detail}`, 'error');
+                }
+            } catch (error) {
+                showAlert('Error resetting password', 'error');
+            }
+        }
+
+        // View session history
+        function viewSessionHistory(agentId) {
+            const agent = agents.find(a => a.agent_id === agentId);
+            if (!agent || !agent.recent_sessions) {
+                showAlert('No session history available', 'info');
+                return;
+            }
+            
+            let historyHtml = `<h3>Session History for ${agent.name} (${agentId})</h3>`;
+            historyHtml += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
+            historyHtml += '<tr style="background: #f0f0f0;"><th style="padding: 8px; border: 1px solid #ddd;">Login Time</th><th style="padding: 8px; border: 1px solid #ddd;">Logout Time</th><th style="padding: 8px; border: 1px solid #ddd;">Duration</th></tr>';
+            
+            agent.recent_sessions.forEach(session => {
+                const duration = session.logout_time ? 
+                    `${session.duration_minutes || 0} minutes` : 
+                    'Still active';
+                
+                historyHtml += `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${session.login_time || 'N/A'}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${session.logout_time || 'Still logged in'}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${duration}</td>
+                    </tr>
+                `;
+            });
+            
+            historyHtml += '</table>';
+            
+            // Create a modal-like display
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.5); z-index: 1000; display: flex; 
+                align-items: center; justify-content: center;
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: white; padding: 20px; border-radius: 10px; 
+                max-width: 80%; max-height: 80%; overflow: auto;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            `;
+            
+            modalContent.innerHTML = historyHtml + 
+                '<button onclick="this.closest(\'.modal\').remove()" style="margin-top: 15px; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>';
+            
+            modal.className = 'modal';
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+        }
+
+        // Force logout agent
+        async function forceLogout(agentId) {
+            if (!confirm('Force logout this agent? This will end their current session.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`http://localhost:8000/api/admin/force-logout/${agentId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`Agent ${agentId} has been logged out`, 'success');
+                    await loadAgents(); // Refresh the table
+                } else {
+                    showAlert(`Force logout failed: ${result.detail}`, 'error');
+                }
+            } catch (error) {
+                showAlert('Error during force logout', 'error');
+            }
+        }
+
+        // Populate agent select dropdowns
+        function populateAgentSelects() {
+            const agentSelect = document.getElementById('agentSelect');
+            const exportAgentSelect = document.getElementById('exportAgent');
+            
+            // Clear existing options (keep first default option)
+            agentSelect.innerHTML = '<option value="">Select an agent...</option>';
+            exportAgentSelect.innerHTML = '<option value="">All Agents</option>';
+            
+            agents.forEach(agent => {
+                if (agent.status === 'active') {
+                    const option1 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
+                    const option2 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
+                    agentSelect.appendChild(option1);
+                    exportAgentSelect.appendChild(option2);
+                }
+            });
+            
+            // Also populate session agent select
+            populateSessionAgentSelect();
+        }
+
+        // Copy to clipboard function
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                // Show temporary success message
+                const originalText = element.nextElementSibling.textContent;
+                element.nextElementSibling.textContent = 'Copied!';
+                element.nextElementSibling.style.background = '#4caf50';
+                
+                setTimeout(() => {
+                    element.nextElementSibling.textContent = originalText;
+                    element.nextElementSibling.style.background = '';
+                }, 2000);
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                showAlert('Credentials copied to clipboard!', 'success');
+            });
+        }
+
+        // Setup drag and drop functionality
+        function setupDragAndDrop() {
+            const uploadArea = document.getElementById('uploadArea');
+            const zipFileInput = document.getElementById('zipFile');
+
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].name.endsWith('.zip')) {
+                    handleZipFileSelection(files[0]);
+                } else {
+                    showAlert('Please drop a valid ZIP file', 'error');
+                }
+            });
+
+            zipFileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleZipFileSelection(e.target.files[0]);
+                }
+            });
+        }
+
+        // Handle ZIP file selection
+        function handleZipFileSelection(file) {
+            selectedZipFile = file;
+            
+            document.querySelector('#uploadArea h3').textContent = `📎 Selected: ${file.name}`;
+            document.querySelector('#uploadArea p').textContent = `Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            
+            // Enable upload button if agent is selected
+            updateUploadButtonState();
+            
+            showAlert(`ZIP file "${file.name}" selected successfully!`, 'success');
+        }
+
+        // Update upload button state
+        function updateUploadButtonState() {
+            const uploadBtn = document.getElementById('uploadBtn');
+            const agentSelected = document.getElementById('agentSelect').value !== '';
+            
+            uploadBtn.disabled = !(selectedZipFile && agentSelected);
+        }
+
+        // Agent selection change handler
+        document.getElementById('agentSelect').addEventListener('change', updateUploadButtonState);
+
+        // Upload ZIP file
+        async function uploadZipFile() {
+            if (!selectedZipFile || !document.getElementById('agentSelect').value) {
+                showAlert('Please select both a ZIP file and an agent', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('zip_file', selectedZipFile);
+            formData.append('agent_id', document.getElementById('agentSelect').value);
+
+            // Show progress
+            document.getElementById('uploadProgress').classList.remove('hidden');
+            document.getElementById('uploadBtn').disabled = true;
+
+            try {
+                const response = await fetch('http://localhost:8000/api/admin/upload-tasks', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert(`Successfully uploaded ${result.images_processed} images and assigned tasks!`, 'success');
+                    
+                    // Reset form
+                    selectedZipFile = null;
+                    document.getElementById('agentSelect').value = '';
+                    document.getElementById('zipFile').value = '';
+                    document.querySelector('#uploadArea h3').textContent = '📎 Drop ZIP file here or click to upload';
+                    document.querySelector('#uploadArea p').textContent = 'Supported formats: .zip (containing .jpg, .jpeg, .png images)';
+                    
+                    // Refresh statistics
+                    loadStatistics();
+                    
+                } else {
+                    showAlert(`Upload failed: ${result.detail || 'Unknown error'}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Upload error:', error);
+                showAlert('Network error during upload', 'error');
+            } finally {
+                document.getElementById('uploadProgress').classList.add('hidden');
+                document.getElementById('uploadBtn').disabled = false;
+                updateUploadButtonState();
+            }
+        }
+
+        // Export data to Excel
+        async function exportToExcel() {
+            const filters = {
+                agent_id: document.getElementById('exportAgent').value,
+                date_from: document.getElementById('dateFrom').value,
+                date_to: document.getElementById('dateTo').value
+            };
+
+            // Build query string
+            const queryParams = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) queryParams.append(key, value);
+            });
+
+            try {
+                const response = await fetch(`http://localhost:8000/api/admin/export-excel?${queryParams}`, {
+                    method: 'GET'
+                });
+
+                if (response.ok) {
+                    // Create download link
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `crime_records_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    showAlert('Excel file downloaded successfully!', 'success');
+                } else {
+                    const error = await response.json();
+                    showAlert(`Export failed: ${error.detail}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Export error:', error);
+                showAlert('Network error during export', 'error');
+            }
+        }
+
+        // Preview data
+        async function previewData() {
+            const filters = {
+                agent_id: document.getElementById('exportAgent').value,
+                date_from: document.getElementById('dateFrom').value,
+                date_to: document.getElementById('dateTo').value
+            };
+
+            const queryParams = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) queryParams.append(key, value);
+            });
+
+            try {
+                const response = await fetch(`http://localhost:8000/api/admin/preview-data?${queryParams}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayDataPreview(data);
+                    document.getElementById('dataPreviewSection').classList.remove('hidden');
+                } else {
+                    showAlert(`Preview failed: ${data.detail}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Preview error:', error);
+                showAlert('Network error during preview', 'error');
+            }
+        }
+
+        // Display data preview
+        function displayDataPreview(data) {
+            const thead = document.getElementById('previewTableHead');
+            const tbody = document.getElementById('previewTableBody');
+
+            // Clear existing content
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="100%">No data found with current filters</td></tr>';
+                return;
+            }
+
+            // Create headers
+            const headers = Object.keys(data[0]);
+            const headerRow = document.createElement('tr');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header.replace(/_/g, ' ').toUpperCase();
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+
+            // Create data rows (limit to first 50 rows for performance)
+            data.slice(0, 50).forEach(row => {
+                const tr = document.createElement('tr');
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    td.textContent = row[header] || '';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+
+            if (data.length > 50) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="${headers.length}" style="text-align: center; font-style: italic; color: #666;">Showing first 50 of ${data.length} records. Download Excel for complete data.</td>`;
+                tbody.appendChild(tr);
+            }
+        }
+
+        // Toggle agent status
+        async function toggleAgentStatus(agentId, currentStatus) {
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+            
+            try {
+                const response = await fetch(`http://localhost:8000/api/agents/${agentId}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                if (response.ok) {
+                    showAlert(`Agent status updated to ${newStatus}`, 'success');
+                    loadAgents(); // Refresh the table
+                } else {
+                    const error = await response.json();
+                    showAlert(`Failed to update status: ${error.detail}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('Status update error:', error);
+                showAlert('Network error during status update', 'error');
+            }
+        }
+
+        // Refresh agents
+        function refreshAgents() {
+            loadDashboardData();
+            showAlert('Data refreshed successfully!', 'success');
+        }
+
+        // Show alert messages
+        function showAlert(message, type) {
+            // Remove existing alerts
+            const existingAlerts = document.querySelectorAll('.alert');
+            existingAlerts.forEach(alert => alert.remove());
+
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+
+            // Insert after header
+            const content = document.querySelector('.content');
+            content.insertBefore(alert, content.firstChild);
+
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.remove();
+                }
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
