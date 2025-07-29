@@ -9,9 +9,7 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-    </script>
-</body>
-</html>
+        }
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -841,8 +839,31 @@
         let agents = [];
         let currentApiUrl = 'https://web-production-b3ef2.up.railway.app';
 
+        // Helper function for API calls with error handling
+        async function fetchWithErrorHandling(url, options = {}) {
+            try {
+                console.log(`Fetching ${url} with options:`, options); // Debug
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || response.statusText || 'Unknown error');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error(`Error fetching ${url}:`, error);
+                showAlert(`Error: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        // Get API URL with endpoint
+        function getApiUrl(endpoint) {
+            return `${currentApiUrl}${endpoint}`;
+        }
+
         // Initialize Application
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing app...'); // Debug
             initializeApp();
             setupNavigation();
             setupDragAndDrop();
@@ -852,13 +873,12 @@
 
         // Initialize the application
         function initializeApp() {
-            // Load saved configuration
+            console.log('Initializing app with API URL:', currentApiUrl); // Debug
             const savedUrl = localStorage.getItem('apiBaseUrl');
             if (savedUrl) {
                 currentApiUrl = savedUrl;
                 document.getElementById('apiBaseUrl').value = savedUrl;
             }
-
             loadDashboardData();
         }
 
@@ -866,26 +886,23 @@
         function setupNavigation() {
             const navLinks = document.querySelectorAll('.nav-link');
             const pages = document.querySelectorAll('.page');
+            console.log('Setting up navigation, found links:', navLinks.length); // Debug
 
             navLinks.forEach(link => {
                 link.addEventListener('click', (e) => {
                     e.preventDefault();
-                    
-                    // Remove active class from all links and pages
+                    console.log('Nav link clicked:', link.getAttribute('data-page')); // Debug
                     navLinks.forEach(nl => nl.classList.remove('active'));
                     pages.forEach(page => page.classList.remove('active'));
-                    
-                    // Add active class to clicked link
                     link.classList.add('active');
-                    
-                    // Show corresponding page
                     const pageId = link.getAttribute('data-page');
                     const targetPage = document.getElementById(pageId);
                     if (targetPage) {
                         targetPage.classList.add('active');
-                        
-                        // Load page-specific data
                         loadPageData(pageId);
+                    } else {
+                        console.error('Page not found:', pageId);
+                        showAlert(`Page "${pageId}" not found`, 'error');
                     }
                 });
             });
@@ -893,6 +910,7 @@
 
         // Load page-specific data
         function loadPageData(pageId) {
+            console.log('Loading data for page:', pageId); // Debug
             switch(pageId) {
                 case 'dashboard':
                     loadStatistics();
@@ -908,6 +926,9 @@
                 case 'config':
                     checkSystemHealth();
                     break;
+                default:
+                    console.error('Unknown page:', pageId);
+                    showAlert('Unknown page selected', 'error');
             }
         }
 
@@ -915,16 +936,14 @@
         function detectEnvironment() {
             const hostname = window.location.hostname;
             let environment = 'Local Development';
-            
             if (hostname.includes('railway.app') || hostname.includes('web-production-b3ef2.up.railway.app')) {
                 environment = 'Railway Production';
-                // Auto-update API URL for Railway
                 currentApiUrl = 'https://web-production-b3ef2.up.railway.app';
                 document.getElementById('apiBaseUrl').value = currentApiUrl;
             } else if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
                 environment = 'Production';
             }
-            
+            console.log('Detected environment:', environment); // Debug
             document.getElementById('currentEnvironment').textContent = environment;
         }
 
@@ -935,49 +954,36 @@
                 showAlert('Please enter a valid API URL', 'error');
                 return;
             }
-            
-            currentApiUrl = newUrl.replace(/\/$/, ''); // Remove trailing slash
+            currentApiUrl = newUrl.replace(/\/$/, '');
             localStorage.setItem('apiBaseUrl', currentApiUrl);
-            
+            console.log('Configuration updated, new API URL:', currentApiUrl); // Debug
             showAlert('Configuration updated successfully!', 'success');
         }
 
         async function testConnection() {
+            showAlert('Testing connection to API...', 'info');
             try {
-                showAlert('Testing connection to API...', 'info');
-                const response = await fetch(`${currentApiUrl}/api/admin/statistics`);
-                
-                if (response.ok) {
-                    showAlert('✅ Connection successful! API is reachable.', 'success');
-                } else {
-                    showAlert(`❌ Connection failed. Status: ${response.status}`, 'error');
-                }
+                await fetchWithErrorHandling(getApiUrl('/api/admin/statistics'));
+                showAlert('✅ Connection successful! API is reachable.', 'success');
             } catch (error) {
-                showAlert(`❌ Connection failed: ${error.message}`, 'error');
+                // Error handled by fetchWithErrorHandling
             }
         }
 
         async function checkSystemHealth() {
             const statusDiv = document.getElementById('systemStatus');
             statusDiv.innerHTML = '<p>Checking system health...</p>';
-            
             try {
-                const response = await fetch(`${currentApiUrl}/api/admin/statistics`);
-                const stats = await response.json();
-                
-                if (response.ok) {
-                    statusDiv.innerHTML = `
-                        <div style="color: #28a745;">
-                            <h4>✅ System Healthy</h4>
-                            <p><strong>API Status:</strong> Online</p>
-                            <p><strong>Total Agents:</strong> ${stats.total_agents || 0}</p>
-                            <p><strong>Total Tasks:</strong> ${stats.total_tasks || 0}</p>
-                            <p><strong>Last Updated:</strong> ${new Date().toLocaleString()}</p>
-                        </div>
-                    `;
-                } else {
-                    throw new Error(`API returned status ${response.status}`);
-                }
+                const stats = await fetchWithErrorHandling(getApiUrl('/api/admin/statistics'));
+                statusDiv.innerHTML = `
+                    <div style="color: #28a745;">
+                        <h4>✅ System Healthy</h4>
+                        <p><strong>API Status:</strong> Online</p>
+                        <p><strong>Total Agents:</strong> ${stats.total_agents || 0}</p>
+                        <p><strong>Total Tasks:</strong> ${stats.total_tasks || 0}</p>
+                        <p><strong>Last Updated:</strong> ${new Date().toLocaleString()}</p>
+                    </div>
+                `;
             } catch (error) {
                 statusDiv.innerHTML = `
                     <div style="color: #dc3545;">
@@ -990,18 +996,18 @@
             }
         }
 
-        // API Helper function
-        function getApiUrl(endpoint) {
-            return `${currentApiUrl}${endpoint}`;
-        }
-
         // Load all dashboard data
         async function loadDashboardData() {
-            await Promise.all([
-                loadStatistics(),
-                loadAgents(),
-                populateAgentSelects()
-            ]);
+            console.log('Loading dashboard data...'); // Debug
+            try {
+                await Promise.all([
+                    loadStatistics(),
+                    loadAgents(),
+                    populateAgentSelects()
+                ]);
+            } catch (error) {
+                console.error('Failed to load dashboard data:', error);
+            }
         }
 
         function refreshDashboard() {
@@ -1013,44 +1019,49 @@
         // Load system statistics
         async function loadStatistics() {
             try {
-                const response = await fetch(getApiUrl('/api/admin/statistics'));
-                const stats = await response.json();
-                
+                document.getElementById('totalAgents').textContent = 'Loading...';
+                document.getElementById('totalTasks').textContent = 'Loading...';
+                document.getElementById('completedTasks').textContent = 'Loading...';
+                document.getElementById('pendingTasks').textContent = 'Loading...';
+                const stats = await fetchWithErrorHandling(getApiUrl('/api/admin/statistics'));
                 document.getElementById('totalAgents').textContent = stats.total_agents || 0;
                 document.getElementById('totalTasks').textContent = stats.total_tasks || 0;
                 document.getElementById('completedTasks').textContent = stats.completed_tasks || 0;
                 document.getElementById('pendingTasks').textContent = stats.pending_tasks || 0;
                 document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
-                
             } catch (error) {
-                console.error('Failed to load statistics:', error);
-                showAlert('Failed to load statistics. Check your configuration.', 'error');
+                document.getElementById('totalAgents').textContent = 'Error';
+                document.getElementById('totalTasks').textContent = 'Error';
+                document.getElementById('completedTasks').textContent = 'Error';
+                document.getElementById('pendingTasks').textContent = 'Error';
             }
         }
 
         // Load agents list
         async function loadAgents() {
             try {
-                const response = await fetch(getApiUrl('/api/agents'));
-                agents = await response.json();
+                agents = await fetchWithErrorHandling(getApiUrl('/api/agents'));
+                console.log('Loaded agents:', agents); // Debug
                 updateAgentsTable();
             } catch (error) {
-                console.error('Failed to load agents:', error);
-                showAlert('Failed to load agents', 'error');
+                document.getElementById('agentsTableBody').innerHTML = '<tr><td colspan="9">Failed to load agents</td></tr>';
             }
         }
 
         // Update agents table
         function updateAgentsTable() {
             const tbody = document.getElementById('agentsTableBody');
+            if (!tbody) {
+                console.error('Agents table body not found');
+                return;
+            }
             tbody.innerHTML = '';
-            
             agents.forEach(agent => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${agent.agent_id}</td>
-                    <td>${agent.name}</td>
-                    <td>${agent.email}</td>
+                    <td>${agent.agent_id || 'N/A'}</td>
+                    <td>${agent.name || 'N/A'}</td>
+                    <td>${agent.email || 'N/A'}</td>
                     <td>
                         <span id="password-${agent.agent_id}" style="font-family: monospace; background: #f0f0f0; padding: 4px; border-radius: 4px;">
                             ••••••••
@@ -1060,7 +1071,7 @@
                         <button class="btn btn-sm btn-primary" style="padding: 2px 6px;" 
                                 onclick="resetPassword('${agent.agent_id}')" title="Reset Password">🔄</button>
                     </td>
-                    <td><span class="badge ${agent.status === 'active' ? 'badge-success' : 'badge-danger'}">${agent.status}</span></td>
+                    <td><span class="badge ${agent.status === 'active' ? 'badge-success' : 'badge-danger'}">${agent.status || 'Unknown'}</span></td>
                     <td>
                         <span class="badge ${agent.is_currently_logged_in ? 'badge-success' : 'badge-secondary'}">
                             ${agent.is_currently_logged_in ? '🟢 Online' : '🔴 Offline'}
@@ -1085,16 +1096,15 @@
         // Populate agent select dropdowns
         function populateAgentSelects() {
             const selects = ['agentSelect', 'exportAgent', 'sessionAgent'];
-            
             selects.forEach(selectId => {
                 const select = document.getElementById(selectId);
-                if (!select) return;
-                
-                // Clear existing options (keep first default option)
+                if (!select) {
+                    console.warn(`Select element ${selectId} not found`); // Debug
+                    return;
+                }
                 const firstOption = select.firstElementChild;
                 select.innerHTML = '';
                 select.appendChild(firstOption);
-                
                 agents.forEach(agent => {
                     if (agent.status === 'active') {
                         const option = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
@@ -1106,46 +1116,45 @@
 
         // Setup agent registration form
         function setupAgentRegistration() {
-            document.getElementById('agentRegistrationForm').addEventListener('submit', async function(e) {
+            const form = document.getElementById('agentRegistrationForm');
+            if (!form) {
+                console.error('Agent registration form not found');
+                return;
+            }
+            form.addEventListener('submit', async function(e) {
                 e.preventDefault();
+                if (!form.checkValidity()) {
+                    showAlert('Please fill all required fields correctly', 'error');
+                    return;
+                }
                 await registerNewAgent();
             });
         }
 
         // Register new agent
         async function registerNewAgent() {
-            const formData = new FormData(document.getElementById('agentRegistrationForm'));
-            const submitBtn = document.querySelector('#agentRegistrationForm button[type="submit"]');
+            const form = document.getElementById('agentRegistrationForm');
+            const submitBtn = form.querySelector('button[type="submit"]');
             const originalText = submitBtn.textContent;
-            
             submitBtn.textContent = 'Registering...';
             submitBtn.disabled = true;
 
             try {
-                const response = await fetch(getApiUrl('/api/agents/register'), {
+                const formData = new FormData(form);
+                console.log('Registering agent with data:', Object.fromEntries(formData)); // Debug
+                const result = await fetchWithErrorHandling(getApiUrl('/api/agents/register'), {
                     method: 'POST',
                     body: formData
                 });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    document.getElementById('newAgentId').textContent = result.agent_id;
-                    document.getElementById('newAgentPassword').textContent = result.password;
-                    document.getElementById('newAgentCredentials').classList.remove('hidden');
-                    document.getElementById('agentRegistrationForm').reset();
-                    
-                    await loadAgents();
-                    populateAgentSelects();
-                    showAlert(`Agent registered successfully! ID: ${result.agent_id}`, 'success');
-                    
-                } else {
-                    showAlert(`Registration failed: ${result.detail}`, 'error');
-                }
-
+                document.getElementById('newAgentId').textContent = result.agent_id;
+                document.getElementById('newAgentPassword').textContent = result.password;
+                document.getElementById('newAgentCredentials').classList.remove('hidden');
+                form.reset();
+                await loadAgents();
+                populateAgentSelects();
+                showAlert(`Agent registered successfully! ID: ${result.agent_id}`, 'success');
             } catch (error) {
-                console.error('Registration error:', error);
-                showAlert('Network error during registration', 'error');
+                // Error handled by fetchWithErrorHandling
             } finally {
                 submitBtn.textContent = originalText;
                 submitBtn.disabled = false;
@@ -1156,6 +1165,10 @@
         function setupDragAndDrop() {
             const uploadArea = document.getElementById('uploadArea');
             const zipFileInput = document.getElementById('zipFile');
+            if (!uploadArea || !zipFileInput) {
+                console.error('Upload area or zip file input not found');
+                return;
+            }
 
             uploadArea.addEventListener('dragover', (e) => {
                 e.preventDefault();
@@ -1169,7 +1182,6 @@
             uploadArea.addEventListener('drop', (e) => {
                 e.preventDefault();
                 uploadArea.classList.remove('dragover');
-                
                 const files = e.dataTransfer.files;
                 if (files.length > 0 && files[0].name.endsWith('.zip')) {
                     handleZipFileSelection(files[0]);
@@ -1184,13 +1196,13 @@
                 }
             });
 
-            // Update upload button state when agent is selected
             document.getElementById('agentSelect').addEventListener('change', updateUploadButtonState);
         }
 
         // Handle ZIP file selection
         function handleZipFileSelection(file) {
             selectedZipFile = file;
+            console.log('Selected file:', file.name, file.size); // Debug
             document.querySelector('#uploadArea h3').textContent = `📎 Selected: ${file.name}`;
             document.querySelector('#uploadArea p').textContent = `Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
             updateUploadButtonState();
@@ -1202,6 +1214,7 @@
             const uploadBtn = document.getElementById('uploadBtn');
             const agentSelected = document.getElementById('agentSelect').value !== '';
             uploadBtn.disabled = !(selectedZipFile && agentSelected);
+            console.log('Upload button state:', { file: !!selectedZipFile, agent: agentSelected }); // Debug
         }
 
         // Upload ZIP file
@@ -1214,39 +1227,27 @@
             const formData = new FormData();
             formData.append('zip_file', selectedZipFile);
             formData.append('agent_id', document.getElementById('agentSelect').value);
+            console.log('Uploading file:', selectedZipFile.name, 'for agent:', document.getElementById('agentSelect').value); // Debug
 
             document.getElementById('uploadProgress').classList.remove('hidden');
             document.getElementById('uploadBtn').disabled = true;
 
             try {
-                const response = await fetch(getApiUrl('/api/admin/upload-tasks'), {
+                const result = await fetchWithErrorHandling(getApiUrl('/api/admin/upload-tasks'), {
                     method: 'POST',
                     body: formData
                 });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    showAlert(`Successfully uploaded ${result.images_processed} images and assigned tasks!`, 'success');
-                    
-                    // Reset form
-                    selectedZipFile = null;
-                    document.getElementById('agentSelect').value = '';
-                    document.getElementById('zipFile').value = '';
-                    document.querySelector('#uploadArea h3').textContent = '📎 Drop ZIP file here or click to upload';
-                    document.querySelector('#uploadArea p').textContent = 'Supported formats: .zip (containing .jpg, .jpeg, .png images)';
-                    
-                    loadStatistics();
-                } else {
-                    showAlert(`Upload failed: ${result.detail || 'Unknown error'}`, 'error');
-                }
-
+                showAlert(`Successfully uploaded ${result.images_processed} images and assigned tasks!`, 'success');
+                selectedZipFile = null;
+                document.getElementById('agentSelect').value = '';
+                document.getElementById('zipFile').value = '';
+                document.querySelector('#uploadArea h3').textContent = '📎 Drop ZIP file here or click to upload';
+                document.querySelector('#uploadArea p').textContent = 'Supported formats: .zip (containing .jpg, .jpeg, .png images)';
+                loadStatistics();
             } catch (error) {
-                console.error('Upload error:', error);
-                showAlert('Network error during upload', 'error');
+                // Error handled by fetchWithErrorHandling
             } finally {
                 document.getElementById('uploadProgress').classList.add('hidden');
-                document.getElementById('uploadBtn').disabled = false;
                 updateUploadButtonState();
             }
         }
@@ -1254,78 +1255,55 @@
         // Agent management functions
         async function showPassword(agentId) {
             try {
-                const response = await fetch(getApiUrl(`/api/admin/agent-password/${agentId}`));
-                const result = await response.json();
-                
-                if (response.ok) {
-                    showAlert(result.message, 'info');
-                } else {
-                    showAlert(`Error: ${result.detail}`, 'error');
-                }
+                const result = await fetchWithErrorHandling(getApiUrl(`/api/admin/agent-password/${agentId}`));
+                const passwordElement = document.getElementById(`password-${agentId}`);
+                passwordElement.textContent = result.password;
+                setTimeout(() => {
+                    passwordElement.textContent = '••••••••';
+                }, 5000); // Hide after 5 seconds
             } catch (error) {
-                showAlert('Error retrieving password information', 'error');
+                // Error handled by fetchWithErrorHandling
             }
         }
 
         async function resetPassword(agentId) {
-            if (!confirm('Are you sure you want to reset this agent\'s password?')) return;
-            
+            if (!confirm(`Are you sure you want to reset the password for agent ${agentId}?`)) return;
             try {
-                const response = await fetch(getApiUrl(`/api/admin/reset-password/${agentId}`), {
+                const result = await fetchWithErrorHandling(getApiUrl(`/api/admin/reset-password/${agentId}`), {
                     method: 'POST'
                 });
-                const result = await response.json();
-                
-                if (response.ok) {
-                    alert(`New Password for ${agentId}: ${result.new_password}\n\nPlease save this password securely.`);
-                    showAlert(`Password reset successfully for agent ${agentId}`, 'success');
-                } else {
-                    showAlert(`Password reset failed: ${result.detail}`, 'error');
-                }
+                alert(`New Password for ${agentId}: ${result.new_password}\n\nPlease save this password securely.`);
+                showAlert(`Password reset successfully for agent ${agentId}`, 'success');
             } catch (error) {
-                showAlert('Error resetting password', 'error');
+                // Error handled by fetchWithErrorHandling
             }
         }
 
         async function toggleAgentStatus(agentId, currentStatus) {
             const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-            
             try {
-                const response = await fetch(getApiUrl(`/api/agents/${agentId}/status`), {
+                await fetchWithErrorHandling(getApiUrl(`/api/agents/${agentId}/status`), {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ status: newStatus })
                 });
-
-                if (response.ok) {
-                    showAlert(`Agent status updated to ${newStatus}`, 'success');
-                    loadAgents();
-                } else {
-                    const error = await response.json();
-                    showAlert(`Failed to update status: ${error.detail}`, 'error');
-                }
+                showAlert(`Agent status updated to ${newStatus}`, 'success');
+                await loadAgents();
             } catch (error) {
-                showAlert('Network error during status update', 'error');
+                // Error handled by fetchWithErrorHandling
             }
         }
 
         async function forceLogout(agentId) {
-            if (!confirm('Force logout this agent?')) return;
-            
+            if (!confirm(`Force logout agent ${agentId}?`)) return;
             try {
-                const response = await fetch(getApiUrl(`/api/admin/force-logout/${agentId}`), {
+                await fetchWithErrorHandling(getApiUrl(`/api/admin/force-logout/${agentId}`), {
                     method: 'POST'
                 });
-                const result = await response.json();
-                
-                if (response.ok) {
-                    showAlert(`Agent ${agentId} has been logged out`, 'success');
-                    loadAgents();
-                } else {
-                    showAlert(`Force logout failed: ${result.detail}`, 'error');
-                }
+                showAlert(`Agent ${agentId} has been logged out`, 'success');
+                await loadAgents();
             } catch (error) {
-                showAlert('Error during force logout', 'error');
+                // Error handled by fetchWithErrorHandling
             }
         }
 
@@ -1336,33 +1314,30 @@
                 date_from: document.getElementById('dateFrom').value,
                 date_to: document.getElementById('dateTo').value
             };
-
             const queryParams = new URLSearchParams();
             Object.entries(filters).forEach(([key, value]) => {
                 if (value) queryParams.append(key, value);
             });
+            console.log('Exporting with filters:', filters); // Debug
 
             try {
                 const response = await fetch(getApiUrl(`/api/admin/export-excel?${queryParams}`));
-
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `crime_records_export_${new Date().toISOString().split('T')[0]}.xlsx`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                    
-                    showAlert('Excel file downloaded successfully!', 'success');
-                } else {
+                if (!response.ok) {
                     const error = await response.json();
-                    showAlert(`Export failed: ${error.detail}`, 'error');
+                    throw new Error(error.detail || 'Export failed');
                 }
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `crime_records_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                showAlert('Excel file downloaded successfully!', 'success');
             } catch (error) {
-                showAlert('Network error during export', 'error');
+                showAlert(`Export failed: ${error.message}`, 'error');
             }
         }
 
@@ -1372,31 +1347,24 @@
                 date_from: document.getElementById('dateFrom').value,
                 date_to: document.getElementById('dateTo').value
             };
-
             const queryParams = new URLSearchParams();
             Object.entries(filters).forEach(([key, value]) => {
                 if (value) queryParams.append(key, value);
             });
+            console.log('Previewing data with filters:', filters); // Debug
 
             try {
-                const response = await fetch(getApiUrl(`/api/admin/preview-data?${queryParams}`));
-                const data = await response.json();
-
-                if (response.ok) {
-                    displayDataPreview(data);
-                    document.getElementById('dataPreviewSection').classList.remove('hidden');
-                } else {
-                    showAlert(`Preview failed: ${data.detail}`, 'error');
-                }
+                const data = await fetchWithErrorHandling(getApiUrl(`/api/admin/preview-data?${queryParams}`));
+                displayDataPreview(data);
+                document.getElementById('dataPreviewSection').classList.remove('hidden');
             } catch (error) {
-                showAlert('Network error during preview', 'error');
+                // Error handled by fetchWithErrorHandling
             }
         }
 
         function displayDataPreview(data) {
             const thead = document.getElementById('previewTableHead');
             const tbody = document.getElementById('previewTableBody');
-
             thead.innerHTML = '';
             tbody.innerHTML = '';
 
@@ -1433,27 +1401,86 @@
 
         async function testDataAvailability() {
             try {
-                const response = await fetch(getApiUrl('/api/admin/preview-data?limit=1'));
-                const data = await response.json();
-                
-                if (response.ok) {
-                    showAlert(`✅ Data available! Found ${data.length > 0 ? 'records' : 'no records'} in database.`, 'success');
-                } else {
-                    showAlert(`❌ Data test failed: ${data.detail}`, 'error');
-                }
+                const data = await fetchWithErrorHandling(getApiUrl('/api/admin/preview-data?limit=1'));
+                showAlert(`✅ Data available! Found ${data.length > 0 ? 'records' : 'no records'} in database.`, 'success');
             } catch (error) {
-                showAlert('❌ Network error during data test', 'error');
+                // Error handled by fetchWithErrorHandling
             }
         }
 
         async function loadSessionReport() {
-            // Implementation for session reports
-            showAlert('Session report functionality will be implemented based on your backend API', 'info');
+            const filters = {
+                agent_id: document.getElementById('sessionAgent').value,
+                date_from: document.getElementById('sessionDateFrom').value,
+                date_to: document.getElementById('sessionDateTo').value
+            };
+            const queryParams = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) queryParams.append(key, value);
+            });
+            console.log('Loading session report with filters:', filters); // Debug
+
+            try {
+                const sessions = await fetchWithErrorHandling(getApiUrl(`/api/admin/session-report?${queryParams}`));
+                displaySessionReport(sessions);
+                document.getElementById('sessionReportContainer').style.display = 'block';
+            } catch (error) {
+                // Error handled by fetchWithErrorHandling
+            }
+        }
+
+        function displaySessionReport(sessions) {
+            const tbody = document.getElementById('sessionReportBody');
+            tbody.innerHTML = '';
+            if (sessions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6">No sessions found</td></tr>';
+                return;
+            }
+            sessions.forEach(session => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${session.agent_id || 'N/A'}</td>
+                    <td>${session.agent_name || 'N/A'}</td>
+                    <td>${session.login_time || 'N/A'}</td>
+                    <td>${session.logout_time || 'Active'}</td>
+                    <td>${session.duration || '-'}</td>
+                    <td><span class="badge ${session.status === 'active' ? 'badge-success' : 'badge-secondary'}">${session.status || 'Unknown'}</span></td>
+                `;
+                tbody.appendChild(row);
+            });
         }
 
         async function exportSessionReport() {
-            // Implementation for session export
-            showAlert('Session export functionality will be implemented based on your backend API', 'info');
+            const filters = {
+                agent_id: document.getElementById('sessionAgent').value,
+                date_from: document.getElementById('sessionDateFrom').value,
+                date_to: document.getElementById('sessionDateTo').value
+            };
+            const queryParams = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) queryParams.append(key, value);
+            });
+            console.log('Exporting session report with filters:', filters); // Debug
+
+            try {
+                const response = await fetch(getApiUrl(`/api/admin/export-session-report?${queryParams}`));
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Export failed');
+                }
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `session_report_${new Date().toISOString().split('T')[0]}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                showAlert('Session report exported successfully!', 'success');
+            } catch (error) {
+                showAlert(`Export failed: ${error.message}`, 'error');
+            }
         }
 
         // Utility functions
@@ -1465,14 +1492,16 @@
 
         function copyToClipboard(elementId) {
             const element = document.getElementById(elementId);
+            if (!element) {
+                console.error('Element not found for copy:', elementId);
+                return;
+            }
             const text = element.textContent;
-            
             navigator.clipboard.writeText(text).then(() => {
                 const btn = element.nextElementSibling;
                 const originalText = btn.textContent;
                 btn.textContent = 'Copied!';
                 btn.style.background = '#4caf50';
-                
                 setTimeout(() => {
                     btn.textContent = originalText;
                     btn.style.background = '';
@@ -1483,21 +1512,21 @@
         }
 
         function showAlert(message, type) {
-            // Remove existing alerts
             document.querySelectorAll('.alert').forEach(alert => alert.remove());
-
             const alert = document.createElement('div');
             alert.className = `alert alert-${type}`;
             alert.textContent = message;
-
-            // Insert at the top of current page content
             const currentPage = document.querySelector('.page.active .page-content');
             if (currentPage) {
                 currentPage.insertBefore(alert, currentPage.firstChild);
+            } else {
+                console.warn('No active page found for alert');
+                document.body.appendChild(alert);
             }
-
-            // Auto remove after 5 seconds
             setTimeout(() => {
                 if (alert.parentNode) alert.remove();
             }, 5000);
         }
+    </script>
+</body>
+</html>
