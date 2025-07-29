@@ -18,7 +18,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
         }
         
         /* Animated background particles */
@@ -61,7 +60,7 @@
             flex-direction: column;
         }
         
-        /* Login section - attractive design */
+        /* Login section */
         .login-section {
             flex: 1;
             display: flex;
@@ -143,10 +142,6 @@
             font-size: 16px;
             background: #f8f9fa;
             transition: all 0.3s ease;
-            autocomplete: off;
-            autocapitalize: off;
-            autocorrect: off;
-            spellcheck: false;
         }
         
         .form-group input:focus {
@@ -184,17 +179,13 @@
             box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
         }
         
-        .login-btn:active {
-            transform: translateY(0);
-        }
-        
         .login-btn:disabled {
             opacity: 0.7;
             cursor: not-allowed;
             transform: none;
         }
         
-        /* Task section - same as before but hidden initially */
+        /* Task section */
         .task-section {
             display: flex;
             flex-direction: column;
@@ -228,6 +219,17 @@
             flex-shrink: 0;
         }
         
+        .security-notice {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 12px;
+            color: #856404;
+            text-align: center;
+        }
+        
         .form-grid {
             display: grid;
             grid-template-columns: repeat(6, 1fr);
@@ -254,10 +256,17 @@
             border-radius: 4px;
             font-size: 13px;
             height: 32px;
-            autocomplete: off;
-            autocapitalize: off;
-            autocorrect: off;
-            spellcheck: false;
+        }
+        
+        .form-group-task input.protected {
+            background: #fffacd;
+            border-color: #f0ad4e;
+        }
+        
+        .form-group-task input.protected:focus {
+            background: #fff;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
         }
         
         .datetime-input {
@@ -396,9 +405,7 @@
             border-left-color: #17a2b8;
         }
         
-        .hidden { 
-            display: none; 
-        }
+        .hidden { display: none !important; }
         
         .completed-section {
             text-align: center;
@@ -414,96 +421,7 @@
             margin-bottom: 15px;
             color: #2c3e50;
         }
-        
-        /* Enhanced responsive design for larger forms */
-        @media (max-width: 1400px) {
-            .form-grid {
-                grid-template-columns: repeat(5, 1fr);
-                gap: 22px;
-            }
-        }
-        
-        @media (max-width: 1200px) {
-            .form-grid {
-                grid-template-columns: repeat(4, 1fr);
-                gap: 20px;
-            }
-            
-            .form-group-task input {
-                height: 52px;
-                font-size: 15px;
-                padding: 14px 18px;
-            }
-            
-            .form-group-task label {
-                font-size: 15px;
-            }
-        }
-        
-        @media (max-width: 1024px) {
-            .form-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 18px;
-            }
-            
-            .form-group-task input {
-                height: 50px;
-                font-size: 14px;
-                padding: 12px 16px;
-            }
-            
-            .form-section {
-                padding: 30px;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .login-card {
-                margin: 20px;
-                padding: 30px 25px;
-            }
-            
-            .form-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 15px;
-            }
-            
-            .form-group-task input {
-                height: 48px;
-                font-size: 13px;
-                padding: 10px 14px;
-            }
-            
-            .form-group-task label {
-                font-size: 13px;
-            }
-            
-            .form-section {
-                padding: 25px;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .form-grid {
-                grid-template-columns: repeat(1, 1fr);
-                gap: 12px;
-            }
-            
-            .login-card {
-                padding: 25px 20px;
-            }
-            
-            .form-group-task input {
-                height: 45px;
-                font-size: 12px;
-            }
-            
-            .form-section {
-                padding: 20px;
-            }
-        }
 
-        /* Security overlay */
         .security-warning {
             position: fixed;
             top: 0;
@@ -516,9 +434,32 @@
             justify-content: center;
             align-items: center;
             z-index: 9999;
-            font-size: 24px;
+            font-size: 18px;
             font-weight: bold;
             text-align: center;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 1400px) {
+            .form-grid { grid-template-columns: repeat(5, 1fr); }
+        }
+        
+        @media (max-width: 1200px) {
+            .form-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        
+        @media (max-width: 1024px) {
+            .form-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        
+        @media (max-width: 768px) {
+            .login-card { margin: 20px; padding: 30px 25px; }
+            .form-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        
+        @media (max-width: 480px) {
+            .form-grid { grid-template-columns: repeat(1, 1fr); }
+            .login-card { padding: 25px 20px; }
         }
     </style>
 </head>
@@ -527,7 +468,7 @@
     <div class="security-warning" id="securityWarning">
         <div>
             <h2>⚠️ SECURITY ALERT ⚠️</h2>
-            <p>Copy/Paste operations are not allowed in this secure system</p>
+            <p>Copy/Paste operations are not allowed for form data entry</p>
             <p>Please type all information manually</p>
         </div>
     </div>
@@ -542,7 +483,7 @@
     </div>
 
     <div class="container">
-        <!-- Attractive Login Section -->
+        <!-- Login Section -->
         <div id="loginSection" class="login-section">
             <div class="login-card">
                 <div class="login-header">
@@ -551,7 +492,7 @@
                     <p>Agent Dashboard Login</p>
                 </div>
                 
-                <form id="loginForm" class="login-form" autocomplete="off" spellcheck="false">
+                <form id="loginForm" class="login-form">
                     <div class="form-group">
                         <label for="agent_id">Agent ID</label>
                         <div class="input-container">
@@ -559,10 +500,6 @@
                                    id="agent_id" 
                                    name="agent_id" 
                                    placeholder="Enter your Agent ID"
-                                   autocomplete="off" 
-                                   autocapitalize="off" 
-                                   autocorrect="off" 
-                                   spellcheck="false" 
                                    required>
                             <div class="input-icon">👤</div>
                         </div>
@@ -575,10 +512,6 @@
                                    id="password" 
                                    name="password" 
                                    placeholder="Enter your password"
-                                   autocomplete="new-password" 
-                                   autocapitalize="off" 
-                                   autocorrect="off" 
-                                   spellcheck="false" 
                                    required>
                             <div class="input-icon">🔒</div>
                         </div>
@@ -595,7 +528,7 @@
             </div>
         </div>
 
-        <!-- Task Section (same as before) -->
+        <!-- Task Section -->
         <div id="taskSection" class="task-section hidden">
             <div class="progress-info">
                 <div>
@@ -611,172 +544,142 @@
                 <p>Loading next task...</p>
             </div>
 
-            <!-- FORM SECTION - TOP -->
+            <!-- FORM SECTION -->
             <div class="form-section">
-                <form id="taskForm" autocomplete="off" spellcheck="false">
+                <div class="security-notice">
+                    🔒 <strong>Security Notice:</strong> Copy/paste is disabled for data entry fields below to ensure data integrity
+                </div>
+                
+                <form id="taskForm">
                     <div class="form-grid">
                         <!-- Row 1 -->
                         <div class="form-group-task">
                             <label>DR Number:</label>
-                            <input type="text" name="DR_NO" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" 
-                                   placeholder="Enter DR Number" required>
+                            <input type="text" name="DR_NO" class="protected" placeholder="Enter DR Number" required>
                         </div>
                         <div class="form-group-task">
                             <label>Date Reported (MM/DD/YYYY HH:MM AM/PM):</label>
-                            <input type="text" name="Date_Rptd" class="datetime-input"
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" 
-                                   >
+                            <input type="text" name="Date_Rptd" class="datetime-input protected">
                         </div>
                         <div class="form-group-task">
                             <label>Date Occurred (MM/DD/YYYY HH:MM AM/PM):</label>
-                            <input type="text" name="DATE_OCC" class="datetime-input"
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" 
-                                   >
+                            <input type="text" name="DATE_OCC" class="datetime-input protected">
                         </div>
                         <div class="form-group-task">
                             <label>Time Occurred (HH:MM AM/PM):</label>
-                            <input type="text" name="TIME_OCC" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" 
-                                   >
+                            <input type="text" name="TIME_OCC" class="protected">
                         </div>
                         <div class="form-group-task">
                             <label>Unique ID:</label>
-                            <input type="text" name="Unique_Identifier" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="Unique_Identifier" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Area Name:</label>
-                            <input type="text" name="AREA_NAME" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="AREA_NAME" class="protected" required>
                         </div>
                         
                         <!-- Row 2 -->
                         <div class="form-group-task">
                             <label>Report Dist No:</label>
-                            <input type="text" name="Rpt_Dist_No" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="Rpt_Dist_No" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>VIN (1-10):</label>
-                            <input type="text" name="VIN" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="VIN" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Crime:</label>
-                            <input type="text" name="Crm" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="Crm" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Crime Code Desc:</label>
-                            <input type="text" name="Crm_Cd_Desc" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="Crm_Cd_Desc" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>MO Codes:</label>
-                            <input type="text" name="Mocodes" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="Mocodes" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Victim Age:</label>
-                            <input type="number" name="Vict_Age" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="number" name="Vict_Age" class="protected" required>
                         </div>
                         
                         <!-- Row 3 -->
                         <div class="form-group-task">
                             <label>Geolocation:</label>
-                            <input type="text" name="Geolocation" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="Geolocation" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Department:</label>
-                            <input type="text" name="DEPARTMENT" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="DEPARTMENT" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Premise Code:</label>
-                            <input type="text" name="Premis_Cd" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="Premis_Cd" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Premise Desc:</label>
-                            <input type="text" name="Premis_Desc" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="Premis_Desc" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Arrest Key:</label>
-                            <input type="text" name="ARREST_KEY" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="ARREST_KEY" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>PD Description:</label>
-                            <input type="text" name="PD_DESC" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="PD_DESC" class="protected" required>
                         </div>
                         
                         <!-- Row 4 -->
                         <div class="form-group-task">
                             <label>CCD LON Code:</label>
-                            <input type="text" name="CCD_LONCOD" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="CCD_LONCOD" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Status Desc:</label>
-                            <input type="text" name="Status_Desc" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="Status_Desc" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Law Code:</label>
-                            <input type="text" name="LAW_CODE" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="LAW_CODE" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Sub Agency:</label>
-                            <input type="text" name="SubAgency" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="SubAgency" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Charge:</label>
-                            <input type="text" name="Charge" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="Charge" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Race:</label>
-                            <input type="text" name="Race" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="Race" class="protected" required>
                         </div>
                         
                         <!-- Row 5 -->
                         <div class="form-group-task">
                             <label>Location:</label>
-                            <input type="text" name="LOCATION" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="LOCATION" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Sequence ID:</label>
-                            <input type="text" name="SeqID" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="SeqID" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Latitude:</label>
-                            <input type="text" name="LAT" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="LAT" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Longitude:</label>
-                            <input type="text" name="LON" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="LON" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Point:</label>
-                            <input type="text" name="Point" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="Point" class="protected" required>
                         </div>
                         <div class="form-group-task">
                             <label>Shape Area:</label>
-                            <input type="text" name="Shape__Area" 
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
+                            <input type="text" name="Shape__Area" class="protected" required>
                         </div>
                     </div>
                 </form>
@@ -788,7 +691,7 @@
                 </div>
             </div>
 
-            <!-- IMAGE SECTION - BOTTOM -->
+            <!-- IMAGE SECTION -->
             <div class="image-section">
                 <div class="image-container">
                     <img id="taskImage" src="" alt="Task Image">
@@ -810,42 +713,52 @@
     </div>
 
     <script>
+        // Global variables
         let currentAgentId = null;
         let currentTaskIndex = 0;
         let totalTasks = 0;
 
-        // Global configuration object for international deployment
+        // Configuration - auto-detect environment
         const CONFIG = {
-            API_BASE_URL: window.location.origin,
-            LANGUAGE: 'en',
-            DATE_FORMAT: 'DD/MM/YYYY',
-            TIME_FORMAT: '24h',
-            PATTERNS: {
-                DATE_TIME: /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} (AM|PM)$/,
-                TIME: /^\d{2}:\d{2} (AM|PM)$/
-            },
+            API_BASE_URL: getApiBaseUrl(),
             MESSAGES: {
                 LOGIN_SUCCESS: 'Login successful',
                 LOGIN_FAILED: 'Invalid credentials. Please check your Agent ID and password.',
                 TASK_SUBMITTED: 'Task submitted successfully!',
-                LOADING_TASK: 'Loading next task...',
                 NETWORK_ERROR: 'Network error occurred. Please check your connection.',
-                ALL_COMPLETED: 'All Tasks Completed!',
                 LOGOUT_SUCCESS: 'Logged out successfully'
             }
         };
+
+        // Auto-detect API URL based on environment
+        function getApiBaseUrl() {
+            const hostname = window.location.hostname;
+            
+            // If running on Railway domain
+            if (hostname.includes('railway.app') || hostname.includes('web-production-b3ef2.up.railway.app')) {
+                return 'https://web-production-b3ef2.up.railway.app';
+            }
+            
+            // If running locally
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                return 'http://localhost:8000';
+            }
+            
+            // Default to current origin
+            return window.location.origin;
+        }
 
         function getApiUrl(endpoint) {
             return `${CONFIG.API_BASE_URL}${endpoint}`;
         }
 
-        // COMPREHENSIVE SECURITY FUNCTIONS TO PREVENT COPY/PASTE
+        // Security functions for protected inputs only
         function showSecurityWarning() {
             const warning = document.getElementById('securityWarning');
             warning.style.display = 'flex';
             setTimeout(() => {
                 warning.style.display = 'none';
-            }, 3000);
+            }, 2000);
         }
 
         function preventCopyPaste(e) {
@@ -855,160 +768,59 @@
             return false;
         }
 
-        function blockKeyboardShortcuts(e) {
-            // Block common copy/paste/cut shortcuts
-            if (e.ctrlKey || e.metaKey) {
-                const blockedKeys = ['c', 'v', 'x', 'a', 's', 'z', 'y'];
-                if (blockedKeys.includes(e.key.toLowerCase())) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    showSecurityWarning();
-                    return false;
-                }
-            }
-            
-            // Block F12, Ctrl+Shift+I, Ctrl+U, etc.
-            if (e.key === 'F12' || 
-                (e.ctrlKey && e.shiftKey && e.key === 'I') ||
-                (e.ctrlKey && e.key === 'U') ||
-                (e.ctrlKey && e.shiftKey && e.key === 'J')) {
-                e.preventDefault();
-                e.stopPropagation();
-                showSecurityWarning();
-                return false;
-            }
+        function isProtectedInput(element) {
+            return element && element.classList && element.classList.contains('protected');
         }
 
-        // Disable drag and drop
-        function preventDragDrop(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            showSecurityWarning();
-            return false;
-        }
-
-        // Disable text selection
-        function preventSelection(e) {
-            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
-                e.preventDefault();
-                return false;
-            }
-        }
-
-        // COMPLETE SECURITY IMPLEMENTATION
+        // Initialize security on page load
         document.addEventListener('DOMContentLoaded', function() {
-            // Disable autocomplete on all forms and inputs
-            const forms = document.querySelectorAll('form');
-            forms.forEach(form => {
-                form.setAttribute('autocomplete', 'off');
-                form.setAttribute('spellcheck', 'false');
-            });
+            console.log('🚀 Agent Login System Initialized');
+            console.log('🌐 API Base URL:', CONFIG.API_BASE_URL);
             
-            const inputs = document.querySelectorAll('input');
-            inputs.forEach(input => {
-                input.setAttribute('autocomplete', 'off');
-                input.setAttribute('autocapitalize', 'off');
-                input.setAttribute('autocorrect', 'off');
-                input.setAttribute('spellcheck', 'false');
-                
-                // Comprehensive event blocking for each input
+            // Apply security only to protected inputs
+            const protectedInputs = document.querySelectorAll('input.protected');
+            protectedInputs.forEach(input => {
                 input.addEventListener('copy', preventCopyPaste);
                 input.addEventListener('paste', preventCopyPaste);
                 input.addEventListener('cut', preventCopyPaste);
                 input.addEventListener('contextmenu', preventCopyPaste);
-                input.addEventListener('selectstart', preventSelection);
-                input.addEventListener('dragstart', preventDragDrop);
-                input.addEventListener('drop', preventDragDrop);
-                input.addEventListener('dragover', preventDragDrop);
                 
-                // Remove paste event listener if it exists
-                input.onpaste = preventCopyPaste;
-                input.oncopy = preventCopyPaste;
-                input.oncut = preventCopyPaste;
-                
-                // Disable suggestion popups
-                input.addEventListener('focus', function() {
-                    this.setAttribute('autocomplete', 'off');
-                });
+                // Disable autocomplete for protected inputs
+                input.setAttribute('autocomplete', 'off');
+                input.setAttribute('autocapitalize', 'off');
+                input.setAttribute('autocorrect', 'off');
+                input.setAttribute('spellcheck', 'false');
             });
             
-            // Global document event listeners for security
-            document.addEventListener('copy', preventCopyPaste);
-            document.addEventListener('paste', preventCopyPaste);
-            document.addEventListener('cut', preventCopyPaste);
-            document.addEventListener('contextmenu', preventCopyPaste);
-            document.addEventListener('keydown', blockKeyboardShortcuts);
-            document.addEventListener('selectstart', preventSelection);
-            document.addEventListener('dragstart', preventDragDrop);
-            document.addEventListener('drop', preventDragDrop);
-            document.addEventListener('dragover', preventDragDrop);
-            
-            // Disable browser back/forward
-            window.addEventListener('popstate', function(e) {
-                window.history.forward();
-            });
-            
-            // Disable browser refresh
-            window.addEventListener('beforeunload', function(e) {
-                if (currentAgentId) {
-                    e.preventDefault();
-                    e.returnValue = '';
+            // Global keyboard handler - only block copy/paste in protected inputs
+            document.addEventListener('keydown', function(e) {
+                if (isProtectedInput(e.target)) {
+                    if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'x'].includes(e.key.toLowerCase())) {
+                        preventCopyPaste(e);
+                    }
                 }
             });
-            
-            // ONLY validation for datetime inputs - NO AUTO-FORMATTING
-            const dateTimeInputs = document.querySelectorAll('input[name="Date_Rptd"], input[name="DATE_OCC"]');
-            dateTimeInputs.forEach(input => {
-                input.addEventListener('blur', function(e) {
-                    const pattern = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} (AM|PM)$/;
-                    if (e.target.value && !pattern.test(e.target.value)) {
-                        e.target.style.borderColor = '#dc3545';
-                        e.target.title = 'Format: MM/DD/YYYY HH:MM AM/PM (e.g., 11/04/2021 12:30 PM)';
-                    } else {
-                        e.target.style.borderColor = '#667eea';
-                        e.target.title = '';
-                    }
-                });
-            });
-            
-            // Time field validation - AM/PM FORMAT
-            const timeInput = document.querySelector('input[name="TIME_OCC"]');
-            if (timeInput) {
-                timeInput.addEventListener('blur', function(e) {
-                    const pattern = /^\d{2}:\d{2} (AM|PM)$/;
-                    if (e.target.value && !pattern.test(e.target.value)) {
-                        e.target.style.borderColor = '#dc3545';
-                        e.target.title = 'Format: HH:MM AM/PM (e.g., 02:30 PM)';
-                    } else {
-                        e.target.style.borderColor = '#e1e8ed';
-                        e.target.title = '';
-                    }
-                });
-            }
+
+            // Test API connectivity
+            testApiConnection();
         });
 
-        // Additional security: Override clipboard functions
-        if (navigator.clipboard) {
-            navigator.clipboard.writeText = function() {
-                showSecurityWarning();
-                return Promise.reject('Clipboard access denied');
-            };
-            navigator.clipboard.readText = function() {
-                showSecurityWarning();
-                return Promise.reject('Clipboard access denied');
-            };
+        // Test API connection
+        async function testApiConnection() {
+            try {
+                const response = await fetch(getApiUrl('/api/admin/statistics'));
+                if (response.ok) {
+                    console.log('✅ API Connection: Online');
+                } else {
+                    console.log('⚠️ API Connection: Response not OK -', response.status);
+                }
+            } catch (error) {
+                console.log('❌ API Connection Error:', error.message);
+                showAlert('Warning: Cannot connect to server. Please check the connection.', 'error');
+            }
         }
 
-        // Override document selection
-        document.onselectstart = function() {
-            return false;
-        };
-        
-        document.onmousedown = function() {
-            return false;
-        };
-
-        // Login form handler - FIXED
+        // Login form handler
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -1020,24 +832,30 @@
             const formData = new FormData(this);
             
             try {
-                console.log('🔑 Attempting login...'); // Debug log
+                console.log('🔑 Attempting login to:', getApiUrl('/api/agents/login'));
                 
                 const response = await fetch(getApiUrl('/api/agents/login'), {
                     method: 'POST',
                     body: formData
                 });
                 
-                console.log('📡 Response status:', response.status); // Debug log
+                console.log('📡 Response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.log('❌ Response error:', errorText);
+                    showAlert(`Login failed: ${response.status} - ${errorText}`, 'error');
+                    return;
+                }
                 
                 const result = await response.json();
-                console.log('📝 Response data:', result); // Debug log
+                console.log('📝 Login response:', result);
                 
-                if (response.ok) {
+                if (result.agent_id) {
                     currentAgentId = result.agent_id;
                     document.getElementById('agentName').textContent = result.name || currentAgentId;
                     showAlert(CONFIG.MESSAGES.LOGIN_SUCCESS, 'success');
                     
-                    // Wait a moment then show task section
                     setTimeout(() => {
                         showTaskSection();
                         loadCurrentTask();
@@ -1047,15 +865,15 @@
                     showAlert(result.detail || CONFIG.MESSAGES.LOGIN_FAILED, 'error');
                 }
             } catch (error) {
-                console.error('❌ Login error:', error); // Debug log
-                showAlert(CONFIG.MESSAGES.NETWORK_ERROR, 'error');
+                console.error('❌ Login error:', error);
+                showAlert(`${CONFIG.MESSAGES.NETWORK_ERROR}: ${error.message}`, 'error');
             } finally {
                 loginBtn.textContent = originalText;
                 loginBtn.disabled = false;
             }
         });
 
-        // Enhanced Submit function - using global config
+        // Submit form data
         async function submitAndNext() {
             if (!currentAgentId) {
                 showAlert('Please login first', 'error');
@@ -1093,14 +911,17 @@
             submitBtn.disabled = true;
             
             try {
+                console.log('📤 Submitting task for agent:', currentAgentId);
+                
                 const response = await fetch(getApiUrl(`/api/agents/${currentAgentId}/submit`), {
                     method: 'POST',
                     body: formData
                 });
                 
                 const data = await response.json();
+                console.log('📝 Submit response:', data);
                 
-                if (response.ok && (data.success || data.message.includes('success'))) {
+                if (response.ok && (data.success || (data.message && data.message.includes('success')))) {
                     showAlert(CONFIG.MESSAGES.TASK_SUBMITTED, 'success');
                     
                     // Clear form
@@ -1120,6 +941,7 @@
                 }
                 
             } catch (error) {
+                console.error('❌ Submit error:', error);
                 showAlert('Network error: ' + error.message, 'error');
             } finally {
                 submitBtn.textContent = originalText;
@@ -1127,20 +949,36 @@
             }
         }
 
+        // Load current task
         async function loadCurrentTask() {
             if (!currentAgentId) return;
             
             try {
+                console.log('📋 Loading task for agent:', currentAgentId);
+                
                 const response = await fetch(getApiUrl(`/api/agents/${currentAgentId}/current-task`));
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.log('❌ Load task error:', errorText);
+                    showAlert('Failed to load task: ' + response.status, 'error');
+                    return;
+                }
+                
                 const result = await response.json();
+                console.log('📋 Task data:', result);
                 
                 if (result.completed || result.message === 'All tasks completed') {
                     document.getElementById('totalCompleted').textContent = result.total_completed || 'All';
                     showCompletedSection();
                 } else if (result.image_url) {
-                    const imageUrl = result.image_url.startsWith('http') ? result.image_url : `${CONFIG.API_BASE_URL}${result.image_url}`;
-                    document.getElementById('taskImage').src = imageUrl;
+                    // Handle image URL - ensure it's absolute
+                    let imageUrl = result.image_url;
+                    if (!imageUrl.startsWith('http')) {
+                        imageUrl = `${CONFIG.API_BASE_URL}${imageUrl}`;
+                    }
                     
+                    document.getElementById('taskImage').src = imageUrl;
                     document.getElementById('imageName').textContent = result.image_name || 'Unknown';
                     
                     currentTaskIndex = result.current_index || 0;
@@ -1148,15 +986,20 @@
                     const progressText = result.progress || `${currentTaskIndex + 1}/${totalTasks}`;
                     document.getElementById('progressInfo').textContent = `Progress: ${progressText}`;
                 } else {
-                    showAlert('No tasks available', 'error');
+                    showAlert('No tasks available', 'info');
                 }
             } catch (error) {
-                showAlert('Failed to load task', 'error');
+                console.error('❌ Load task error:', error);
+                showAlert('Failed to load task: ' + error.message, 'error');
             }
         }
 
+        // UI Control Functions
         function showLoadingSpinner(show) {
-            document.getElementById('loadingSpinner').style.display = show ? 'block' : 'none';
+            const spinner = document.getElementById('loadingSpinner');
+            if (spinner) {
+                spinner.style.display = show ? 'block' : 'none';
+            }
         }
 
         function showTaskSection() {
@@ -1183,14 +1026,20 @@
             }
         }
 
+        // Logout function
         function logout() {
             if (currentAgentId) {
                 fetch(getApiUrl(`/api/agents/${currentAgentId}/logout`), {
                     method: 'POST'
-                }).then(response => response.json())
-                .then(data => {
+                }).then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    return { session_duration: 'Unknown' };
+                }).then(data => {
                     showAlert(`${CONFIG.MESSAGES.LOGOUT_SUCCESS}. Session: ${data.session_duration || 'Unknown'}`, 'success');
                 }).catch(error => {
+                    console.log('Logout error:', error);
                     showAlert('Logged out locally', 'info');
                 });
             }
@@ -1206,11 +1055,12 @@
             await loadCurrentTask();
             showLoadingSpinner(false);
             
-            if (currentAgentId) {
+            if (currentAgentId && !document.getElementById('completedSection').classList.contains('hidden')) {
                 showTaskSection();
             }
         }
 
+        // Alert system
         function showAlert(message, type) {
             // Remove existing alerts
             const existingAlerts = document.querySelectorAll('.alert');
@@ -1221,16 +1071,31 @@
             alert.textContent = message;
             
             // Insert alert in appropriate section
-            if (!document.getElementById('loginSection').classList.contains('hidden')) {
-                // Login section is visible - insert after login card
+            const loginSection = document.getElementById('loginSection');
+            const taskSection = document.getElementById('taskSection');
+            const completedSection = document.getElementById('completedSection');
+            
+            if (!loginSection.classList.contains('hidden')) {
+                // Login section is visible
                 const loginCard = document.querySelector('.login-card');
-                loginCard.parentNode.insertBefore(alert, loginCard.nextSibling);
+                if (loginCard && loginCard.parentNode) {
+                    loginCard.parentNode.insertBefore(alert, loginCard.nextSibling);
+                }
+            } else if (!taskSection.classList.contains('hidden')) {
+                // Task section is visible
+                taskSection.insertBefore(alert, taskSection.firstChild);
+            } else if (!completedSection.classList.contains('hidden')) {
+                // Completed section is visible
+                completedSection.insertBefore(alert, completedSection.firstChild);
             } else {
-                // Task section is visible - insert at top
+                // Fallback - insert in container
                 const container = document.querySelector('.container');
-                container.insertBefore(alert, container.firstChild);
+                if (container) {
+                    container.insertBefore(alert, container.firstChild);
+                }
             }
             
+            // Auto remove after 5 seconds
             setTimeout(() => {
                 if (alert.parentNode) {
                     alert.remove();
@@ -1238,23 +1103,49 @@
             }, 5000);
         }
 
-        // Additional security measures
-        window.addEventListener('load', function() {
-            // Disable developer tools detection (basic)
-            setInterval(function() {
-                if (window.outerHeight - window.innerHeight > 200 || window.outerWidth - window.innerWidth > 200) {
-                    showSecurityWarning();
-                }
-            }, 1000);
+        // Prevent browser navigation during active session
+        window.addEventListener('popstate', function(e) {
+            if (currentAgentId) {
+                window.history.forward();
+            }
         });
 
-        // Block common developer shortcuts
-        document.addEventListener('keydown', function(e) {
-            // Block F1-F12 keys
-            if (e.keyCode >= 112 && e.keyCode <= 123) {
+        // Warn before page unload during active session
+        window.addEventListener('beforeunload', function(e) {
+            if (currentAgentId) {
                 e.preventDefault();
-                showSecurityWarning();
-                return false;
+                e.returnValue = 'You have an active session. Are you sure you want to leave?';
+            }
+        });
+
+        // Add input validation for datetime fields
+        document.addEventListener('DOMContentLoaded', function() {
+            const dateTimeInputs = document.querySelectorAll('input[name="Date_Rptd"], input[name="DATE_OCC"]');
+            dateTimeInputs.forEach(input => {
+                input.addEventListener('blur', function(e) {
+                    const pattern = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} (AM|PM)$/;
+                    if (e.target.value && !pattern.test(e.target.value)) {
+                        e.target.style.borderColor = '#dc3545';
+                        e.target.title = 'Format: MM/DD/YYYY HH:MM AM/PM (e.g., 11/04/2021 12:30 PM)';
+                    } else {
+                        e.target.style.borderColor = '';
+                        e.target.title = '';
+                    }
+                });
+            });
+            
+            const timeInput = document.querySelector('input[name="TIME_OCC"]');
+            if (timeInput) {
+                timeInput.addEventListener('blur', function(e) {
+                    const pattern = /^\d{2}:\d{2} (AM|PM)$/;
+                    if (e.target.value && !pattern.test(e.target.value)) {
+                        e.target.style.borderColor = '#dc3545';
+                        e.target.title = 'Format: HH:MM AM/PM (e.g., 02:30 PM)';
+                    } else {
+                        e.target.style.borderColor = '';
+                        e.target.title = '';
+                    }
+                });
             }
         });
     </script>
