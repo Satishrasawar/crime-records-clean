@@ -5,126 +5,82 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Crime Records System</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
         }
-
         .container {
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* Sidebar Navigation */
-        .sidebar {
-            width: 280px;
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            color: white;
-            padding: 20px 0;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-            position: fixed;
-            height: 100vh;
-            overflow-y: auto;
-            z-index: 1000;
-        }
-
-        .sidebar-header {
-            text-align: center;
-            padding: 20px;
-            border-bottom: 1px solid #34495e;
-            margin-bottom: 20px;
-        }
-
-        .sidebar-header h1 {
-            font-size: 1.8em;
-            margin-bottom: 5px;
-        }
-
-        .sidebar-header p {
-            font-size: 0.9em;
-            opacity: 0.8;
-        }
-
-        .nav-menu {
-            list-style: none;
-        }
-
-        .nav-item {
-            margin: 5px 0;
-        }
-
-        .nav-link {
-            display: flex;
-            align-items: center;
-            padding: 15px 25px;
-            color: white;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            border-left: 4px solid transparent;
-        }
-
-        .nav-link:hover, .nav-link.active {
-            background: rgba(255,255,255,0.1);
-            border-left-color: #667eea;
-            transform: translateX(5px);
-        }
-
-        .nav-link i {
-            margin-right: 12px;
-            font-size: 1.2em;
-            width: 20px;
-            text-align: center;
-        }
-
-        /* Main Content */
-        .main-content {
-            flex: 1;
-            margin-left: 280px;
-            padding: 20px;
-        }
-
-        .page {
-            display: none;
+            max-width: 1400px;
+            margin: 0 auto;
             background: white;
             border-radius: 15px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             overflow: hidden;
-            min-height: calc(100vh - 40px);
         }
-
-        .page.active {
-            display: block;
-        }
-
-        .page-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
             color: white;
-            padding: 25px 30px;
-            border-bottom: 1px solid #eee;
+            padding: 30px 40px;
+            text-align: center;
+            position: relative;
         }
-
-        .page-header h2 {
-            font-size: 2em;
-            margin-bottom: 5px;
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.5em;
         }
-
-        .page-header p {
-            opacity: 0.9;
-            font-size: 1.1em;
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
-
-        .page-content {
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        .login-container {
+            max-width: 400px;
+            margin: 50px auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .login-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
             padding: 30px;
+            text-align: center;
         }
-
-        /* Common Styles */
+        .login-form {
+            padding: 40px;
+        }
+        .security-badge {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(76, 175, 80, 0.9);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .content {
+            padding: 40px;
+        }
         .section {
             background: #f8f9fa;
             margin-bottom: 30px;
@@ -132,98 +88,11 @@
             border-radius: 10px;
             border-left: 5px solid #667eea;
         }
-
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin: 5px;
-            text-decoration: none;
-            display: inline-block;
+        .section h2 {
+            color: #2c3e50;
+            margin-top: 0;
+            font-size: 1.8em;
         }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-            color: white;
-        }
-
-        .btn-info {
-            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
-            color: white;
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
-            color: white;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #2d3748;
-        }
-
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s ease;
-        }
-
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin: 20px 0;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 25px;
-            border-radius: 10px;
-            text-align: center;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .stat-number {
-            font-size: 2.5em;
-            font-weight: bold;
-            color: #667eea;
-            margin-bottom: 10px;
-        }
-
-        .stat-label {
-            color: #718096;
-            font-size: 1.1em;
-        }
-
         .upload-area {
             border: 3px dashed #667eea;
             border-radius: 10px;
@@ -233,17 +102,92 @@
             margin: 20px 0;
             transition: all 0.3s ease;
         }
-
         .upload-area:hover {
             border-color: #5a67d8;
             background: #f7faff;
         }
-
         .upload-area.dragover {
             border-color: #4c51bf;
             background: #edf2f7;
         }
-
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+        }
+        .btn-info {
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+            color: white;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .stat-label {
+            color: #718096;
+            font-size: 1.1em;
+        }
         .progress-bar {
             width: 100%;
             height: 20px;
@@ -252,44 +196,37 @@
             overflow: hidden;
             margin: 10px 0;
         }
-
         .progress-fill {
             height: 100%;
             background: linear-gradient(90deg, #48bb78, #38a169);
             width: 0%;
             transition: width 0.3s ease;
         }
-
         .alert {
             padding: 15px 20px;
             border-radius: 8px;
             margin: 15px 0;
             font-weight: 500;
         }
-
         .alert-success {
             background: #f0fff4;
             color: #22543d;
             border: 1px solid #9ae6b4;
         }
-
         .alert-error {
             background: #fff5f5;
             color: #742a2a;
             border: 1px solid #feb2b2;
         }
-
         .alert-info {
             background: #ebf8ff;
             color: #2a4365;
             border: 1px solid #90cdf4;
         }
-
         .table-container {
             overflow-x: auto;
             margin: 20px 0;
         }
-
         table {
             width: 100%;
             border-collapse: collapse;
@@ -298,50 +235,47 @@
             overflow: hidden;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-
         th, td {
             padding: 15px;
             text-align: left;
             border-bottom: 1px solid #e2e8f0;
         }
-
         th {
             background: #667eea;
             color: white;
             font-weight: 600;
         }
-
         tr:hover {
             background: #f7faff;
         }
-
         .badge {
             padding: 4px 8px;
             border-radius: 4px;
             font-size: 12px;
             font-weight: bold;
         }
-
         .badge-success {
             background: #d4edda;
             color: #155724;
         }
-
         .badge-danger {
             background: #f8d7da;
             color: #721c24;
         }
-
         .badge-secondary {
             background: #e2e3e5;
             color: #383d41;
         }
-
         .btn-sm {
             padding: 6px 12px;
             font-size: 14px;
         }
-
+        form {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
         .credentials-container {
             background: linear-gradient(135deg, #e8f5e8 0%, #f0fff0 100%);
             border: 2px solid #4caf50;
@@ -350,524 +284,875 @@
             margin: 20px 0;
             box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2);
         }
-
+        .credential-box {
+            background: white;
+            border: 1px solid #c8e6c9;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .credential-value {
+            font-size: 1.3em;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            padding: 10px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        .copy-btn {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .copy-btn:hover {
+            background: #1976d2;
+        }
         .hidden {
             display: none;
         }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
+        .login-attempts {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 14px;
         }
-
-        .filter-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
         }
-
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
-            }
-
-            .main-content {
-                margin-left: 0;
-            }
-
-            .nav-menu {
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: center;
-            }
-
-            .nav-item {
-                flex: 1;
-                min-width: 150px;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <nav class="sidebar">
-            <div class="sidebar-header">
-                <h1>🏛️ Admin Dashboard</h1>
-                <p>Crime Records Data Entry System</p>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-header">
+            <h1>🔐 Admin Login</h1>
+            <p>Crime Records System Administration</p>
+        </div>
+        <div class="login-form">
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="adminUsername">Username:</label>
+                    <input type="text" id="adminUsername" name="username" required autocomplete="username">
+                </div>
+                
+                <div class="form-group">
+                    <label for="adminPassword">Password:</label>
+                    <input type="password" id="adminPassword" name="password" required autocomplete="current-password">
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="rememberMe" style="margin-right: 8px;">
+                        Remember me for 7 days
+                    </label>
+                </div>
+                
+                <div id="loginError" class="alert alert-error hidden">
+                    Invalid credentials. Please try again.
+                </div>
+                
+                <div id="loginAttempts" class="login-attempts hidden">
+                    Too many failed attempts. Please wait before trying again.
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%;" id="loginBtn">
+                    🚀 Login to Dashboard
+                </button>
+            </form>
+            
+            <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; text-align: center; font-size: 14px; color: #666;">
+                <strong>Default Credentials:</strong><br>
+                Username: <code>admin</code><br>
+                Password: <code>admin123</code><br>
+                <em>(Change these in production!)</em>
             </div>
-            <ul class="nav-menu">
-                <li class="nav-item"><a href="#" class="nav-link active" data-page="dashboard"><i>📊</i> System Statistics</a></li>
-                <li class="nav-item"><a href="#" class="nav-link" data-page="upload"><i>📁</i> Upload Task Images</a></li>
-                <li class="nav-item"><a href="#" class="nav-link" data-page="export"><i>📊</i> Export Submitted Data</a></li>
-                <li class="nav-item"><a href="#" class="nav-link" data-page="register"><i>👤</i> Register New Agent</a></li>
-                <li class="nav-item"><a href="#" class="nav-link" data-page="sessions"><i>⏰</i> Agent Session Report</a></li>
-                <li class="nav-item"><a href="#" class="nav-link" data-page="agents"><i>👥</i> Agent Management</a></li>
-            </ul>
-        </nav>
+        </div>
+    </div>
 
-        <main class="main-content">
-            <div id="dashboard" class="page active">
-                <div class="page-header">
-                    <h2>📊 System Statistics</h2>
-                    <p>System statistics and quick overview</p>
-                </div>
-                <div class="page-content">
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-number" id="totalAgents">0</div>
-                            <div class="stat-label">Total Agents</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number" id="totalTasks">0</div>
-                            <div class="stat-label">Total Tasks</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number" id="completedTasks">0</div>
-                            <div class="stat-label">Completed Tasks</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number" id="pendingTasks">0</div>
-                            <div class="stat-label">Pending Tasks</div>
-                        </div>
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="container hidden">
+        <div class="header">
+            <div class="security-badge">
+                🔒 Secured Session
+            </div>
+            <button class="logout-btn" onclick="logout()">
+                🚪 Logout
+            </button>
+            <h1>🏛️ Admin Dashboard</h1>
+            <p>Crime Records Data Entry System</p>
+        </div>
+
+        <div class="content">
+            <!-- Statistics Section -->
+            <div class="section">
+                <h2>📊 System Statistics</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalAgents">0</div>
+                        <div class="stat-label">Total Agents</div>
                     </div>
-                    <div class="section">
-                        <h3>System Health</h3>
-                        <p>All systems are operational. Last updated: <span id="lastUpdated">Loading...</span></p>
-                        <button class="btn btn-primary" onclick="refreshDashboard()">🔄 Refresh Data</button>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalTasks">0</div>
+                        <div class="stat-label">Total Tasks</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="completedTasks">0</div>
+                        <div class="stat-label">Completed Tasks</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="pendingTasks">0</div>
+                        <div class="stat-label">Pending Tasks</div>
                     </div>
                 </div>
             </div>
 
-            <div id="upload" class="page">
-                <div class="page-header">
-                    <h2>📁 Upload Task Images</h2>
-                    <p>Upload a ZIP file containing up to 5000 images to assign tasks to agents.</p>
+            <!-- Upload ZIP Section -->
+            <div class="section">
+                <h2>📁 Upload Task Images</h2>
+                <p>Upload a ZIP file containing up to 5000 images to assign tasks to agents.</p>
+                
+                <div class="form-group">
+                    <label for="agentSelect">Assign to Agent:</label>
+                    <select id="agentSelect" required>
+                        <option value="">Select an agent...</option>
+                    </select>
                 </div>
-                <div class="page-content">
-                    <div class="section">
+
+                <div class="upload-area" id="uploadArea">
+                    <div>
+                        <h3>📎 Drop ZIP file here or click to upload</h3>
+                        <p>Supported formats: .zip (containing .jpg, .jpeg, .png images)</p>
+                        <input type="file" id="zipFile" accept=".zip" style="display: none;">
+                        <button type="button" class="btn btn-primary" onclick="document.getElementById('zipFile').click()">
+                            Choose ZIP File
+                        </button>
+                    </div>
+                </div>
+
+                <div id="uploadProgress" class="hidden">
+                    <h4>Upload Progress</h4>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div id="uploadStatus">Preparing upload...</div>
+                </div>
+
+                <button type="button" class="btn btn-success" id="uploadBtn" onclick="uploadZipFile()" disabled>
+                    🚀 Upload & Assign Tasks
+                </button>
+            </div>
+
+            <!-- Export Data Section -->
+            <div class="section">
+                <h2>📊 Export Submitted Data</h2>
+                <p>Download all submitted form data as Excel spreadsheet.</p>
+                
+                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="exportAgent">Filter by Agent (Optional):</label>
+                        <select id="exportAgent">
+                            <option value="">All Agents</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="dateFrom">From Date (Optional):</label>
+                        <input type="date" id="dateFrom">
+                    </div>
+                    
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="dateTo">To Date (Optional):</label>
+                        <input type="date" id="dateTo">
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button type="button" class="btn btn-info" onclick="exportToExcel()">
+                        📥 Download Excel Report
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="previewData()">
+                        👁️ Preview Data
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="testDataAvailability()">
+                        🔍 Test Data Availability
+                    </button>
+                </div>
+            </div>
+
+            <!-- Agent Registration Section -->
+            <div class="section">
+                <h2>👤 Register New Agent</h2>
+                <p>Create a new agent account with auto-generated credentials.</p>
+                
+                <form id="agentRegistrationForm">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
                         <div class="form-group">
-                            <label for="agentSelect">Assign to Agent:</label>
-                            <select id="agentSelect" required>
-                                <option value="">Select an agent...</option>
+                            <label for="agentName">Full Name:</label>
+                            <input type="text" id="agentName" name="name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="agentEmail">Email:</label>
+                            <input type="email" id="agentEmail" name="email" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="agentMobile">Mobile Number:</label>
+                            <input type="tel" id="agentMobile" name="mobile" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="agentDob">Date of Birth:</label>
+                            <input type="date" id="agentDob" name="dob" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="agentCountry">Country:</label>
+                            <input type="text" id="agentCountry" name="country" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="agentGender">Gender:</label>
+                            <select id="agentGender" name="gender" required>
+                                <option value="">Select Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
                             </select>
                         </div>
-                        <div class="upload-area" id="uploadArea">
-                            <div>
-                                <h3>📎 Drop ZIP file here or click to upload</h3>
-                                <p>Supported formats: .zip (containing .jpg, .jpeg, .png images)</p>
-                                <input type="file" id="zipFile" accept=".zip" style="display: none;">
-                                <button type="button" class="btn btn-primary" onclick="document.getElementById('zipFile').click()">Choose ZIP File</button>
-                            </div>
+                    </div>
+                    
+                    <div style="margin-top: 20px; text-align: center;">
+                        <button type="submit" class="btn btn-primary">
+                            🔑 Register Agent & Generate Credentials
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Agent Credentials Display -->
+                <div id="newAgentCredentials" class="hidden" style="margin-top: 30px; padding: 20px; background: #e8f5e8; border-radius: 10px; border: 2px solid #4caf50;">
+                    <h3 style="color: #2e7d32; margin-top: 0;">✅ Agent Registered Successfully!</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0;">
+                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
+                            <strong>Agent ID:</strong><br>
+                            <span id="newAgentId" style="font-size: 1.2em; color: #1976d2; font-family: monospace;"></span>
+                            <button onclick="copyToClipboard('newAgentId')" class="btn btn-info" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">Copy</button>
                         </div>
-                        <div id="uploadProgress" class="hidden">
-                            <h4>Upload Progress</h4>
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="progressFill"></div>
-                            </div>
-                            <div id="uploadStatus">Preparing upload...</div>
+                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
+                            <strong>Password:</strong><br>
+                            <span id="newAgentPassword" style="font-size: 1.2em; color: #d32f2f; font-family: monospace;"></span>
+                            <button onclick="copyToClipboard('newAgentPassword')" class="btn btn-info" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">Copy</button>
                         </div>
-                        <button type="button" class="btn btn-success" id="uploadBtn" onclick="uploadZipFile()" disabled>🚀 Upload & Assign Tasks</button>
+                    </div>
+                    <div class="alert alert-info">
+                        <strong>⚠️ Important:</strong> Please save these credentials securely. The password cannot be recovered and will need to be shared with the agent.
                     </div>
                 </div>
             </div>
 
-            <div id="export" class="page">
-                <div class="page-header">
-                    <h2>📊 Export Submitted Data</h2>
-                    <p>Download all submitted form data as Excel spreadsheet.</p>
-                </div>
-                <div class="page-content">
-                    <div class="section">
-                        <div class="filter-grid">
-                            <div class="form-group">
-                                <label for="exportAgent">Filter by Agent (Optional):</label>
-                                <select id="exportAgent">
-                                    <option value="">All Agents</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="dateFrom">From Date (Optional):</label>
-                                <input type="date" id="dateFrom">
-                            </div>
-                            <div class="form-group">
-                                <label for="dateTo">To Date (Optional):</label>
-                                <input type="date" id="dateTo">
-                            </div>
-                        </div>
-                        <div style="margin-top: 20px;">
-                            <button type="button" class="btn btn-info" onclick="exportToExcel()">📥 Download Excel Report</button>
-                            <button type="button" class="btn btn-success" onclick="previewData()">👁️ Preview Data</button>
-                            <button type="button" class="btn btn-primary" onclick="testDataAvailability()">🔍 Test Data Availability</button>
-                        </div>
-                        <div class="hidden" id="dataPreviewSection">
-                            <h3>📋 Data Preview</h3>
-                            <div class="table-container">
-                                <table id="dataPreviewTable">
-                                    <thead id="previewTableHead"></thead>
-                                    <tbody id="previewTableBody"></tbody>
-                                </table>
-                            </div>
-                        </div>
+            <!-- Session Report Section -->
+            <div class="section">
+                <h2>⏰ Agent Session Report</h2>
+                <p>Track agent login/logout times and working hours.</p>
+                
+                <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="sessionAgent">Filter by Agent (Optional):</label>
+                        <select id="sessionAgent">
+                            <option value="">All Agents</option>
+                        </select>
                     </div>
+                    
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="sessionDateFrom">From Date:</label>
+                        <input type="date" id="sessionDateFrom">
+                    </div>
+                    
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="sessionDateTo">To Date:</label>
+                        <input type="date" id="sessionDateTo">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <button type="button" class="btn btn-primary" onclick="loadSessionReport()">
+                        📊 Load Session Report
+                    </button>
+                    <button type="button" class="btn btn-info" onclick="exportSessionReport()">
+                        📥 Export Sessions to Excel
+                    </button>
+                </div>
+
+                <!-- Session Report Table -->
+                <div class="table-container" id="sessionReportContainer" style="display: none;">
+                    <h3>Session Activity Report</h3>
+                    <table id="sessionReportTable">
+                        <thead>
+                            <tr>
+                                <th>Agent ID</th>
+                                <th>Agent Name</th>
+                                <th>Login Time</th>
+                                <th>Logout Time</th>
+                                <th>Duration (Minutes)</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessionReportBody">
+                            <!-- Session data will be loaded here -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <div id="register" class="page">
-                <div class="page-header">
-                    <h2>👤 Register New Agent</h2>
-                    <p>Create a new agent account with auto-generated credentials.</p>
+            <!-- Agents Management Section -->
+            <div class="section">
+                <h2>👥 Agent Management</h2>
+                
+                <div class="table-container">
+                    <table id="agentsTable">
+                        <thead>
+                            <tr>
+                                <th>Agent ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Password</th>
+                                <th>Status</th>
+                                <th>Login Status</th>
+                                <th>Tasks Completed</th>
+                                <th>Last Login</th>
+                                <th>Last Logout</th>
+                                <th>Session Duration</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="agentsTableBody">
+                            <!-- Agent data will be loaded here -->
+                        </tbody>
+                    </table>
                 </div>
-                <div class="page-content">
-                    <div class="section">
-                        <form id="agentRegistrationForm">
-                            <div class="form-grid">
-                                <div class="form-group">
-                                    <label for="agentName">Full Name:</label>
-                                    <input type="text" id="agentName" name="name" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="agentEmail">Email:</label>
-                                    <input type="email" id="agentEmail" name="email" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="agentMobile">Mobile Number:</label>
-                                    <input type="tel" id="agentMobile" name="mobile" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="agentDob">Date of Birth:</label>
-                                    <input type="date" id="agentDob" name="dob" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="agentCountry">Country:</label>
-                                    <input type="text" id="agentCountry" name="country" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="agentGender">Gender:</label>
-                                    <select id="agentGender" name="gender" required>
-                                        <option value="">Select Gender</option>
-                                        <option value="Male">Male</option>
-                                        <option value="Female">Female</option>
-                                        <option value="Other">Other</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div style="margin-top: 20px; text-align: center;">
-                                <button type="submit" class="btn btn-primary">🔑 Register Agent & Generate Credentials</button>
-                            </div>
-                        </form>
-                        <div id="newAgentCredentials" class="hidden credentials-container">
-                            <h3 style="color: #2e7d32; margin-top: 0;">✅ Agent Registered Successfully!</h3>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0;">
-                                <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
-                                    <strong>Agent ID:</strong><br>
-                                    <span id="newAgentId" style="font-size: 1.2em; color: #1976d2; font-family: monospace;"></span>
-                                    <button onclick="copyToClipboard('newAgentId')" class="btn btn-info btn-sm">Copy</button>
-                                </div>
-                                <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
-                                    <strong>Password:</strong><br>
-                                    <span id="newAgentPassword" style="font-size: 1.2em; color: #d32f2f; font-family: monospace;"></span>
-                                    <button onclick="copyToClipboard('newAgentPassword')" class="btn btn-info btn-sm">Copy</button>
-                                </div>
-                            </div>
-                            <div class="alert alert-info">
-                                <strong>⚠️ Important:</strong> Please save these credentials securely. The password cannot be recovered and will need to be shared with the agent.
-                            </div>
-                        </div>
-                    </div>
-                </div>
+
+                <button type="button" class="btn btn-primary" onclick="refreshAgents()">
+                    🔄 Refresh Agents
+                </button>
             </div>
 
-            <div id="sessions" class="page">
-                <div class="page-header">
-                    <h2>⏰ Agent Session Report</h2>
-                    <p>Track agent login/logout times and working hours.</p>
-                </div>
-                <div class="page-content">
-                    <div class="section">
-                        <div class="filter-grid">
-                            <div class="form-group">
-                                <label for="sessionAgent">Filter by Agent (Optional):</label>
-                                <select id="sessionAgent">
-                                    <option value="">All Agents</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="sessionDateFrom">From Date:</label>
-                                <input type="date" id="sessionDateFrom">
-                            </div>
-                            <div class="form-group">
-                                <label for="sessionDateTo">To Date:</label>
-                                <input type="date" id="sessionDateTo">
-                            </div>
-                        </div>
-                        <div style="margin-bottom: 20px;">
-                            <button type="button" class="btn btn-primary" onclick="loadSessionReport()">📊 Load Session Report</button>
-                            <button type="button" class="btn btn-info" onclick="exportSessionReport()">📥 Export Sessions to Excel</button>
-                        </div>
-                        <div class="table-container" id="sessionReportContainer" style="display: none;">
-                            <h3>Session Activity Report</h3>
-                            <table id="sessionReportTable">
-                                <thead>
-                                    <tr>
-                                        <th>Agent ID</th>
-                                        <th>Agent Name</th>
-                                        <th>Login Time</th>
-                                        <th>Logout Time</th>
-                                        <th>Duration (Minutes)</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="sessionReportBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
+            <!-- Data Preview Section -->
+            <div class="section hidden" id="dataPreviewSection">
+                <h2>📋 Data Preview</h2>
+                <div class="table-container">
+                    <table id="dataPreviewTable">
+                        <thead id="previewTableHead">
+                            <!-- Headers will be dynamically generated -->
+                        </thead>
+                        <tbody id="previewTableBody">
+                            <!-- Data will be loaded here -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
-
-            <div id="agents" class="page">
-                <div class="page-header">
-                    <h2>👥 Agent Management</h2>
-                    <p>Manage agent accounts and monitor their status</p>
-                </div>
-                <div class="page-content">
-                    <div class="section">
-                        <div style="margin-bottom: 20px;">
-                            <button type="button" class="btn btn-primary" onclick="refreshAgents()">🔄 Refresh Agents</button>
-                        </div>
-                        <div class="table-container">
-                            <table id="agentsTable">
-                                <thead>
-                                    <tr>
-                                        <th>Agent ID</th>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Password</th>
-                                        <th>Status</th>
-                                        <th>Login Status</th>
-                                        <th>Tasks Completed</th>
-                                        <th>Last Login</th>
-                                        <th>Last Logout</th>
-                                        <th>Session Duration</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="agentsTableBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="preview" class="page">
-                <div class="page-header">
-                    <h2>📋 Data Preview</h2>
-                    <p>Preview submitted data before exporting</p>
-                </div>
-                <div class="page-content">
-                    <div class="section">
-                        <div class="table-container">
-                            <table id="dataPreviewTable">
-                                <thead id="previewTableHead"></thead>
-                                <tbody id="previewTableBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
+        </div>
     </div>
 
     <script>
-        // Global Variables
-        let selectedZipFile = null;
+        // Configuration
+        const BASE_URL = 'https://web-production-b3ef2.up.railway.app';
+        const SESSION_KEY = 'admin_session';
+        const REMEMBER_KEY = 'admin_remember';
+        
+        // Security and session management
+        let sessionTimeout;
+        let failedAttempts = 0;
+        let lockoutTime = null;
         let agents = [];
-        const currentApiUrl = 'https://web-production-b3ef2.up.railway.app';
+        let selectedZipFile = null;
 
-        // Helper function for API calls with error handling
-        async function fetchWithErrorHandling(url, options = {}) {
-            try {
-                console.log(`Fetching ${url} with options:`, options);
-                const response = await fetch(url, options);
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.detail || response.statusText || 'Unknown error');
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            checkExistingSession();
+            setupLoginForm();
+            setupDragAndDrop();
+            setupAgentRegistration();
+            
+            // Session activity monitoring
+            setupSessionMonitoring();
+        });
+
+        // Check for existing valid session
+        function checkExistingSession() {
+            const session = getSession();
+            const rememberToken = localStorage.getItem(REMEMBER_KEY);
+            
+            if (session && session.expiry > Date.now()) {
+                // Valid session exists
+                showDashboard();
+                return;
+            }
+            
+            if (rememberToken) {
+                // Check if remember token is valid (7 days)
+                try {
+                    const remembered = JSON.parse(rememberToken);
+                    if (remembered.expiry > Date.now()) {
+                        // Auto-login with remember token
+                        createSession(true);
+                        showDashboard();
+                        return;
+                    } else {
+                        localStorage.removeItem(REMEMBER_KEY);
+                    }
+                } catch (e) {
+                    localStorage.removeItem(REMEMBER_KEY);
                 }
-                return await response.json();
+            }
+            
+            // No valid session, show login
+            showLogin();
+        }
+
+        // Setup login form
+        function setupLoginForm() {
+            document.getElementById('loginForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await handleLogin();
+            });
+        }
+
+        // Handle login attempt
+        async function handleLogin() {
+            // Check lockout
+            if (lockoutTime && Date.now() < lockoutTime) {
+                const remainingTime = Math.ceil((lockoutTime - Date.now()) / 1000);
+                showLoginError(`Too many failed attempts. Please wait ${remainingTime} seconds.`);
+                return;
+            }
+
+            const username = document.getElementById('adminUsername').value;
+            const password = document.getElementById('adminPassword').value;
+            const rememberMe = document.getElementById('rememberMe').checked;
+            const loginBtn = document.getElementById('loginBtn');
+
+            // Show loading state
+            loginBtn.innerHTML = '<div class="loading-spinner"></div>Logging in...';
+            loginBtn.disabled = true;
+
+            try {
+                // Simulate API call delay for security
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Check credentials (in production, this should be server-side)
+                if (await validateCredentials(username, password)) {
+                    // Successful login
+                    createSession(rememberMe);
+                    failedAttempts = 0;
+                    lockoutTime = null;
+                    showDashboard();
+                    showAlert('Login successful! Welcome to the admin dashboard.', 'success');
+                } else {
+                    // Failed login
+                    failedAttempts++;
+                    
+                    if (failedAttempts >= 3) {
+                        lockoutTime = Date.now() + (30 * 1000); // 30 seconds lockout
+                        showLoginError('Too many failed attempts. Account locked for 30 seconds.');
+                    } else {
+                        showLoginError(`Invalid credentials. ${3 - failedAttempts} attempts remaining.`);
+                    }
+                }
             } catch (error) {
-                console.error(`Error fetching ${url}:`, error);
-                showAlert(`Error: ${error.message}`, 'error');
+                showLoginError('Login error. Please try again.');
+            } finally {
+                // Reset button
+                loginBtn.innerHTML = '🚀 Login to Dashboard';
+                loginBtn.disabled = false;
+            }
+        }
+
+        // Validate credentials (replace with server-side validation)
+        async function validateCredentials(username, password) {
+            // In production, this should make an API call to your server
+            // For now, using hardcoded credentials
+            const validCredentials = [
+                { username: 'admin', password: 'admin123' },
+                { username: 'superadmin', password: 'super123' },
+                { username: 'manager', password: 'manager123' }
+            ];
+            
+            return validCredentials.some(cred => 
+                cred.username === username && cred.password === password
+            );
+        }
+
+        // Create session
+        function createSession(rememberMe = false) {
+            const session = {
+                authenticated: true,
+                loginTime: Date.now(),
+                expiry: Date.now() + (2 * 60 * 60 * 1000), // 2 hours
+                username: document.getElementById('adminUsername').value
+            };
+            
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+            
+            if (rememberMe) {
+                const rememberToken = {
+                    expiry: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+                };
+                localStorage.setItem(REMEMBER_KEY, JSON.stringify(rememberToken));
+            }
+            
+            // Setup session timeout
+            setupSessionTimeout();
+        }
+
+        // Get current session
+        function getSession() {
+            try {
+                const session = sessionStorage.getItem(SESSION_KEY);
+                return session ? JSON.parse(session) : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // Setup session timeout and monitoring
+        function setupSessionTimeout() {
+            // Clear existing timeout
+            if (sessionTimeout) {
+                clearTimeout(sessionTimeout);
+            }
+            
+            // Set 2-hour timeout
+            sessionTimeout = setTimeout(() => {
+                showAlert('Session expired. Please login again.', 'info');
+                logout();
+            }, 2 * 60 * 60 * 1000);
+        }
+
+        // Setup session activity monitoring
+        function setupSessionMonitoring() {
+            // Extend session on user activity
+            const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+            let lastActivity = Date.now();
+            
+            activityEvents.forEach(event => {
+                document.addEventListener(event, () => {
+                    const now = Date.now();
+                    if (now - lastActivity > 60000) { // Only extend if more than 1 minute since last activity
+                        lastActivity = now;
+                        extendSession();
+                    }
+                });
+            });
+            
+            // Check session validity every minute
+            setInterval(() => {
+                const session = getSession();
+                if (!session || session.expiry <= Date.now()) {
+                    if (document.getElementById('dashboard').style.display !== 'none') {
+                        showAlert('Session expired. Please login again.', 'info');
+                        logout();
+                    }
+                }
+            }, 60000);
+        }
+
+        // Extend session
+        function extendSession() {
+            const session = getSession();
+            if (session && session.expiry > Date.now()) {
+                session.expiry = Date.now() + (2 * 60 * 60 * 1000); // Extend by 2 hours
+                sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+                setupSessionTimeout();
+            }
+        }
+
+        // Show login screen
+        function showLogin() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('adminUsername').focus();
+        }
+
+        // Show dashboard
+        function showDashboard() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            loadDashboardData();
+        }
+
+        // Show login error
+        function showLoginError(message) {
+            const errorDiv = document.getElementById('loginError');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                errorDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Logout function
+        function logout() {
+            sessionStorage.removeItem(SESSION_KEY);
+            localStorage.removeItem(REMEMBER_KEY);
+            
+            if (sessionTimeout) {
+                clearTimeout(sessionTimeout);
+            }
+            
+            // Clear form data
+            document.getElementById('loginForm').reset();
+            document.getElementById('loginError').classList.add('hidden');
+            
+            showLogin();
+            showAlert('Logged out successfully.', 'info');
+        }
+
+        // Enhanced API request function with auth
+        async function makeAuthenticatedRequest(url, options = {}) {
+            const session = getSession();
+            
+            if (!session || session.expiry <= Date.now()) {
+                showAlert('Session expired. Please login again.', 'error');
+                logout();
+                throw new Error('Session expired');
+            }
+            
+            // Add auth headers if needed (implement based on your backend)
+            const authOptions = {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'Authorization': `Bearer ${session.username}`, // Customize based on your auth system
+                    'X-Session-Token': session.loginTime // Additional security token
+                }
+            };
+            
+            try {
+                const response = await fetch(url, authOptions);
+                
+                // Handle auth errors
+                if (response.status === 401 || response.status === 403) {
+                    showAlert('Authentication failed. Please login again.', 'error');
+                    logout();
+                    throw new Error('Authentication failed');
+                }
+                
+                return response;
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    showAlert('Network error. Please check your connection.', 'error');
+                }
                 throw error;
             }
         }
 
-        // Get API URL with endpoint
-        function getApiUrl(endpoint) {
-            return `${currentApiUrl}${endpoint}`;
-        }
-
-        // Initialize Application
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, initializing app...');
-            initializeApp();
-            setupNavigation();
-            setupDragAndDrop();
-            setupAgentRegistration();
-        });
-
-        // Initialize the application
-        function initializeApp() {
-            console.log('Initializing app with API URL:', currentApiUrl);
-            loadDashboardData();
-        }
-
-        // Setup navigation between pages
-        function setupNavigation() {
-            const navLinks = document.querySelectorAll('.nav-link');
-            const pages = document.querySelectorAll('.page');
-            console.log('Setting up navigation, found links:', navLinks.length);
-
-            navLinks.forEach(link => {
-                link.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    console.log('Nav link clicked:', link.getAttribute('data-page'));
-                    navLinks.forEach(nl => nl.classList.remove('active'));
-                    pages.forEach(page => page.classList.remove('active'));
-                    link.classList.add('active');
-                    const pageId = link.getAttribute('data-page');
-                    const targetPage = document.getElementById(pageId);
-                    if (targetPage) {
-                        targetPage.classList.add('active');
-                        loadPageData(pageId);
-                    } else {
-                        console.error('Page not found:', pageId);
-                        showAlert(`Page "${pageId}" not found`, 'error');
-                    }
-                });
+        // Setup agent registration form
+        function setupAgentRegistration() {
+            document.getElementById('agentRegistrationForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await registerNewAgent();
             });
         }
 
-        // Load page-specific data
-        function loadPageData(pageId) {
-            console.log('Loading data for page:', pageId);
-            switch(pageId) {
-                case 'dashboard':
-                    loadStatistics();
-                    break;
-                case 'upload':
-                case 'agents':
-                case 'register':
-                case 'sessions':
-                case 'export':
-                    loadAgents();
-                    populateAgentSelects();
-                    break;
-                case 'preview':
-                    previewData();
-                    break;
-                default:
-                    console.error('Unknown page:', pageId);
-                    showAlert('Unknown page selected', 'error');
-            }
-        }
+        // Register new agent (with authentication)
+        async function registerNewAgent() {
+            const formData = new FormData(document.getElementById('agentRegistrationForm'));
+            
+            const submitBtn = document.querySelector('#agentRegistrationForm button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Registering...';
+            submitBtn.disabled = true;
 
-        // Load all dashboard data
-        async function loadDashboardData() {
-            console.log('Loading dashboard data...');
             try {
-                await Promise.all([
-                    loadStatistics(),
-                    loadAgents(),
-                    populateAgentSelects()
-                ]);
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/agents/register`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('newAgentId').textContent = result.agent_id;
+                    document.getElementById('newAgentPassword').textContent = result.password;
+                    document.getElementById('newAgentCredentials').classList.remove('hidden');
+                    
+                    document.getElementById('agentRegistrationForm').reset();
+                    
+                    await loadAgents();
+                    populateAgentSelects();
+                    
+                    showAlert(`Agent registered successfully! ID: ${result.agent_id}`, 'success');
+                    document.getElementById('newAgentCredentials').scrollIntoView({ behavior: 'smooth' });
+                    
+                } else {
+                    showAlert(`Registration failed: ${result.detail}`, 'error');
+                }
+
             } catch (error) {
-                console.error('Failed to load dashboard data:', error);
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Registration error:', error);
+                    showAlert('Network error during registration', 'error');
+                }
+            } finally {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
             }
         }
 
-        function refreshDashboard() {
-            loadDashboardData();
-            document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
-            showAlert('Dashboard refreshed successfully!', 'success');
+        // Load all dashboard data (with authentication)
+        async function loadDashboardData() {
+            await Promise.all([
+                loadStatistics(),
+                loadAgents(),
+                populateAgentSelects()
+            ]);
         }
 
-        // Load system statistics
+        // Load system statistics (with authentication)
         async function loadStatistics() {
             try {
-                document.getElementById('totalAgents').textContent = 'Loading...';
-                document.getElementById('totalTasks').textContent = 'Loading...';
-                document.getElementById('completedTasks').textContent = 'Loading...';
-                document.getElementById('pendingTasks').textContent = 'Loading...';
-                const stats = await fetchWithErrorHandling(getApiUrl('/api/admin/statistics'));
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/statistics`);
+                const stats = await response.json();
+                
                 document.getElementById('totalAgents').textContent = stats.total_agents || 0;
                 document.getElementById('totalTasks').textContent = stats.total_tasks || 0;
                 document.getElementById('completedTasks').textContent = stats.completed_tasks || 0;
                 document.getElementById('pendingTasks').textContent = stats.pending_tasks || 0;
-                document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+                
             } catch (error) {
-                document.getElementById('totalAgents').textContent = 'Error';
-                document.getElementById('totalTasks').textContent = 'Error';
-                document.getElementById('completedTasks').textContent = 'Error';
-                document.getElementById('pendingTasks').textContent = 'Error';
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Failed to load statistics:', error);
+                    showAlert('Failed to load statistics', 'error');
+                }
             }
         }
 
-        // Load agents list
+        // Load agents list (with authentication)
         async function loadAgents() {
             try {
-                agents = await fetchWithErrorHandling(getApiUrl('/api/agents'));
-                console.log('Loaded agents:', agents);
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/agents`);
+                agents = await response.json();
+                
                 updateAgentsTable();
+                
             } catch (error) {
-                document.getElementById('agentsTableBody').innerHTML = '<tr><td colspan="11">Failed to load agents</td></tr>';
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Failed to load agents:', error);
+                    showAlert('Failed to load agents', 'error');
+                }
             }
         }
 
-        // Update agents table
+        // Copy to clipboard function
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = element.nextElementSibling.textContent;
+                element.nextElementSibling.textContent = 'Copied!';
+                element.nextElementSibling.style.background = '#4caf50';
+                
+                setTimeout(() => {
+                    element.nextElementSibling.textContent = originalText;
+                    element.nextElementSibling.style.background = '';
+                }, 2000);
+            }).catch(() => {
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                showAlert('Credentials copied to clipboard!', 'success');
+            });
+        }
+
+        // Update agents table with password and session info
         function updateAgentsTable() {
             const tbody = document.getElementById('agentsTableBody');
-            if (!tbody) {
-                console.error('Agents table body not found');
-                return;
-            }
             tbody.innerHTML = '';
+            
             agents.forEach(agent => {
                 const row = document.createElement('tr');
+                
+                let sessionDuration = 'N/A';
+                if (agent.is_currently_logged_in && agent.last_login) {
+                    const loginTime = new Date(agent.last_login);
+                    const now = new Date();
+                    const durationMs = now - loginTime;
+                    const hours = Math.floor(durationMs / (1000 * 60 * 60));
+                    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+                    sessionDuration = `${hours}h ${minutes}m`;
+                }
+                
                 row.innerHTML = `
-                    <td>${agent.agent_id || 'N/A'}</td>
-                    <td>${agent.name || 'N/A'}</td>
-                    <td>${agent.email || 'N/A'}</td>
+                    <td>${agent.agent_id}</td>
+                    <td>${agent.name}</td>
+                    <td>${agent.email}</td>
                     <td>
                         <span id="password-${agent.agent_id}" style="font-family: monospace; background: #f0f0f0; padding: 4px; border-radius: 4px;">
                             ••••••••
                         </span>
-                        <button class="btn btn-sm btn-info" style="padding: 2px 6px; margin-left: 5px;" 
-                                onclick="showPassword('${agent.agent_id}')" title="Show Password">👁️</button>
-                        <button class="btn btn-sm btn-primary" style="padding: 2px 6px;" 
-                                onclick="resetPassword('${agent.agent_id}')" title="Reset Password">🔄</button>
+                        <button class="btn btn-sm" style="padding: 2px 6px; margin-left: 5px;" 
+                                onclick="showPassword('${agent.agent_id}')" title="Show Password">
+                            👁️
+                        </button>
+                        <button class="btn btn-sm" style="padding: 2px 6px; margin-left: 2px;" 
+                                onclick="resetPassword('${agent.agent_id}')" title="Reset Password">
+                            🔄
+                        </button>
                     </td>
-                    <td><span class="badge ${agent.status === 'active' ? 'badge-success' : 'badge-danger'}">${agent.status || 'Unknown'}</span></td>
-                    <td><span class="badge ${agent.is_currently_logged_in ? 'badge-success' : 'badge-secondary'}">
-                        ${agent.is_currently_logged_in ? '🟢 Online' : '🔴 Offline'}</span></td>
+                    <td><span class="badge ${agent.status === 'active' ? 'badge-success' : 'badge-danger'}">${agent.status}</span></td>
+                    <td>
+                        <span class="badge ${agent.is_currently_logged_in ? 'badge-success' : 'badge-secondary'}" 
+                              title="${agent.is_currently_logged_in ? 'Currently logged in' : 'Not logged in'}">
+                            ${agent.is_currently_logged_in ? '🟢 Online' : '🔴 Offline'}
+                        </span>
+                    </td>
                     <td>${agent.tasks_completed || 0}</td>
                     <td>${agent.last_login || 'Never'}</td>
-                    <td>${agent.last_logout || 'N/A'}</td>
-                    <td>${agent.session_duration || '-'}</td>
+                    <td>${agent.last_logout || 'Never'}</td>
+                    <td>${sessionDuration}</td>
                     <td>
                         <button class="btn btn-sm ${agent.status === 'active' ? 'btn-danger' : 'btn-success'}" 
                                 onclick="toggleAgentStatus('${agent.agent_id}', '${agent.status}')">
                             ${agent.status === 'active' ? 'Deactivate' : 'Activate'}
                         </button>
+                        <button class="btn btn-sm btn-info" 
+                                onclick="viewSessionHistory('${agent.agent_id}')" title="View Session History">
+                            📊
+                        </button>
                         ${agent.is_currently_logged_in ? 
-                            `<button class="btn btn-sm btn-danger" onclick="forceLogout('${agent.agent_id}')" title="Force Logout">⏹️</button>` : ''
+                            `<button class="btn btn-sm btn-danger" 
+                                     onclick="forceLogout('${agent.agent_id}')" title="Force Logout">
+                                ⏹️
+                            </button>` : ''
                         }
                     </td>
                 `;
@@ -875,82 +1160,168 @@
             });
         }
 
-        // Populate agent select dropdowns
-        function populateAgentSelects() {
-            const selects = ['agentSelect', 'exportAgent', 'sessionAgent'];
-            selects.forEach(selectId => {
-                const select = document.getElementById(selectId);
-                if (!select) {
-                    console.warn(`Select element ${selectId} not found`);
-                    return;
+        // Show agent password (with authentication)
+        async function showPassword(agentId) {
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/agent-password/${agentId}`);
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(result.message, 'info');
+                } else {
+                    showAlert(`Error: ${result.detail}`, 'error');
                 }
-                const firstOption = select.firstElementChild;
-                select.innerHTML = '';
-                select.appendChild(firstOption);
-                agents.forEach(agent => {
-                    if (agent.status === 'active') {
-                        const option = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
-                        select.appendChild(option);
-                    }
-                });
-            });
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    showAlert('Error retrieving password information', 'error');
+                }
+            }
         }
 
-        // Setup agent registration form
-        function setupAgentRegistration() {
-            const form = document.getElementById('agentRegistrationForm');
-            if (!form) {
-                console.error('Agent registration form not found');
+        // Reset agent password (with authentication)
+        async function resetPassword(agentId) {
+            if (!confirm('Are you sure you want to reset this agent\'s password? This will generate a new password.')) {
                 return;
             }
-            form.addEventListener('submit', async function(e) {
-                e.preventDefault();
-                if (!form.checkValidity()) {
-                    showAlert('Please fill all required fields correctly', 'error');
-                    return;
+            
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/reset-password/${agentId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const passwordDisplay = `
+                        New Password for ${agentId}: 
+                        ${result.new_password}
+                        
+                        Please save this password securely and share it with the agent.
+                    `;
+                    
+                    alert(passwordDisplay);
+                    showAlert(`Password reset successfully for agent ${agentId}`, 'success');
+                    
+                    const passwordSpan = document.getElementById(`password-${agentId}`);
+                    if (passwordSpan) {
+                        passwordSpan.textContent = result.new_password;
+                        passwordSpan.style.background = '#e8f5e8';
+                        setTimeout(() => {
+                            passwordSpan.textContent = '••••••••';
+                            passwordSpan.style.background = '#f0f0f0';
+                        }, 10000);
+                    }
+                    
+                } else {
+                    showAlert(`Password reset failed: ${result.detail}`, 'error');
                 }
-                await registerNewAgent();
-            });
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    showAlert('Error resetting password', 'error');
+                }
+            }
         }
 
-        // Register new agent
-        async function registerNewAgent() {
-            const form = document.getElementById('agentRegistrationForm');
-            const submitBtn = form.querySelector('button[type="submit"]');
-            const originalText = submitBtn.textContent;
-            submitBtn.textContent = 'Registering...';
-            submitBtn.disabled = true;
-
-            try {
-                const formData = new FormData(form);
-                console.log('Registering agent with data:', Object.fromEntries(formData));
-                const result = await fetchWithErrorHandling(getApiUrl('/api/agents/register'), {
-                    method: 'POST',
-                    body: formData
-                });
-                document.getElementById('newAgentId').textContent = result.agent_id;
-                document.getElementById('newAgentPassword').textContent = result.password;
-                document.getElementById('newAgentCredentials').classList.remove('hidden');
-                form.reset();
-                await loadAgents();
-                populateAgentSelects();
-                showAlert(`Agent registered successfully! ID: ${result.agent_id}`, 'success');
-            } catch (error) {
-                // Error handled by fetchWithErrorHandling
-            } finally {
-                submitBtn.textContent = originalText;
-                submitBtn.disabled = false;
+        // View session history
+        function viewSessionHistory(agentId) {
+            const agent = agents.find(a => a.agent_id === agentId);
+            if (!agent || !agent.recent_sessions) {
+                showAlert('No session history available', 'info');
+                return;
             }
+            
+            let historyHtml = `<h3>Session History for ${agent.name} (${agentId})</h3>`;
+            historyHtml += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
+            historyHtml += '<tr style="background: #f0f0f0;"><th style="padding: 8px; border: 1px solid #ddd;">Login Time</th><th style="padding: 8px; border: 1px solid #ddd;">Logout Time</th><th style="padding: 8px; border: 1px solid #ddd;">Duration</th></tr>';
+            
+            agent.recent_sessions.forEach(session => {
+                const duration = session.logout_time ? 
+                    `${session.duration_minutes || 0} minutes` : 
+                    'Still active';
+                
+                historyHtml += `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${session.login_time || 'N/A'}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${session.logout_time || 'Still logged in'}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${duration}</td>
+                    </tr>
+                `;
+            });
+            
+            historyHtml += '</table>';
+            
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.5); z-index: 1000; display: flex; 
+                align-items: center; justify-content: center;
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: white; padding: 20px; border-radius: 10px; 
+                max-width: 80%; max-height: 80%; overflow: auto;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            `;
+            
+            modalContent.innerHTML = historyHtml + 
+                '<button onclick="this.closest(\'.modal\').remove()" style="margin-top: 15px; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>';
+            
+            modal.className = 'modal';
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+        }
+
+        // Force logout agent (with authentication)
+        async function forceLogout(agentId) {
+            if (!confirm('Force logout this agent? This will end their current session.')) {
+                return;
+            }
+            
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/force-logout/${agentId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`Agent ${agentId} has been logged out`, 'success');
+                    await loadAgents();
+                } else {
+                    showAlert(`Force logout failed: ${result.detail}`, 'error');
+                }
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    showAlert('Error during force logout', 'error');
+                }
+            }
+        }
+
+        // Populate agent select dropdowns
+        function populateAgentSelects() {
+            const agentSelect = document.getElementById('agentSelect');
+            const exportAgentSelect = document.getElementById('exportAgent');
+            const sessionAgentSelect = document.getElementById('sessionAgent');
+            
+            agentSelect.innerHTML = '<option value="">Select an agent...</option>';
+            exportAgentSelect.innerHTML = '<option value="">All Agents</option>';
+            sessionAgentSelect.innerHTML = '<option value="">All Agents</option>';
+            
+            agents.forEach(agent => {
+                if (agent.status === 'active') {
+                    const option1 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
+                    const option2 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
+                    const option3 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
+                    agentSelect.appendChild(option1);
+                    exportAgentSelect.appendChild(option2);
+                    sessionAgentSelect.appendChild(option3);
+                }
+            });
         }
 
         // Setup drag and drop functionality
         function setupDragAndDrop() {
             const uploadArea = document.getElementById('uploadArea');
             const zipFileInput = document.getElementById('zipFile');
-            if (!uploadArea || !zipFileInput) {
-                console.error('Upload area or zip file input not found');
-                return;
-            }
 
             uploadArea.addEventListener('dragover', (e) => {
                 e.preventDefault();
@@ -964,6 +1335,7 @@
             uploadArea.addEventListener('drop', (e) => {
                 e.preventDefault();
                 uploadArea.classList.remove('dragover');
+                
                 const files = e.dataTransfer.files;
                 if (files.length > 0 && files[0].name.endsWith('.zip')) {
                     handleZipFileSelection(files[0]);
@@ -977,16 +1349,15 @@
                     handleZipFileSelection(e.target.files[0]);
                 }
             });
-
-            document.getElementById('agentSelect').addEventListener('change', updateUploadButtonState);
         }
 
         // Handle ZIP file selection
         function handleZipFileSelection(file) {
             selectedZipFile = file;
-            console.log('Selected file:', file.name, file.size);
+            
             document.querySelector('#uploadArea h3').textContent = `📎 Selected: ${file.name}`;
             document.querySelector('#uploadArea p').textContent = `Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            
             updateUploadButtonState();
             showAlert(`ZIP file "${file.name}" selected successfully!`, 'success');
         }
@@ -996,10 +1367,12 @@
             const uploadBtn = document.getElementById('uploadBtn');
             const agentSelected = document.getElementById('agentSelect').value !== '';
             uploadBtn.disabled = !(selectedZipFile && agentSelected);
-            console.log('Upload button state:', { file: !!selectedZipFile, agent: agentSelected });
         }
 
-        // Upload ZIP file
+        // Agent selection change handler
+        document.getElementById('agentSelect').addEventListener('change', updateUploadButtonState);
+
+        // Upload ZIP file (with authentication)
         async function uploadZipFile() {
             if (!selectedZipFile || !document.getElementById('agentSelect').value) {
                 showAlert('Please select both a ZIP file and an agent', 'error');
@@ -1009,151 +1382,248 @@
             const formData = new FormData();
             formData.append('zip_file', selectedZipFile);
             formData.append('agent_id', document.getElementById('agentSelect').value);
-            console.log('Uploading file:', selectedZipFile.name, 'for agent:', document.getElementById('agentSelect').value);
 
             document.getElementById('uploadProgress').classList.remove('hidden');
             document.getElementById('uploadBtn').disabled = true;
 
             try {
-                const result = await fetchWithErrorHandling(getApiUrl('/api/admin/upload-tasks'), {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/upload-tasks`, {
                     method: 'POST',
                     body: formData
                 });
-                showAlert(`Successfully uploaded ${result.images_processed} images and assigned tasks!`, 'success');
-                selectedZipFile = null;
-                document.getElementById('agentSelect').value = '';
-                document.getElementById('zipFile').value = '';
-                document.querySelector('#uploadArea h3').textContent = '📎 Drop ZIP file here or click to upload';
-                document.querySelector('#uploadArea p').textContent = 'Supported formats: .zip (containing .jpg, .jpeg, .png images)';
-                loadStatistics();
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert(`Successfully uploaded ${result.images_processed} images and assigned tasks!`, 'success');
+                    
+                    selectedZipFile = null;
+                    document.getElementById('agentSelect').value = '';
+                    document.getElementById('zipFile').value = '';
+                    document.querySelector('#uploadArea h3').textContent = '📎 Drop ZIP file here or click to upload';
+                    document.querySelector('#uploadArea p').textContent = 'Supported formats: .zip (containing .jpg, .jpeg, .png images)';
+                    
+                    loadStatistics();
+                    
+                } else {
+                    showAlert(`Upload failed: ${result.detail || 'Unknown error'}`, 'error');
+                }
+
             } catch (error) {
-                // Error handled by fetchWithErrorHandling
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Upload error:', error);
+                    showAlert('Network error during upload', 'error');
+                }
             } finally {
                 document.getElementById('uploadProgress').classList.add('hidden');
+                document.getElementById('uploadBtn').disabled = false;
                 updateUploadButtonState();
             }
         }
 
-        // Agent management functions
-        async function showPassword(agentId) {
-            try {
-                const result = await fetchWithErrorHandling(getApiUrl(`/api/admin/agent-password/${agentId}`));
-                const passwordElement = document.getElementById(`password-${agentId}`);
-                passwordElement.textContent = result.password;
-                setTimeout(() => {
-                    passwordElement.textContent = '••••••••';
-                }, 5000);
-            } catch (error) {
-                // Error handled by fetchWithErrorHandling
-            }
-        }
-
-        async function resetPassword(agentId) {
-            if (!confirm(`Are you sure you want to reset the password for agent ${agentId}?`)) return;
-            try {
-                const result = await fetchWithErrorHandling(getApiUrl(`/api/admin/reset-password/${agentId}`), {
-                    method: 'POST'
-                });
-                alert(`New Password for ${agentId}: ${result.new_password}\n\nPlease save this password securely.`);
-                showAlert(`Password reset successfully for agent ${agentId}`, 'success');
-            } catch (error) {
-                // Error handled by fetchWithErrorHandling
-            }
-        }
-
-        async function toggleAgentStatus(agentId, currentStatus) {
-            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-            try {
-                await fetchWithErrorHandling(getApiUrl(`/api/agents/${agentId}/status`), {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: newStatus })
-                });
-                showAlert(`Agent status updated to ${newStatus}`, 'success');
-                await loadAgents();
-            } catch (error) {
-                // Error handled by fetchWithErrorHandling
-            }
-        }
-
-        async function forceLogout(agentId) {
-            if (!confirm(`Force logout agent ${agentId}?`)) return;
-            try {
-                await fetchWithErrorHandling(getApiUrl(`/api/admin/force-logout/${agentId}`), {
-                    method: 'POST'
-                });
-                showAlert(`Agent ${agentId} has been logged out`, 'success');
-                await loadAgents();
-            } catch (error) {
-                // Error handled by fetchWithErrorHandling
-            }
-        }
-
-        // Export and session functions
+        // Export data to Excel (with authentication)
         async function exportToExcel() {
             const filters = {
                 agent_id: document.getElementById('exportAgent').value,
                 date_from: document.getElementById('dateFrom').value,
                 date_to: document.getElementById('dateTo').value
             };
+
             const queryParams = new URLSearchParams();
             Object.entries(filters).forEach(([key, value]) => {
                 if (value) queryParams.append(key, value);
             });
-            console.log('Exporting with filters:', filters);
 
             try {
-                const response = await fetch(getApiUrl(`/api/admin/export-excel?${queryParams}`));
-                if (!response.ok) {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/export-excel?${queryParams}`, {
+                    method: 'GET'
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `crime_records_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    showAlert('Excel file downloaded successfully!', 'success');
+                } else {
                     const error = await response.json();
-                    throw new Error(error.detail || 'Export failed');
+                    showAlert(`Export failed: ${error.detail}`, 'error');
                 }
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `crime_records_export_${new Date().toISOString().split('T')[0]}.xlsx`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-                showAlert('Excel file downloaded successfully!', 'success');
+
             } catch (error) {
-                showAlert(`Export failed: ${error.message}`, 'error');
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Export error:', error);
+                    showAlert('Network error during export', 'error');
+                }
             }
         }
 
+        // Preview data (with authentication)
         async function previewData() {
             const filters = {
                 agent_id: document.getElementById('exportAgent').value,
                 date_from: document.getElementById('dateFrom').value,
                 date_to: document.getElementById('dateTo').value
             };
+
             const queryParams = new URLSearchParams();
             Object.entries(filters).forEach(([key, value]) => {
                 if (value) queryParams.append(key, value);
             });
-            console.log('Previewing data with filters:', filters);
 
             try {
-                const data = await fetchWithErrorHandling(getApiUrl(`/api/admin/preview-data?${queryParams}`));
-                displayDataPreview(data);
-                document.getElementById('dataPreviewSection').classList.remove('hidden');
-                const previewLink = document.querySelector('.nav-link[data-page="preview"]');
-                if (previewLink) {
-                    document.querySelectorAll('.nav-link').forEach(nl => nl.classList.remove('active'));
-                    document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-                    previewLink.classList.add('active');
-                    document.getElementById('preview').classList.add('active');
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/preview-data?${queryParams}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayDataPreview(data);
+                    document.getElementById('dataPreviewSection').classList.remove('hidden');
+                } else {
+                    showAlert(`Preview failed: ${data.detail}`, 'error');
                 }
+
             } catch (error) {
-                // Error handled by fetchWithErrorHandling
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Preview error:', error);
+                    showAlert('Network error during preview', 'error');
+                }
             }
         }
 
+        // Test data availability (with authentication)
+        async function testDataAvailability() {
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/test-data`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert(`Data test successful: ${data.message}`, 'success');
+                } else {
+                    showAlert(`Data test failed: ${data.detail}`, 'error');
+                }
+
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Data test error:', error);
+                    showAlert('Network error during data test', 'error');
+                }
+            }
+        }
+
+        // Load session report (with authentication)
+        async function loadSessionReport() {
+            const filters = {
+                agent_id: document.getElementById('sessionAgent').value,
+                date_from: document.getElementById('sessionDateFrom').value,
+                date_to: document.getElementById('sessionDateTo').value
+            };
+
+            const queryParams = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) queryParams.append(key, value);
+            });
+
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/session-report?${queryParams}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    displaySessionReport(data);
+                    document.getElementById('sessionReportContainer').style.display = 'block';
+                } else {
+                    showAlert(`Session report failed: ${data.detail}`, 'error');
+                }
+
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Session report error:', error);
+                    showAlert('Network error during session report', 'error');
+                }
+            }
+        }
+
+        // Export session report (with authentication)
+        async function exportSessionReport() {
+            const filters = {
+                agent_id: document.getElementById('sessionAgent').value,
+                date_from: document.getElementById('sessionDateFrom').value,
+                date_to: document.getElementById('sessionDateTo').value
+            };
+
+            const queryParams = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) queryParams.append(key, value);
+            });
+
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/export-sessions?${queryParams}`, {
+                    method: 'GET'
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `session_report_${new Date().toISOString().split('T')[0]}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    showAlert('Session report downloaded successfully!', 'success');
+                } else {
+                    const error = await response.json();
+                    showAlert(`Session export failed: ${error.detail}`, 'error');
+                }
+
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Session export error:', error);
+                    showAlert('Network error during session export', 'error');
+                }
+            }
+        }
+
+        // Display session report
+        function displaySessionReport(data) {
+            const tbody = document.getElementById('sessionReportBody');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6">No session data found with current filters</td></tr>';
+                return;
+            }
+
+            data.forEach(session => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${session.agent_id}</td>
+                    <td>${session.agent_name}</td>
+                    <td>${session.login_time || 'N/A'}</td>
+                    <td>${session.logout_time || 'Still logged in'}</td>
+                    <td>${session.duration_minutes || 0}</td>
+                    <td>
+                        <span class="badge ${session.logout_time ? 'badge-success' : 'badge-danger'}">
+                            ${session.logout_time ? 'Completed' : 'Active'}
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Display data preview
         function displayDataPreview(data) {
             const thead = document.getElementById('previewTableHead');
             const tbody = document.getElementById('previewTableBody');
+
             thead.innerHTML = '';
             tbody.innerHTML = '';
 
@@ -1183,139 +1653,168 @@
 
             if (data.length > 50) {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td colspan="${headers.length}" style="text-align: center; font-style: italic; color: #666;">Showing first 50 of ${data.length} records</td>`;
+                tr.innerHTML = `<td colspan="${headers.length}" style="text-align: center; font-style: italic; color: #666;">Showing first 50 of ${data.length} records. Download Excel for complete data.</td>`;
                 tbody.appendChild(tr);
             }
         }
 
-        async function testDataAvailability() {
+        // Toggle agent status (with authentication)
+        async function toggleAgentStatus(agentId, currentStatus) {
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+            
             try {
-                const data = await fetchWithErrorHandling(getApiUrl('/api/admin/preview-data?limit=1'));
-                showAlert(`✅ Data available! Found ${data.length > 0 ? 'records' : 'no records'} in database.`, 'success');
-            } catch (error) {
-                // Error handled by fetchWithErrorHandling
-            }
-        }
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/agents/${agentId}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
 
-        async function loadSessionReport() {
-            const filters = {
-                agent_id: document.getElementById('sessionAgent').value,
-                date_from: document.getElementById('sessionDateFrom').value,
-                date_to: document.getElementById('sessionDateTo').value
-            };
-            const queryParams = new URLSearchParams();
-            Object.entries(filters).forEach(([key, value]) => {
-                if (value) queryParams.append(key, value);
-            });
-            console.log('Loading session report with filters:', filters);
-
-            try {
-                const sessions = await fetchWithErrorHandling(getApiUrl(`/api/admin/session-report?${queryParams}`));
-                displaySessionReport(sessions);
-                document.getElementById('sessionReportContainer').style.display = 'block';
-            } catch (error) {
-                // Error handled by fetchWithErrorHandling
-            }
-        }
-
-        function displaySessionReport(sessions) {
-            const tbody = document.getElementById('sessionReportBody');
-            tbody.innerHTML = '';
-            if (sessions.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6">No sessions found</td></tr>';
-                return;
-            }
-            sessions.forEach(session => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${session.agent_id || 'N/A'}</td>
-                    <td>${session.agent_name || 'N/A'}</td>
-                    <td>${session.login_time || 'N/A'}</td>
-                    <td>${session.logout_time || 'Active'}</td>
-                    <td>${session.duration || '-'}</td>
-                    <td><span class="badge ${session.status === 'active' ? 'badge-success' : 'badge-secondary'}">${session.status || 'Unknown'}</span></td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        async function exportSessionReport() {
-            const filters = {
-                agent_id: document.getElementById('sessionAgent').value,
-                date_from: document.getElementById('sessionDateFrom').value,
-                date_to: document.getElementById('sessionDateTo').value
-            };
-            const queryParams = new URLSearchParams();
-            Object.entries(filters).forEach(([key, value]) => {
-                if (value) queryParams.append(key, value);
-            });
-            console.log('Exporting session report with filters:', filters);
-
-            try {
-                const response = await fetch(getApiUrl(`/api/admin/export-session-report?${queryParams}`));
-                if (!response.ok) {
+                if (response.ok) {
+                    showAlert(`Agent status updated to ${newStatus}`, 'success');
+                    loadAgents();
+                } else {
                     const error = await response.json();
-                    throw new Error(error.detail || 'Export failed');
+                    showAlert(`Failed to update status: ${error.detail}`, 'error');
                 }
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `session_report_${new Date().toISOString().split('T')[0]}.xlsx`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-                showAlert('Session report exported successfully!', 'success');
+
             } catch (error) {
-                showAlert(`Export failed: ${error.message}`, 'error');
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Status update error:', error);
+                    showAlert('Network error during status update', 'error');
+                }
             }
         }
 
-        // Utility functions
+        // Refresh agents
         function refreshAgents() {
-            loadAgents();
-            populateAgentSelects();
-            showAlert('Agents data refreshed!', 'success');
+            loadDashboardData();
+            showAlert('Data refreshed successfully!', 'success');
         }
 
-        function copyToClipboard(elementId) {
-            const element = document.getElementById(elementId);
-            if (!element) {
-                console.error('Element not found for copy:', elementId);
-                return;
-            }
-            const text = element.textContent;
-            navigator.clipboard.writeText(text).then(() => {
-                const btn = element.nextElementSibling;
-                const originalText = btn.textContent;
-                btn.textContent = 'Copied!';
-                btn.style.background = '#4caf50';
-                setTimeout(() => {
-                    btn.textContent = originalText;
-                    btn.style.background = '';
-                }, 2000);
-            }).catch(() => {
-                showAlert('Failed to copy to clipboard', 'error');
-            });
-        }
-
+        // Show alert messages
         function showAlert(message, type) {
-            document.querySelectorAll('.alert').forEach(alert => alert.remove());
+            const existingAlerts = document.querySelectorAll('.alert');
+            existingAlerts.forEach(alert => alert.remove());
+
             const alert = document.createElement('div');
             alert.className = `alert alert-${type}`;
             alert.textContent = message;
-            const currentPage = document.querySelector('.page.active .page-content');
-            if (currentPage) {
-                currentPage.insertBefore(alert, currentPage.firstChild);
+
+            const content = document.querySelector('.content');
+            if (content) {
+                content.insertBefore(alert, content.firstChild);
             } else {
-                console.warn('No active page found for alert');
-                document.body.appendChild(alert);
+                // If on login screen
+                const loginForm = document.querySelector('.login-form');
+                if (loginForm) {
+                    loginForm.insertBefore(alert, loginForm.firstChild);
+                }
             }
+
             setTimeout(() => {
-                if (alert.parentNode) alert.remove();
+                if (alert.parentNode) {
+                    alert.remove();
+                }
             }, 5000);
         }
+
+        // Security enhancements
+        
+        // Prevent right-click context menu on sensitive areas
+        document.addEventListener('contextmenu', function(e) {
+            if (e.target.closest('.credential-value') || e.target.closest('input[type="password"]')) {
+                e.preventDefault();
+            }
+        });
+
+        // Prevent drag and drop on password fields
+        document.addEventListener('dragstart', function(e) {
+            if (e.target.closest('.credential-value') || e.target.closest('input[type="password"]')) {
+                e.preventDefault();
+            }
+        });
+
+        // Clear sensitive data on page unload
+        window.addEventListener('beforeunload', function() {
+            // Clear any sensitive form data
+            const passwordInputs = document.querySelectorAll('input[type="password"]');
+            passwordInputs.forEach(input => input.value = '');
+            
+            // Clear credential displays
+            const credentialValues = document.querySelectorAll('.credential-value');
+            credentialValues.forEach(element => element.textContent = '••••••••');
+        });
+
+        // Disable browser back/forward navigation on sensitive pages
+        history.pushState(null, null, location.href);
+        window.addEventListener('popstate', function() {
+            history.pushState(null, null, location.href);
+        });
+
+        // Auto-logout on tab visibility change (optional security feature)
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // Page is hidden - could implement auto-logout after extended period
+                // For now, just extend session timeout when page becomes visible again
+                return;
+            } else {
+                // Page is visible again - refresh session if valid
+                const session = getSession();
+                if (session && session.expiry > Date.now()) {
+                    extendSession();
+                }
+            }
+        });
+
+        // Additional security: Check for suspicious activity
+        let suspiciousActivityCount = 0;
+        const MAX_SUSPICIOUS_ACTIVITIES = 5;
+
+        function detectSuspiciousActivity(activityType) {
+            suspiciousActivityCount++;
+            
+            if (suspiciousActivityCount >= MAX_SUSPICIOUS_ACTIVITIES) {
+                showAlert('Suspicious activity detected. Session will be terminated for security.', 'error');
+                setTimeout(() => {
+                    logout();
+                }, 3000);
+            }
+        }
+
+        // Monitor for rapid failed authentication attempts
+        document.getElementById('adminPassword').addEventListener('input', function() {
+            if (failedAttempts >= 2) {
+                // User is typing after failed attempts - this is normal, reset counter
+                if (this.value.length > 3) {
+                    suspiciousActivityCount = 0;
+                }
+            }
+        });
+
+        // Keyboard shortcuts for quick logout (Ctrl+Shift+L)
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.shiftKey && e.key === 'L') {
+                e.preventDefault();
+                if (getSession()) {
+                    logout();
+                    showAlert('Quick logout activated', 'info');
+                }
+            }
+        });
+
+        // Session info display (optional)
+        function showSessionInfo() {
+            const session = getSession();
+            if (session) {
+                const timeRemaining = Math.max(0, Math.floor((session.expiry - Date.now()) / 60000));
+                console.log(`Session active. Time remaining: ${timeRemaining} minutes`);
+            }
+        }
+
+        // Call session info every 10 minutes (for debugging)
+        setInterval(showSessionInfo, 10 * 60 * 1000);
     </script>
 </body>
 </html>
