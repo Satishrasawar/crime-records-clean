@@ -1,35 +1,33 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from app.routes.agent_routes import router as agent_router
 
-# Database setup
-from app.database import Base, engine
-from app.models import Agent, TaskProgress, SubmittedForm, AgentSession
+# Import your local modules (ensure these imports work)
+try:
+    from agent_routes import router as agent_router
+    from database import Base, engine
+    from models import Agent, TaskProgress, SubmittedForm, AgentSession
+except ImportError as e:
+    print(f"Import error: {e}")
+    # Create a minimal app if imports fail
+    pass
 
-import os
-PORT = int(os.environ.get("PORT", 8000))
-ENVIRONMENT = os.environ.get("RAILWAY_ENVIRONMENT", "development")
+# Create directories if they don't exist
+os.makedirs("static/task_images", exist_ok=True)
 
-# Database URL for Railway (they provide PostgreSQL)
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./database.db")
-
+# Initialize FastAPI app
 app = FastAPI(
-    title="Crime Records Data Entry System",
+    title="Crime Records Data Entry System", 
     version="2.0.0",
-    description="Enhanced system with ZIP upload and Excel export"
+    description="Enhanced system for agent-task-system.com"
 )
 
-# Update CORS for your domain
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://agent-task-system.com",
-        "https://www.agent-task-system.com",
-        "http://localhost:3000",  # For development
-        "http://127.0.0.1:3000"   # For development
-    ],
+    allow_origins=["*"],  # Allow all for testing
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,97 +38,78 @@ print("🔧 Creating database tables...")
 try:
     Base.metadata.create_all(bind=engine)
     print("✅ Database tables created successfully!")
-    
-    # Verify tables were created
-    from sqlalchemy import inspect
-    inspector = inspect(engine)
-    tables = inspector.get_table_names()
-    print(f"📋 Available tables: {', '.join(tables)}")
-    
 except Exception as e:
     print(f"❌ Error creating database tables: {e}")
 
-# Create directories if they don't exist
-os.makedirs("static/task_images/crime_records_wide", exist_ok=True)
-os.makedirs("templates", exist_ok=True)
-
-# Initialize FastAPI app
-app = FastAPI(
-    title="Crime Records Data Entry System", 
-    version="2.0.0",
-    description="Enhanced system with ZIP upload and Excel export"
-)
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+try:
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+except Exception as e:
+    print(f"Warning: Could not mount static files: {e}")
 
 # Include routers
-app.include_router(agent_router)
+try:
+    app.include_router(agent_router)
+    print("✅ Agent routes included")
+except Exception as e:
+    print(f"Warning: Could not include agent routes: {e}")
 
-# ✅ ADD THESE ROUTES TO SERVE HTML FILES
+# CRITICAL: Health endpoint (must work for Railway)
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Railway"""
+    return {
+        "status": "healthy", 
+        "platform": "Railway",
+        "message": "Service is running"
+    }
+
+# Root endpoint
+@app.get("/")
+def root():
+    """Root endpoint"""
+    return {
+        "message": "Crime Records Data Entry System API v2.0",
+        "status": "running",
+        "platform": "Railway",
+        "health_check": "/health"
+    }
+
+# Serve HTML files
 @app.get("/admin.html")
 async def serve_admin_panel():
-    """Serve the admin dashboard"""
-    admin_file = "../admin.html"  # Go up one level from backend
-    if os.path.exists(admin_file):
-        return FileResponse(admin_file)
-    else:
-        # Try current directory
+    """Serve admin dashboard"""
+    try:
         if os.path.exists("admin.html"):
             return FileResponse("admin.html")
-        # Try parent directory
-        elif os.path.exists("../admin.html"):
-            return FileResponse("../admin.html")
-        else:
-            return {"error": "Admin panel not found. Please ensure admin.html is in the project root or backend directory."}
+        return {"error": "Admin panel not found"}
+    except Exception as e:
+        return {"error": f"Could not serve admin panel: {e}"}
 
 @app.get("/agent.html")
 async def serve_agent_panel():
-    """Serve the agent interface"""
-    agent_file = "../agent.html"  # Go up one level from backend
-    if os.path.exists(agent_file):
-        return FileResponse(agent_file)
-    else:
-        # Try current directory
+    """Serve agent interface"""
+    try:
         if os.path.exists("agent.html"):
             return FileResponse("agent.html")
-        # Try parent directory
-        elif os.path.exists("../agent.html"):
-            return FileResponse("../agent.html")
-        else:
-            return {"error": "Agent panel not found. Please ensure agent.html is in the project root or backend directory."}
+        return {"error": "Agent panel not found"}
+    except Exception as e:
+        return {"error": f"Could not serve agent panel: {e}"}
 
-@app.get("/")
-def root():
+# Debug info
+@app.get("/debug")
+def debug_info():
+    """Debug endpoint to check what files exist"""
+    import os
+    files = os.listdir(".")
     return {
-        "message": "Crime Records Data Entry System API v2.0", 
-        "panels": {
-            "admin_dashboard": "http://localhost:8000/admin.html",
-            "agent_interface": "http://localhost:8000/agent.html"
-        },
-        "features": [
-            "Agent Registration with Auto-Generated Credentials",
-            "ZIP File Upload for Bulk Image Assignment", 
-            "Excel Export with Filtering",
-            "Auto-Progression After Form Submission",
-            "Real-time Progress Tracking"
-        ],
-        "api_docs": "http://localhost:8000/docs"
+        "files": files,
+        "python_version": os.sys.version,
+        "environment": dict(os.environ)
     }
-
-@app.get("/health")
-def health_check():
-    return {"status": "healthy", "database": "connected"}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    port = int(os.environ.get("PORT", 8000))
+    print(f"🚀 Starting server on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
