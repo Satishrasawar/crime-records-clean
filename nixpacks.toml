@@ -4,14 +4,15 @@ nixPkgs = ["python311", "python311Packages.pip", "python311Packages.virtualenv"]
 [phases.install]
 dependsOn = ["setup"]
 cmds = [
-    "python -m venv --copies venv",
-    ". venv/bin/activate && pip install --upgrade pip",
-    ". venv/bin/activate && pip install -r requirements.txt"
+    "python3 -m venv venv",
+    "source venv/bin/activate",
+    "pip install --upgrade pip",
+    "pip install -r requirements.txt"
 ]
 
 [phases.build]
 dependsOn = ["install"]
-cmds = ["echo 'Build phase complete'"]
+cmds = ["echo 'Build complete'"]
 
 [start]
-cmd = ". venv/bin/activate && uvicorn main:app --host 0.0.0.0 --port $PORT"
+cmd = "source venv/bin/activate && python -m uvicorn main:app --host 0.0.0.0 --port $PORT"
