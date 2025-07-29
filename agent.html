@@ -502,9 +502,36 @@
                 padding: 20px;
             }
         }
+
+        /* Security overlay */
+        .security-warning {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(220, 53, 69, 0.95);
+            color: white;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
+    <!-- Security Warning Overlay -->
+    <div class="security-warning" id="securityWarning">
+        <div>
+            <h2>⚠️ SECURITY ALERT ⚠️</h2>
+            <p>Copy/Paste operations are not allowed in this secure system</p>
+            <p>Please type all information manually</p>
+        </div>
+    </div>
+
     <!-- Animated background -->
     <div class="particles">
         <div class="particle"></div>
@@ -812,7 +839,63 @@
             return `${CONFIG.API_BASE_URL}${endpoint}`;
         }
 
-        // NO AUTO-FORMATTING - Completely manual entry
+        // COMPREHENSIVE SECURITY FUNCTIONS TO PREVENT COPY/PASTE
+        function showSecurityWarning() {
+            const warning = document.getElementById('securityWarning');
+            warning.style.display = 'flex';
+            setTimeout(() => {
+                warning.style.display = 'none';
+            }, 3000);
+        }
+
+        function preventCopyPaste(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            showSecurityWarning();
+            return false;
+        }
+
+        function blockKeyboardShortcuts(e) {
+            // Block common copy/paste/cut shortcuts
+            if (e.ctrlKey || e.metaKey) {
+                const blockedKeys = ['c', 'v', 'x', 'a', 's', 'z', 'y'];
+                if (blockedKeys.includes(e.key.toLowerCase())) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showSecurityWarning();
+                    return false;
+                }
+            }
+            
+            // Block F12, Ctrl+Shift+I, Ctrl+U, etc.
+            if (e.key === 'F12' || 
+                (e.ctrlKey && e.shiftKey && e.key === 'I') ||
+                (e.ctrlKey && e.key === 'U') ||
+                (e.ctrlKey && e.shiftKey && e.key === 'J')) {
+                e.preventDefault();
+                e.stopPropagation();
+                showSecurityWarning();
+                return false;
+            }
+        }
+
+        // Disable drag and drop
+        function preventDragDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            showSecurityWarning();
+            return false;
+        }
+
+        // Disable text selection
+        function preventSelection(e) {
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                return false;
+            }
+        }
+
+        // COMPLETE SECURITY IMPLEMENTATION
         document.addEventListener('DOMContentLoaded', function() {
             // Disable autocomplete on all forms and inputs
             const forms = document.querySelectorAll('form');
@@ -828,15 +911,49 @@
                 input.setAttribute('autocorrect', 'off');
                 input.setAttribute('spellcheck', 'false');
                 
-                // Disable right-click context menu
-                input.addEventListener('contextmenu', function(e) {
-                    e.preventDefault();
-                });
+                // Comprehensive event blocking for each input
+                input.addEventListener('copy', preventCopyPaste);
+                input.addEventListener('paste', preventCopyPaste);
+                input.addEventListener('cut', preventCopyPaste);
+                input.addEventListener('contextmenu', preventCopyPaste);
+                input.addEventListener('selectstart', preventSelection);
+                input.addEventListener('dragstart', preventDragDrop);
+                input.addEventListener('drop', preventDragDrop);
+                input.addEventListener('dragover', preventDragDrop);
+                
+                // Remove paste event listener if it exists
+                input.onpaste = preventCopyPaste;
+                input.oncopy = preventCopyPaste;
+                input.oncut = preventCopyPaste;
                 
                 // Disable suggestion popups
                 input.addEventListener('focus', function() {
                     this.setAttribute('autocomplete', 'off');
                 });
+            });
+            
+            // Global document event listeners for security
+            document.addEventListener('copy', preventCopyPaste);
+            document.addEventListener('paste', preventCopyPaste);
+            document.addEventListener('cut', preventCopyPaste);
+            document.addEventListener('contextmenu', preventCopyPaste);
+            document.addEventListener('keydown', blockKeyboardShortcuts);
+            document.addEventListener('selectstart', preventSelection);
+            document.addEventListener('dragstart', preventDragDrop);
+            document.addEventListener('drop', preventDragDrop);
+            document.addEventListener('dragover', preventDragDrop);
+            
+            // Disable browser back/forward
+            window.addEventListener('popstate', function(e) {
+                window.history.forward();
+            });
+            
+            // Disable browser refresh
+            window.addEventListener('beforeunload', function(e) {
+                if (currentAgentId) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
             });
             
             // ONLY validation for datetime inputs - NO AUTO-FORMATTING
@@ -869,6 +986,27 @@
                 });
             }
         });
+
+        // Additional security: Override clipboard functions
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText = function() {
+                showSecurityWarning();
+                return Promise.reject('Clipboard access denied');
+            };
+            navigator.clipboard.readText = function() {
+                showSecurityWarning();
+                return Promise.reject('Clipboard access denied');
+            };
+        }
+
+        // Override document selection
+        document.onselectstart = function() {
+            return false;
+        };
+        
+        document.onmousedown = function() {
+            return false;
+        };
 
         // Login form handler - FIXED
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
@@ -1099,6 +1237,26 @@
                 }
             }, 5000);
         }
+
+        // Additional security measures
+        window.addEventListener('load', function() {
+            // Disable developer tools detection (basic)
+            setInterval(function() {
+                if (window.outerHeight - window.innerHeight > 200 || window.outerWidth - window.innerWidth > 200) {
+                    showSecurityWarning();
+                }
+            }, 1000);
+        });
+
+        // Block common developer shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Block F1-F12 keys
+            if (e.keyCode >= 112 && e.keyCode <= 123) {
+                e.preventDefault();
+                showSecurityWarning();
+                return false;
+            }
+        });
     </script>
 </body>
 </html>
