@@ -121,14 +121,6 @@
             text-align: left;
         }
         
-        .form-group label {
-            display: block;
-            color: #2c3e50;
-            font-weight: 600;
-            margin-bottom: 8px;
-            font-size: 14px;
-        }
-        
         .input-container {
             position: relative;
         }
@@ -219,20 +211,9 @@
             flex-shrink: 0;
         }
         
-        .security-notice {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 8px;
-            padding: 10px;
-            margin-bottom: 15px;
-            font-size: 12px;
-            color: #856404;
-            text-align: center;
-        }
-        
         .form-grid {
             display: grid;
-            grid-template-columns: repeat(6, 1fr);
+            grid-template-columns: repeat(6, minmax(250px, 1fr));
             gap: 12px;
             margin-bottom: 15px;
         }
@@ -251,11 +232,11 @@
         }
         
         .form-group-task input {
-            padding: 6px 8px;
+            padding: 8px 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            font-size: 13px;
-            height: 32px;
+            font-size: 14px;
+            height: 40px;
         }
         
         .form-group-task input.protected {
@@ -286,7 +267,7 @@
             flex: 1.5;
             background: #f8f9fa;
             border-radius: 10px;
-            padding: 10px;
+            padding: 15px;
             display: flex;
             flex-direction: column;
             border: 1px solid #ddd;
@@ -299,11 +280,12 @@
             align-items: center;
             justify-content: center;
             min-height: 0;
+            max-height: 100%;
         }
         
         .image-container img {
             max-width: 100%;
-            max-height: 100%;
+            max-height: 80vh;
             object-fit: contain;
             border: 1px solid #ddd;
             border-radius: 8px;
@@ -421,58 +403,32 @@
             margin-bottom: 15px;
             color: #2c3e50;
         }
-
-        .security-warning {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(220, 53, 69, 0.95);
-            color: white;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            font-size: 18px;
-            font-weight: bold;
-            text-align: center;
-        }
         
         /* Responsive design */
         @media (max-width: 1400px) {
-            .form-grid { grid-template-columns: repeat(5, 1fr); }
+            .form-grid { grid-template-columns: repeat(5, minmax(250px, 1fr)); }
         }
         
         @media (max-width: 1200px) {
-            .form-grid { grid-template-columns: repeat(4, 1fr); }
+            .form-grid { grid-template-columns: repeat(4, minmax(250px, 1fr)); }
         }
         
         @media (max-width: 1024px) {
-            .form-grid { grid-template-columns: repeat(3, 1fr); }
+            .form-grid { grid-template-columns: repeat(3, minmax(250px, 1fr)); }
         }
         
         @media (max-width: 768px) {
             .login-card { margin: 20px; padding: 30px 25px; }
-            .form-grid { grid-template-columns: repeat(2, 1fr); }
+            .form-grid { grid-template-columns: repeat(2, minmax(250px, 1fr)); }
         }
         
         @media (max-width: 480px) {
-            .form-grid { grid-template-columns: repeat(1, 1fr); }
+            .form-grid { grid-template-columns: repeat(1, minmax(250px, 1fr)); }
             .login-card { padding: 25px 20px; }
         }
     </style>
 </head>
 <body>
-    <!-- Security Warning Overlay -->
-    <div class="security-warning" id="securityWarning">
-        <div>
-            <h2>⚠️ SECURITY ALERT ⚠️</h2>
-            <p>Copy/Paste operations are not allowed for form data entry</p>
-            <p>Please type all information manually</p>
-        </div>
-    </div>
-
     <!-- Animated background -->
     <div class="particles">
         <div class="particle"></div>
@@ -546,10 +502,6 @@
 
             <!-- FORM SECTION -->
             <div class="form-section">
-                <div class="security-notice">
-                    🔒 <strong>Security Notice:</strong> Copy/paste is disabled for data entry fields below to ensure data integrity
-                </div>
-                
                 <form id="taskForm">
                     <div class="form-grid">
                         <!-- Row 1 -->
@@ -718,9 +670,9 @@
         let currentTaskIndex = 0;
         let totalTasks = 0;
 
-        // Configuration - auto-detect environment
+        // Configuration
         const CONFIG = {
-            API_BASE_URL: getApiBaseUrl(),
+            API_BASE_URL: 'https://web-production-b3ef2.up.railway.app',
             MESSAGES: {
                 LOGIN_SUCCESS: 'Login successful',
                 LOGIN_FAILED: 'Invalid credentials. Please check your Agent ID and password.',
@@ -730,41 +682,14 @@
             }
         };
 
-        // Auto-detect API URL based on environment
-        function getApiBaseUrl() {
-            const hostname = window.location.hostname;
-            
-            // If running on Railway domain
-            if (hostname.includes('railway.app') || hostname.includes('web-production-b3ef2.up.railway.app')) {
-                return 'https://web-production-b3ef2.up.railway.app';
-            }
-            
-            // If running locally
-            if (hostname === 'localhost' || hostname === '127.0.0.1') {
-                return 'http://localhost:8000';
-            }
-            
-            // Default to current origin
-            return window.location.origin;
-        }
-
         function getApiUrl(endpoint) {
             return `${CONFIG.API_BASE_URL}${endpoint}`;
         }
 
-        // Security functions for protected inputs only
-        function showSecurityWarning() {
-            const warning = document.getElementById('securityWarning');
-            warning.style.display = 'flex';
-            setTimeout(() => {
-                warning.style.display = 'none';
-            }, 2000);
-        }
-
+        // Security functions for protected inputs
         function preventCopyPaste(e) {
             e.preventDefault();
             e.stopPropagation();
-            showSecurityWarning();
             return false;
         }
 
