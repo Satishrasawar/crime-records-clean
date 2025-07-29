@@ -770,13 +770,37 @@
 
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing...');
             loadDashboardData();
             setupDragAndDrop();
             setupAgentRegistration();
+            setupEventListeners();
+            
+            // Show dashboard by default
+            showSection('dashboard');
         });
+
+        // Setup all event listeners
+        function setupEventListeners() {
+            // Setup drag and drop after a small delay to ensure elements exist
+            setTimeout(() => {
+                setupDragAndDrop();
+                
+                // Agent selection change handler for upload
+                const agentSelect = document.getElementById('agentSelect');
+                if (agentSelect) {
+                    agentSelect.addEventListener('change', updateUploadButtonState);
+                    console.log('Agent select listener added');
+                } else {
+                    console.log('Agent select not found');
+                }
+            }, 100);
+        }
 
         // Sidebar navigation
         function showSection(sectionId) {
+            console.log('Showing section:', sectionId);
+            
             // Hide all sections
             document.querySelectorAll('.section').forEach(section => {
                 section.classList.remove('active');
@@ -788,10 +812,19 @@
             });
             
             // Show selected section
-            document.getElementById(sectionId).classList.add('active');
+            const targetSection = document.getElementById(sectionId);
+            if (targetSection) {
+                targetSection.classList.add('active');
+                console.log('Section activated:', sectionId);
+            } else {
+                console.error('Section not found:', sectionId);
+            }
             
             // Add active class to selected menu item
-            document.getElementById('menu-' + sectionId).classList.add('active');
+            const menuItem = document.getElementById('menu-' + sectionId);
+            if (menuItem) {
+                menuItem.classList.add('active');
+            }
             
             // Update page title
             const titles = {
@@ -804,10 +837,23 @@
                 'preview': '📋 Data Preview'
             };
             
-            document.getElementById('pageTitle').textContent = titles[sectionId];
+            const pageTitle = document.getElementById('pageTitle');
+            if (pageTitle && titles[sectionId]) {
+                pageTitle.textContent = titles[sectionId];
+            }
             
             // Close mobile sidebar
-            document.getElementById('sidebar').classList.remove('mobile-open');
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) {
+                sidebar.classList.remove('mobile-open');
+            }
+
+            // Load data for specific sections
+            if (sectionId === 'agents') {
+                loadAgents();
+            } else if (sectionId === 'dashboard') {
+                loadStatistics();
+            }
         }
 
         // Toggle mobile sidebar
