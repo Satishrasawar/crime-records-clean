@@ -266,6 +266,25 @@
         .hidden {
             display: none;
         }
+        .connection-status {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .connection-status.connected {
+            background: #4CAF50;
+            color: white;
+        }
+        .connection-status.disconnected {
+            background: #f44336;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -546,16 +565,45 @@
         </div>
     </div>
 
+    <!-- Connection Status Indicator -->
+    <div id="connectionStatus" class="connection-status disconnected">🔄 Connecting...</div>
+
     <script>
         let selectedZipFile = null;
         let agents = [];
 
+        // API Configuration - Use Railway URL
+        const API_BASE_URL = 'https://web-railwaybuilderherokupython.up.railway.app';
+        
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
+            testAPIConnection();
             loadDashboardData();
             setupDragAndDrop();
             setupAgentRegistration();
         });
+
+        // Test API connection and update status indicator
+        async function testAPIConnection() {
+            const statusElement = document.getElementById('connectionStatus');
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const data = await response.json();
+                
+                if (data.status === 'healthy') {
+                    statusElement.textContent = '✅ Connected to Railway';
+                    statusElement.className = 'connection-status connected';
+                    console.log('✅ API Connection successful:', data);
+                } else {
+                    throw new Error('Health check failed');
+                }
+            } catch (error) {
+                statusElement.textContent = '❌ API Disconnected';
+                statusElement.className = 'connection-status disconnected';
+                console.error('❌ API Connection failed:', error);
+                showAlert('Unable to connect to API. Please check your connection.', 'error');
+            }
+        }
 
         // Setup agent registration form
         function setupAgentRegistration() {
@@ -576,7 +624,7 @@
             submitBtn.disabled = true;
 
             try {
-                const response = await fetch('http://localhost:8000/api/agents/register', {
+                const response = await fetch(`${API_BASE_URL}/api/agents/register`, {
                     method: 'POST',
                     body: formData
                 });
@@ -655,7 +703,7 @@
         // Load system statistics
         async function loadStatistics() {
             try {
-                const response = await fetch('http://localhost:8000/api/admin/statistics');
+                const response = await fetch(`${API_BASE_URL}/api/admin/statistics`);
                 const stats = await response.json();
                 
                 document.getElementById('totalAgents').textContent = stats.total_agents || 0;
@@ -672,7 +720,7 @@
         // Load agents list
         async function loadAgents() {
             try {
-                const response = await fetch('http://localhost:8000/api/agents');
+                const response = await fetch(`${API_BASE_URL}/api/agents`);
                 agents = await response.json();
                 
                 updateAgentsTable();
@@ -754,7 +802,7 @@
         // Show agent password
         async function showPassword(agentId) {
             try {
-                const response = await fetch(`http://localhost:8000/api/admin/agent-password/${agentId}`);
+                const response = await fetch(`${API_BASE_URL}/api/admin/agent-password/${agentId}`);
                 const result = await response.json();
                 
                 if (response.ok) {
@@ -774,7 +822,7 @@
             }
             
             try {
-                const response = await fetch(`http://localhost:8000/api/admin/reset-password/${agentId}`, {
+                const response = await fetch(`${API_BASE_URL}/api/admin/reset-password/${agentId}`, {
                     method: 'POST'
                 });
                 const result = await response.json();
@@ -868,7 +916,7 @@
             }
             
             try {
-                const response = await fetch(`http://localhost:8000/api/admin/force-logout/${agentId}`, {
+                const response = await fetch(`${API_BASE_URL}/api/admin/force-logout/${agentId}`, {
                     method: 'POST'
                 });
                 const result = await response.json();
@@ -888,49 +936,22 @@
         function populateAgentSelects() {
             const agentSelect = document.getElementById('agentSelect');
             const exportAgentSelect = document.getElementById('exportAgent');
+            const sessionAgentSelect = document.getElementById('sessionAgent');
             
             // Clear existing options (keep first default option)
             agentSelect.innerHTML = '<option value="">Select an agent...</option>';
             exportAgentSelect.innerHTML = '<option value="">All Agents</option>';
+            sessionAgentSelect.innerHTML = '<option value="">All Agents</option>';
             
             agents.forEach(agent => {
                 if (agent.status === 'active') {
                     const option1 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
                     const option2 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
+                    const option3 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
                     agentSelect.appendChild(option1);
                     exportAgentSelect.appendChild(option2);
+                    sessionAgentSelect.appendChild(option3);
                 }
-            });
-            
-            // Also populate session agent select
-            populateSessionAgentSelect();
-        }
-
-        // Copy to clipboard function
-        function copyToClipboard(elementId) {
-            const element = document.getElementById(elementId);
-            const text = element.textContent;
-            
-            navigator.clipboard.writeText(text).then(() => {
-                // Show temporary success message
-                const originalText = element.nextElementSibling.textContent;
-                element.nextElementSibling.textContent = 'Copied!';
-                element.nextElementSibling.style.background = '#4caf50';
-                
-                setTimeout(() => {
-                    element.nextElementSibling.textContent = originalText;
-                    element.nextElementSibling.style.background = '';
-                }, 2000);
-            }).catch(() => {
-                // Fallback for older browsers
-                const textArea = document.createElement('textarea');
-                textArea.value = text;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                
-                showAlert('Credentials copied to clipboard!', 'success');
             });
         }
 
@@ -1007,7 +1028,7 @@
             document.getElementById('uploadBtn').disabled = true;
 
             try {
-                const response = await fetch('http://localhost:8000/api/admin/upload-tasks', {
+                const response = await fetch(`${API_BASE_URL}/api/admin/upload-tasks`, {
                     method: 'POST',
                     body: formData
                 });
@@ -1056,7 +1077,7 @@
             });
 
             try {
-                const response = await fetch(`http://localhost:8000/api/admin/export-excel?${queryParams}`, {
+                const response = await fetch(`${API_BASE_URL}/api/admin/export-excel?${queryParams}`, {
                     method: 'GET'
                 });
 
@@ -1098,7 +1119,7 @@
             });
 
             try {
-                const response = await fetch(`http://localhost:8000/api/admin/preview-data?${queryParams}`);
+                const response = await fetch(`${API_BASE_URL}/api/admin/preview-data?${queryParams}`);
                 const data = await response.json();
 
                 if (response.ok) {
@@ -1156,12 +1177,135 @@
             }
         }
 
+        // Test data availability
+        function testDataAvailability() {
+            fetch(`${API_BASE_URL}/status`)
+                .then(response => response.json())
+                .then(data => {
+                    showAlert(`System Status: Database ${data.database}, Routes ${data.routes}, Health ${data.health}`, 'info');
+                })
+                .catch(error => {
+                    showAlert('Unable to check system status', 'error');
+                });
+        }
+
+        // Load session report
+        async function loadSessionReport() {
+            const filters = {
+                agent_id: document.getElementById('sessionAgent').value,
+                date_from: document.getElementById('sessionDateFrom').value,
+                date_to: document.getElementById('sessionDateTo').value
+            };
+
+            const queryParams = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) queryParams.append(key, value);
+            });
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/session-report?${queryParams}`);
+                const sessions = await response.json();
+
+                if (response.ok) {
+                    displaySessionReport(sessions);
+                    document.getElementById('sessionReportContainer').style.display = 'block';
+                } else {
+                    showAlert('Failed to load session report', 'error');
+                }
+
+            } catch (error) {
+                console.error('Session report error:', error);
+                showAlert('Network error during session report load', 'error');
+            }
+        }
+
+        // Display session report
+        function displaySessionReport(sessions) {
+            const tbody = document.getElementById('sessionReportBody');
+            tbody.innerHTML = '';
+
+            if (sessions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6">No session data found with current filters</td></tr>';
+                return;
+            }
+
+            sessions.forEach(session => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${session.agent_id}</td>
+                    <td>${session.agent_name}</td>
+                    <td>${session.login_time}</td>
+                    <td>${session.logout_time || 'Still active'}</td>
+                    <td>${session.duration_minutes || 'N/A'}</td>
+                    <td>
+                        <span class="badge ${session.is_active ? 'badge-success' : 'badge-secondary'}">
+                            ${session.is_active ? 'Active' : 'Completed'}
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Export session report
+        async function exportSessionReport() {
+            const filters = {
+                agent_id: document.getElementById('sessionAgent').value,
+                date_from: document.getElementById('sessionDateFrom').value,
+                date_to: document.getElementById('sessionDateTo').value
+            };
+
+            const queryParams = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) queryParams.append(key, value);
+            });
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/session-report?${queryParams}`);
+                const sessions = await response.json();
+
+                if (response.ok && sessions.length > 0) {
+                    // Convert to Excel-like format
+                    const csvContent = [
+                        ['Agent ID', 'Agent Name', 'Login Time', 'Logout Time', 'Duration (Minutes)', 'Status'],
+                        ...sessions.map(session => [
+                            session.agent_id,
+                            session.agent_name,
+                            session.login_time,
+                            session.logout_time || 'Still active',
+                            session.duration_minutes || 'N/A',
+                            session.is_active ? 'Active' : 'Completed'
+                        ])
+                    ].map(row => row.join(',')).join('\n');
+
+                    // Download CSV
+                    const blob = new Blob([csvContent], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `session_report_${new Date().toISOString().split('T')[0]}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    showAlert('Session report downloaded successfully!', 'success');
+                } else {
+                    showAlert('No session data to export', 'error');
+                }
+
+            } catch (error) {
+                console.error('Export error:', error);
+                showAlert('Network error during session export', 'error');
+            }
+        }
+
         // Toggle agent status
         async function toggleAgentStatus(agentId, currentStatus) {
             const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
             
             try {
-                const response = await fetch(`http://localhost:8000/api/agents/${agentId}/status`, {
+                const response = await fetch(`${API_BASE_URL}/api/agents/${agentId}/status`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json'
