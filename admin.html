@@ -779,6 +779,9 @@
         function initializeDashboard() {
             console.log('Starting dashboard initialization...');
             
+            // Test server connection first
+            testServerConnection();
+            
             // Setup navigation
             setupNavigation();
             
@@ -789,6 +792,42 @@
             loadDashboardData();
             
             console.log('Dashboard initialization complete');
+        }
+
+        // Test server connection
+        async function testServerConnection() {
+            console.log('Testing server connection...');
+            
+            const endpoints = [
+                'http://localhost:8000/api/health',
+                'http://localhost:8000/api/admin/statistics',
+                '/api/health',
+                '/api/admin/statistics'
+            ];
+
+            let connected = false;
+            
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(endpoint);
+                    if (response.status !== 404) {
+                        console.log(`✅ Server connected via: ${endpoint}`);
+                        connected = true;
+                        break;
+                    }
+                } catch (err) {
+                    console.log(`❌ Failed to connect to: ${endpoint}`);
+                    continue;
+                }
+            }
+
+            if (!connected) {
+                console.log('⚠️ Server not available - using demo mode');
+                showAlert('🔧 Demo Mode: Server not available. Using sample data for demonstration.', 'info');
+            } else {
+                console.log('✅ Server connection successful');
+                showAlert('✅ Connected to server successfully!', 'success');
+            }
         }
 
         // Setup navigation between sections
@@ -1000,18 +1039,55 @@
             console.log('Loading statistics...');
             
             try {
-                const response = await fetch('http://localhost:8000/api/admin/statistics');
-                const stats = await response.json();
+                const endpoints = [
+                    'http://localhost:8000/api/admin/statistics',
+                    '/api/admin/statistics'
+                ];
+
+                let response = null;
+                for (const endpoint of endpoints) {
+                    try {
+                        response = await fetch(endpoint);
+                        if (response.status !== 404) break;
+                    } catch (err) {
+                        continue;
+                    }
+                }
+
+                if (!response) {
+                    throw new Error('Statistics endpoint not found');
+                }
+
+                if (response.ok) {
+                    const stats = await response.json();
+                    
+                    document.getElementById('totalAgents').textContent = stats.total_agents || 0;
+                    document.getElementById('totalTasks').textContent = stats.total_tasks || 0;
+                    document.getElementById('completedTasks').textContent = stats.completed_tasks || 0;
+                    document.getElementById('pendingTasks').textContent = stats.pending_tasks || 0;
+                    
+                    console.log('Statistics loaded successfully');
+                } else {
+                    // If API fails, show demo data
+                    console.log('API failed, showing demo data');
+                    document.getElementById('totalAgents').textContent = '5';
+                    document.getElementById('totalTasks').textContent = '1250';
+                    document.getElementById('completedTasks').textContent = '823';
+                    document.getElementById('pendingTasks').textContent = '427';
+                    
+                    showAlert('Using demo data - API not available', 'info');
+                }
                 
-                document.getElementById('totalAgents').textContent = stats.total_agents || 0;
-                document.getElementById('totalTasks').textContent = stats.total_tasks || 0;
-                document.getElementById('completedTasks').textContent = stats.completed_tasks || 0;
-                document.getElementById('pendingTasks').textContent = stats.pending_tasks || 0;
-                
-                console.log('Statistics loaded successfully');
             } catch (error) {
                 console.error('Failed to load statistics:', error);
-                showAlert('Failed to load statistics', 'error');
+                
+                // Show demo data as fallback
+                document.getElementById('totalAgents').textContent = '5';
+                document.getElementById('totalTasks').textContent = '1250';
+                document.getElementById('completedTasks').textContent = '823';
+                document.getElementById('pendingTasks').textContent = '427';
+                
+                showAlert('Using demo data - server not available', 'info');
             }
         }
 
@@ -1020,15 +1096,81 @@
             console.log('Loading agents...');
             
             try {
-                const response = await fetch('http://localhost:8000/api/agents');
-                agents = await response.json();
+                const endpoints = [
+                    'http://localhost:8000/api/agents',
+                    '/api/agents',
+                    'http://localhost:8000/api/admin/agents',
+                    '/api/admin/agents'
+                ];
+
+                let response = null;
+                for (const endpoint of endpoints) {
+                    try {
+                        response = await fetch(endpoint);
+                        if (response.status !== 404) break;
+                    } catch (err) {
+                        continue;
+                    }
+                }
+
+                if (!response || !response.ok) {
+                    // Use demo data if API is not available
+                    console.log('API not available, using demo data');
+                    agents = [
+                        {
+                            agent_id: 'AGENT001',
+                            name: 'John Doe',
+                            email: 'john.doe@example.com',
+                            password: 'demo123',
+                            status: 'active',
+                            is_currently_logged_in: false,
+                            tasks_completed: 15,
+                            last_login: '2024-01-15 10:30:00',
+                            last_logout: '2024-01-15 18:45:00'
+                        },
+                        {
+                            agent_id: 'AGENT002',
+                            name: 'Jane Smith',
+                            email: 'jane.smith@example.com',
+                            password: 'demo456',
+                            status: 'active',
+                            is_currently_logged_in: true,
+                            tasks_completed: 23,
+                            last_login: '2024-01-16 09:15:00',
+                            last_logout: null
+                        }
+                    ];
+                    
+                    updateAgentsTable();
+                    showAlert('Using demo agents data - API not available', 'info');
+                    console.log('Demo agents loaded');
+                    return;
+                }
                 
+                agents = await response.json();
                 updateAgentsTable();
                 console.log('Agents loaded successfully');
                 
             } catch (error) {
                 console.error('Failed to load agents:', error);
-                showAlert('Failed to load agents', 'error');
+                
+                // Fallback to demo data
+                agents = [
+                    {
+                        agent_id: 'DEMO001',
+                        name: 'Demo Agent 1',
+                        email: 'demo1@example.com',
+                        password: 'password123',
+                        status: 'active',
+                        is_currently_logged_in: false,
+                        tasks_completed: 0,
+                        last_login: 'Never',
+                        last_logout: 'Never'
+                    }
+                ];
+                
+                updateAgentsTable();
+                showAlert('Using fallback data - server connection failed', 'info');
             }
         }
 
@@ -1194,36 +1336,108 @@
             submitBtn.textContent = 'Registering...';
             submitBtn.disabled = true;
 
-            try {
-                const response = await fetch('http://localhost:8000/api/agents/register', {
-                    method: 'POST',
-                    body: formData
-                });
+            console.log('Starting agent registration...');
+            
+            // Log form data for debugging
+            for (let [key, value] of formData.entries()) {
+                console.log(`${key}: ${value}`);
+            }
 
-                const result = await response.json();
+            try {
+                // Try multiple possible endpoints
+                const endpoints = [
+                    'http://localhost:8000/api/agents/register',
+                    'http://localhost:8000/api/admin/agents/register',
+                    '/api/agents/register',
+                    '/api/admin/agents/register'
+                ];
+
+                let response = null;
+                let lastError = null;
+
+                for (const endpoint of endpoints) {
+                    try {
+                        console.log(`Trying endpoint: ${endpoint}`);
+                        response = await fetch(endpoint, {
+                            method: 'POST',
+                            body: formData,
+                            headers: {
+                                // Don't set Content-Type for FormData, let browser set it
+                            }
+                        });
+                        
+                        console.log(`Response status for ${endpoint}:`, response.status);
+                        
+                        if (response.status !== 404) {
+                            // Found a working endpoint (even if it returns an error)
+                            break;
+                        }
+                    } catch (err) {
+                        console.log(`Failed to reach ${endpoint}:`, err.message);
+                        lastError = err;
+                        continue;
+                    }
+                }
+
+                if (!response) {
+                    throw new Error(`All endpoints failed. Last error: ${lastError?.message || 'Unknown'}`);
+                }
+
+                let result;
+                const contentType = response.headers.get('content-type');
+                
+                if (contentType && contentType.includes('application/json')) {
+                    result = await response.json();
+                } else {
+                    const text = await response.text();
+                    console.log('Non-JSON response:', text);
+                    throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
+                }
+
+                console.log('Registration response:', result);
 
                 if (response.ok) {
                     // Show credentials
-                    document.getElementById('newAgentId').textContent = result.agent_id;
-                    document.getElementById('newAgentPassword').textContent = result.password;
+                    document.getElementById('newAgentId').textContent = result.agent_id || 'Generated ID';
+                    document.getElementById('newAgentPassword').textContent = result.password || 'Generated Password';
                     document.getElementById('newAgentCredentials').classList.remove('hidden');
                     
                     // Clear form
                     document.getElementById('agentRegistrationForm').reset();
                     
                     // Refresh agents list
-                    await loadAgents();
-                    populateAgentSelects();
+                    try {
+                        await loadAgents();
+                        populateAgentSelects();
+                    } catch (refreshError) {
+                        console.log('Failed to refresh agents list:', refreshError);
+                    }
                     
-                    showAlert(`Agent registered successfully! ID: ${result.agent_id}`, 'success');
+                    showAlert(`Agent registered successfully! ID: ${result.agent_id || 'New Agent'}`, 'success');
                     
                 } else {
-                    showAlert(`Registration failed: ${result.detail}`, 'error');
+                    const errorMessage = result.detail || result.message || result.error || 'Unknown error occurred';
+                    showAlert(`Registration failed: ${errorMessage}`, 'error');
+                    console.error('Registration failed:', result);
                 }
 
             } catch (error) {
                 console.error('Registration error:', error);
-                showAlert('Network error during registration', 'error');
+                
+                // More specific error messages
+                let errorMessage = 'Network error during registration';
+                
+                if (error.message.includes('Failed to fetch')) {
+                    errorMessage = 'Cannot connect to server. Please check if the server is running on localhost:8000';
+                } else if (error.message.includes('CORS')) {
+                    errorMessage = 'CORS error - server configuration issue';
+                } else if (error.message.includes('endpoints failed')) {
+                    errorMessage = 'Registration endpoint not found. Please check server API configuration';
+                } else if (error.message) {
+                    errorMessage = `Error: ${error.message}`;
+                }
+                
+                showAlert(errorMessage, 'error');
             } finally {
                 submitBtn.textContent = originalText;
                 submitBtn.disabled = false;
