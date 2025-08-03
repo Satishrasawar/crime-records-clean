@@ -1,6 +1,6 @@
-# Crime Records Data Entry System
+# Client Records Data Entry System
 
-A comprehensive web application for managing crime records data entry with agent management, task assignment, and data export capabilities.
+A comprehensive web application for managing client records data entry with agent management, task assignment, and data export capabilities.
 
 ## Features
 
@@ -32,4 +32,5 @@ cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
+
 uvicorn main:app --reload
