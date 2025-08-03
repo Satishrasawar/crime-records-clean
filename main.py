@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 
 # Initialize FastAPI app first
 app = FastAPI(
-    title="Crime Records Data Entry System", 
+    title="Client Records Data Entry System", 
     version="2.0.0",
     description="Enhanced system for agent-task-system.com"
 )
@@ -37,7 +37,7 @@ def health_check():
 def root():
     """Root endpoint"""
     return {
-        "message": "Crime Records Data Entry System API v2.0",
+        "message": "Client Records Data Entry System API v2.0",
         "status": "running",
         "platform": "Railway",
         "health_check": "/health"
@@ -127,3 +127,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     print(f"🚀 Starting server on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
+
