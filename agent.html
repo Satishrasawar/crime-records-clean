@@ -831,6 +831,7 @@
         let currentTaskId = null;
         let currentTaskIndex = 0;
         let totalTasks = 0;
+        let isSubmitting = false; // Prevent double submissions
 
         // Global configuration object for international deployment
         const CONFIG = {
@@ -890,6 +891,8 @@
 
         // Initialize security and form setup
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Page loaded - initializing...');
+            
             // Apply copy/paste protection to ALL task form inputs (but not login inputs)
             const taskFormInputs = document.querySelectorAll('#taskForm input');
             taskFormInputs.forEach(input => {
@@ -966,6 +969,7 @@
         // Login form handler
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
+            console.log('🔑 Login form submitted');
             
             const loginBtn = document.getElementById('loginBtn');
             const originalText = loginBtn.textContent;
@@ -1011,41 +1015,73 @@
             }
         });
 
-        // Enhanced Submit function
+        // IMPROVED Submit function with comprehensive error handling and logging
         async function submitAndNext() {
+            console.log('🚀 submitAndNext called');
+            
+            // Prevent double submissions
+            if (isSubmitting) {
+                console.log('⚠️ Already submitting, ignoring duplicate call');
+                return;
+            }
+            
+            // Basic validation
             if (!currentAgentId) {
                 showAlert('Please login first', 'error');
+                console.log('❌ No agent logged in');
                 return;
             }
             
             const form = document.getElementById('taskForm');
             if (!form) {
                 showAlert('Form not found', 'error');
+                console.log('❌ Form element not found');
                 return;
             }
             
             // Check if form has data
             const inputs = form.querySelectorAll('input[type!="hidden"]');
             let hasData = false;
+            let filledCount = 0;
+            
             inputs.forEach(input => {
-                if (input.value.trim() !== '') {
+                if (input.value && input.value.trim() !== '') {
                     hasData = true;
+                    filledCount++;
                 }
             });
             
+            console.log(`📊 Form validation: ${filledCount} fields filled out of ${inputs.length} total`);
+            
             if (!hasData) {
                 showAlert('Please fill at least one field before submitting', 'error');
+                console.log('❌ No form data entered');
                 return;
             }
             
-            // Create FormData with task_id
+            // Set submitting flag
+            isSubmitting = true;
+            
+            // Create FormData
             const formData = new FormData(form);
             formData.append('agent_id', currentAgentId);
             
             // Add current task ID if available
             if (currentTaskId) {
                 formData.append('task_id', currentTaskId);
+                console.log('📋 Added task_id:', currentTaskId);
             }
+            
+            // Log form data being sent (for debugging)
+            console.log('📤 Form data being submitted:');
+            let dataCount = 0;
+            for (let [key, value] of formData.entries()) {
+                if (value && value.toString().trim() !== '') {
+                    console.log(`  ${key}: ${value}`);
+                    dataCount++;
+                }
+            }
+            console.log(`📊 Total data fields: ${dataCount}`);
             
             // Show loading state
             const submitBtn = document.getElementById('submitBtn');
@@ -1054,102 +1090,184 @@
             submitBtn.disabled = true;
             
             try {
-                console.log('📤 Submitting form data for agent:', currentAgentId, 'task:', currentTaskId);
+                console.log('📤 Starting submission process...');
                 
-                // Try both endpoints for compatibility
-                let response;
-                let submitUrl;
+                // Try multiple endpoints for better compatibility
+                const endpoints = [
+                    `/api/agents/${currentAgentId}/submit`,
+                    '/api/submit',
+                    `/api/agents/submit`,
+                    currentTaskId ? `/api/agents/tasks/${currentTaskId}/submit` : null
+                ].filter(Boolean);
                 
-                // First try the new endpoint structure
-                if (currentTaskId) {
-                    submitUrl = getApiUrl(`/api/agents/tasks/${currentTaskId}/submit`);
-                } else {
-                    submitUrl = getApiUrl(`/api/agents/${currentAgentId}/submit`);
+                let response = null;
+                let data = null;
+                let lastError = null;
+                
+                for (let i = 0; i < endpoints.length; i++) {
+                    const endpoint = endpoints[i];
+                    const submitUrl = getApiUrl(endpoint);
+                    
+                    try {
+                        console.log(`🔄 Trying endpoint ${i + 1}/${endpoints.length}: ${endpoint}`);
+                        
+                        response = await fetch(submitUrl, {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        console.log(`📡 Response status: ${response.status} for ${endpoint}`);
+                        
+                        // Try to parse response
+                        const responseText = await response.text();
+                        console.log(`📥 Raw response: ${responseText.substring(0, 200)}...`);
+                        
+                        try {
+                            data = JSON.parse(responseText);
+                        } catch (parseError) {
+                            console.log('⚠️ JSON parse failed, treating as plain text');
+                            data = { message: responseText, raw: true };
+                        }
+                        
+                        console.log(`📥 Parsed response:`, data);
+                        
+                        // If we got a successful response, break out of the loop
+                        if (response.ok) {
+                            console.log(`✅ Success with endpoint: ${endpoint}`);
+                            break;
+                        } else {
+                            lastError = data.detail || data.message || data.error || `HTTP ${response.status}`;
+                            console.log(`❌ Failed with ${endpoint}: ${lastError}`);
+                        }
+                        
+                    } catch (fetchError) {
+                        console.log(`❌ Network error with ${endpoint}:`, fetchError.message);
+                        lastError = fetchError.message;
+                        continue;
+                    }
                 }
                 
-                response = await fetch(submitUrl, {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                // If that fails, try the old endpoint
-                if (!response.ok && currentTaskId) {
-                    console.log('🔄 Trying fallback submit endpoint...');
-                    response = await fetch(getApiUrl(`/api/agents/${currentAgentId}/submit`), {
-                        method: 'POST',
-                        body: formData
-                    });
+                // Check if any endpoint succeeded
+                if (!response || !response.ok) {
+                    throw new Error(lastError || 'All submit endpoints failed');
                 }
                 
-                const data = await response.json();
-                console.log('📥 Submit response:', data);
+                // Check for success in response
+                const isSuccess = response.ok && (
+                    data.success === true ||
+                    data.status === 'success' ||
+                    (data.message && (
+                        data.message.toLowerCase().includes('success') ||
+                        data.message.toLowerCase().includes('submitted') ||
+                        data.message.toLowerCase().includes('saved') ||
+                        data.message.toLowerCase().includes('complete')
+                    )) ||
+                    data.raw === true // For plain text responses
+                );
                 
-                if (response.ok && (data.success || data.message.includes('success') || data.message.includes('submitted'))) {
+                if (isSuccess) {
+                    console.log('✅ Submission successful!');
                     showAlert(CONFIG.MESSAGES.TASK_SUBMITTED, 'success');
                     
                     // Clear form
                     form.reset();
                     
-                    // Show loading spinner
-                    showLoadingSpinner(true);
+                    // Keep task ID if available
+                    if (currentTaskId) {
+                        document.getElementById('currentTaskId').value = currentTaskId;
+                    }
                     
-                    // Load next task
+                    // Show loading spinner and load next task
+                    showLoadingSpinner(true);
                     setTimeout(async () => {
-                        await loadCurrentTask();
-                        showLoadingSpinner(false);
+                        try {
+                            await loadCurrentTask();
+                            console.log('✅ Next task loaded');
+                        } catch (error) {
+                            console.error('❌ Error loading next task:', error);
+                            showAlert('Error loading next task: ' + error.message, 'error');
+                        } finally {
+                            showLoadingSpinner(false);
+                        }
                     }, 800);
                     
                 } else {
-                    showAlert('Submission failed: ' + (data.detail || data.message || 'Unknown error'), 'error');
+                    console.log('❌ Submission failed - no success indicator found');
+                    const errorMsg = data.detail || data.message || data.error || 'Unknown error occurred';
+                    showAlert('Submission failed: ' + errorMsg, 'error');
                 }
                 
             } catch (error) {
                 console.error('❌ Submit error:', error);
                 showAlert('Network error: ' + error.message, 'error');
             } finally {
+                // Reset button and flag
                 submitBtn.textContent = originalText;
                 submitBtn.disabled = false;
+                isSubmitting = false;
+                console.log('🔄 Submit process completed');
             }
         }
 
         // Enhanced task loading function to work with chunked upload system
         async function loadCurrentTask() {
-            if (!currentAgentId) return;
+            if (!currentAgentId) {
+                console.log('❌ No agent ID for loading task');
+                return;
+            }
             
             try {
                 console.log('📋 Loading current task for agent:', currentAgentId);
                 
                 // Try multiple endpoints to find tasks
-                let response;
-                let result;
+                const endpoints = [
+                    `/api/agents/${currentAgentId}/tasks/current`,
+                    `/api/agents/${currentAgentId}/current-task`,
+                    `/api/agents/${currentAgentId}/tasks`,
+                    `/api/tasks/current/${currentAgentId}`
+                ];
                 
-                // First try the new task progress endpoint
-                response = await fetch(getApiUrl(`/api/agents/${currentAgentId}/tasks/current`));
+                let response = null;
+                let result = null;
                 
-                if (!response.ok) {
-                    // Fallback to the old endpoint
-                    console.log('🔄 Trying fallback current-task endpoint...');
-                    response = await fetch(getApiUrl(`/api/agents/${currentAgentId}/current-task`));
+                for (const endpoint of endpoints) {
+                    try {
+                        console.log(`🔄 Trying task endpoint: ${endpoint}`);
+                        response = await fetch(getApiUrl(endpoint));
+                        
+                        if (response.ok) {
+                            result = await response.json();
+                            console.log(`✅ Success with ${endpoint}:`, result);
+                            break;
+                        } else {
+                            console.log(`❌ Failed ${endpoint}: ${response.status}`);
+                        }
+                    } catch (err) {
+                        console.log(`❌ Network error with ${endpoint}:`, err.message);
+                        continue;
+                    }
                 }
                 
-                if (!response.ok) {
-                    // Try getting all tasks and find the next pending one
-                    console.log('🔄 Trying to get all tasks...');
-                    response = await fetch(getApiUrl(`/api/agents/${currentAgentId}/tasks`));
+                if (!response || !response.ok || !result) {
+                    throw new Error('All task loading endpoints failed');
                 }
                 
-                result = await response.json();
                 console.log('📊 Task data received:', result);
                 
                 // Handle different response formats
                 if (Array.isArray(result)) {
                     // If we got an array of tasks, find the first pending one
-                    const pendingTask = result.find(task => task.status === 'pending' || task.status === 'in_progress');
+                    const pendingTask = result.find(task => 
+                        task.status === 'pending' || 
+                        task.status === 'in_progress' || 
+                        task.status === 'assigned'
+                    );
+                    
                     if (pendingTask) {
                         result = {
                             task: pendingTask,
-                            image_url: pendingTask.image_path,
-                            image_name: pendingTask.image_filename,
+                            image_url: pendingTask.image_path || pendingTask.image_url,
+                            image_name: pendingTask.image_filename || pendingTask.filename,
                             current_index: result.findIndex(t => t.id === pendingTask.id),
                             total_images: result.length
                         };
@@ -1168,19 +1286,22 @@
                     currentTaskId = result.id;
                     result = {
                         task: result,
-                        image_url: result.image_path,
-                        image_name: result.image_filename
+                        image_url: result.image_path || result.image_url,
+                        image_name: result.image_filename || result.filename
                     };
                 }
                 
                 // Check if all tasks are completed
                 if (result.completed || result.message === 'All tasks completed' || 
                     (result.task && result.task.status === 'completed' && !result.next_available)) {
+                    
+                    console.log('✅ All tasks completed');
                     document.getElementById('totalCompleted').textContent = result.total_completed || 'All';
                     showCompletedSection();
-                } else if (result.image_url || (result.task && result.task.image_path)) {
+                    
+                } else if (result.image_url || (result.task && (result.task.image_path || result.task.image_url))) {
                     // Load the task
-                    const imageUrl = result.image_url || result.task.image_path;
+                    const imageUrl = result.image_url || result.task.image_path || result.task.image_url;
                     const fullImageUrl = imageUrl.startsWith('http') ? imageUrl : `${CONFIG.API_BASE_URL}${imageUrl}`;
                     
                     console.log('🖼️ Loading image:', fullImageUrl);
@@ -1195,12 +1316,21 @@
                         showAlert('Image could not be loaded. Please contact admin.', 'error');
                     };
                     
-                    document.getElementById('imageName').textContent = result.image_name || result.task?.image_filename || 'Unknown';
+                    taskImage.onload = function() {
+                        console.log('✅ Image loaded successfully');
+                    };
+                    
+                    document.getElementById('imageName').textContent = 
+                        result.image_name || 
+                        result.task?.image_filename || 
+                        result.task?.filename || 
+                        'Task Image';
                     
                     // Update task ID for form submission
                     if (result.task?.id) {
                         currentTaskId = result.task.id;
                         document.getElementById('currentTaskId').value = currentTaskId;
+                        console.log('📋 Set current task ID to:', currentTaskId);
                     }
                     
                     // Update progress
@@ -1208,6 +1338,8 @@
                     totalTasks = result.total_images || 0;
                     const progressText = result.progress || `${currentTaskIndex + 1}/${totalTasks}`;
                     document.getElementById('progressInfo').textContent = `Progress: ${progressText}`;
+                    
+                    console.log('✅ Task loaded successfully');
                     
                 } else {
                     console.log('❌ No tasks available or invalid response format');
@@ -1251,10 +1383,13 @@
                 if (currentTaskId) {
                     document.getElementById('currentTaskId').value = currentTaskId;
                 }
+                console.log('🧹 Form cleared');
             }
         }
 
         async function logout() {
+            console.log('👋 Logging out...');
+            
             if (currentAgentId) {
                 try {
                     const response = await fetch(getApiUrl(`/api/agents/${currentAgentId}/logout`), {
@@ -1272,10 +1407,12 @@
             currentTaskId = null;
             currentTaskIndex = 0;
             totalTasks = 0;
+            isSubmitting = false;
             showLoginSection();
         }
 
         async function checkForNewTasks() {
+            console.log('🔄 Checking for new tasks...');
             showLoadingSpinner(true);
             await loadCurrentTask();
             showLoadingSpinner(false);
@@ -1312,9 +1449,53 @@
             }, 5000);
         }
 
+        // Add debug function for testing
+        function debugSubmit() {
+            console.log('🧪 Debug Submit Info:');
+            console.log('- Current Agent ID:', currentAgentId);
+            console.log('- Current Task ID:', currentTaskId);
+            console.log('- Is Submitting:', isSubmitting);
+            console.log('- API Base URL:', CONFIG.API_BASE_URL);
+            
+            const form = document.getElementById('taskForm');
+            if (form) {
+                const inputs = form.querySelectorAll('input[type!="hidden"]');
+                let filledCount = 0;
+                inputs.forEach(input => {
+                    if (input.value && input.value.trim() !== '') {
+                        filledCount++;
+                    }
+                });
+                console.log(`- Form has ${filledCount}/${inputs.length} fields filled`);
+            } else {
+                console.log('- Form not found!');
+            }
+            
+            const submitBtn = document.getElementById('submitBtn');
+            console.log('- Submit button found:', !!submitBtn);
+            console.log('- Submit button enabled:', submitBtn ? !submitBtn.disabled : 'N/A');
+        }
+
+        // Add keyboard shortcut for submit (Ctrl+Enter) and debug (Ctrl+Shift+D)
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                if (!document.getElementById('taskSection').classList.contains('hidden')) {
+                    e.preventDefault();
+                    submitAndNext();
+                }
+            }
+            
+            // Debug shortcut
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
+                e.preventDefault();
+                debugSubmit();
+            }
+        });
+
         // Add debug logging for task loading
         console.log('🚀 Agent panel initialized');
         console.log('🔗 API Base URL:', CONFIG.API_BASE_URL);
+        console.log('💡 Debug tip: Press Ctrl+Shift+D to see debug info, or type debugSubmit() in console');
     </script>
 </body>
 </html>
