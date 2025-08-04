@@ -138,18 +138,9 @@
             background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
             color: white;
         }
-        .btn-warning {
-            background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
-            color: white;
-        }
         .btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
         }
         .form-group {
             margin-bottom: 20px;
@@ -199,29 +190,17 @@
         }
         .progress-bar {
             width: 100%;
-            height: 25px;
+            height: 20px;
             background: #e2e8f0;
-            border-radius: 12px;
+            border-radius: 10px;
             overflow: hidden;
-            margin: 15px 0;
-            position: relative;
+            margin: 10px 0;
         }
         .progress-fill {
             height: 100%;
             background: linear-gradient(90deg, #48bb78, #38a169);
             width: 0%;
             transition: width 0.3s ease;
-            position: relative;
-        }
-        .progress-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #2d3748;
-            font-weight: bold;
-            font-size: 14px;
-            z-index: 2;
         }
         .alert {
             padding: 15px 20px;
@@ -243,11 +222,6 @@
             background: #ebf8ff;
             color: #2a4365;
             border: 1px solid #90cdf4;
-        }
-        .alert-warning {
-            background: #fffaf0;
-            color: #744210;
-            border: 1px solid #fbd38d;
         }
         .table-container {
             overflow-x: auto;
@@ -288,10 +262,6 @@
             background: #f8d7da;
             color: #721c24;
         }
-        .badge-warning {
-            background: #fff3cd;
-            color: #856404;
-        }
         .badge-secondary {
             background: #e2e3e5;
             color: #383d41;
@@ -306,8 +276,57 @@
             border-radius: 10px;
             border: 1px solid #e2e8f0;
         }
+        .credentials-container {
+            background: linear-gradient(135deg, #e8f5e8 0%, #f0fff0 100%);
+            border: 2px solid #4caf50;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2);
+        }
+        .credential-box {
+            background: white;
+            border: 1px solid #c8e6c9;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .credential-value {
+            font-size: 1.3em;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            padding: 10px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        .copy-btn {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .copy-btn:hover {
+            background: #1976d2;
+        }
         .hidden {
             display: none;
+        }
+        .login-attempts {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 14px;
         }
         .loading-spinner {
             border: 3px solid #f3f3f3;
@@ -323,103 +342,58 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        
-        /* New styles for enhanced features */
-        .file-analysis {
+
+        /* Enhanced upload progress styles */
+        .upload-progress-enhanced {
             background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
+            border: 2px solid #667eea;
+            border-radius: 10px;
             padding: 20px;
             margin: 20px 0;
         }
         
-        .upload-details {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin: 15px 0;
+        .upload-speed {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
         }
         
-        .detail-item {
-            background: white;
-            padding: 15px;
-            border-radius: 6px;
-            text-align: center;
-            border: 1px solid #e9ecef;
-        }
-        
-        .detail-value {
-            font-size: 1.5em;
+        .upload-eta {
+            font-size: 14px;
+            color: #333;
             font-weight: bold;
-            color: #495057;
-        }
-        
-        .detail-label {
-            font-size: 0.9em;
-            color: #6c757d;
             margin-top: 5px;
         }
         
         .chunk-progress {
-            margin: 10px 0;
-            padding: 10px;
             background: #e9ecef;
-            border-radius: 6px;
-            font-family: monospace;
-            font-size: 14px;
+            border-radius: 4px;
+            height: 6px;
+            margin: 10px 0;
+            overflow: hidden;
         }
         
-        .auto-refresh-controls {
-            background: #e8f5e8;
-            border: 1px solid #4caf50;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            flex-wrap: wrap;
+        .chunk-fill {
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
         }
         
-        .refresh-status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 500;
+        .upload-status-detailed {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 10px 0;
         }
         
-        .refresh-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #28a745;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-        
-        .processing-queue {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 15px 0;
-        }
-        
-        .queue-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #f8f9fa;
-        }
-        
-        .queue-item:last-child {
-            border-bottom: none;
+        .upload-cancel-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
         }
         
         .file-size-warning {
@@ -431,38 +405,14 @@
             margin: 15px 0;
         }
         
-        .compression-options {
-            background: #e8f4fd;
-            border: 1px solid #bee5eb;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        
-        .compression-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-        
-        .compression-option {
-            background: white;
-            border: 2px solid #dee2e6;
-            border-radius: 6px;
-            padding: 15px;
+        .retry-upload {
+            background: #fd7e14;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
             cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .compression-option:hover {
-            border-color: #667eea;
-            transform: translateY(-2px);
-        }
-        
-        .compression-option.selected {
-            border-color: #667eea;
-            background: #f8f9ff;
+            margin-left: 10px;
         }
     </style>
 </head>
@@ -496,11 +446,16 @@
                     Invalid credentials. Please try again.
                 </div>
                 
+                <div id="loginAttempts" class="login-attempts hidden">
+                    Too many failed attempts. Please wait before trying again.
+                </div>
+                
                 <button type="submit" class="btn btn-primary" style="width: 100%;" id="loginBtn">
                     🚀 Login to Dashboard
                 </button>
             </form>
             
+            <!-- SECURE LOGIN NOTICE -->
             <div style="margin-top: 20px; padding: 15px; background: #e8f5e8; border-radius: 8px; text-align: center; font-size: 14px; color: #2e7d32; border: 1px solid #4caf50;">
                 <strong>🔒 Secure System</strong><br>
                 Contact administrator for login credentials<br>
@@ -523,21 +478,6 @@
         </div>
 
         <div class="content">
-            <!-- Auto-refresh Controls -->
-            <div class="auto-refresh-controls">
-                <div class="refresh-status">
-                    <div class="refresh-indicator" id="refreshIndicator"></div>
-                    <span>Auto-refresh: <span id="refreshStatus">Active</span></span>
-                </div>
-                <button class="btn btn-sm btn-info" onclick="toggleAutoRefresh()">
-                    <span id="toggleRefreshText">Disable Auto-refresh</span>
-                </button>
-                <button class="btn btn-sm btn-primary" onclick="forceRefresh()">
-                    🔄 Refresh Now
-                </button>
-                <span style="font-size: 14px; color: #6c757d;">Last updated: <span id="lastUpdateTime">Never</span></span>
-            </div>
-
             <!-- Statistics Section -->
             <div class="section">
                 <h2>📊 System Statistics</h2>
@@ -558,17 +498,13 @@
                         <div class="stat-number" id="pendingTasks">0</div>
                         <div class="stat-label">Pending Tasks</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-number" id="processingQueue">0</div>
-                        <div class="stat-label">Processing Queue</div>
-                    </div>
                 </div>
             </div>
 
             <!-- Enhanced Upload ZIP Section -->
             <div class="section">
-                <h2>📁 Upload Task Images (Enhanced)</h2>
-                <p>Upload large ZIP files with optimized chunked processing for files up to 1GB.</p>
+                <h2>📁 Upload Task Images (Enhanced for Large Files)</h2>
+                <p>Upload a ZIP file containing up to 5000 images to assign tasks to agents. Optimized for large files up to 1GB.</p>
                 
                 <div class="form-group">
                     <label for="agentSelect">Assign to Agent:</label>
@@ -577,37 +513,18 @@
                     </select>
                 </div>
 
-                <!-- File Size Warning -->
+                <!-- File size warning -->
                 <div id="fileSizeWarning" class="file-size-warning hidden">
-                    <strong>⚠️ Large File Detected</strong><br>
-                    File size: <span id="detectedFileSize"></span><br>
-                    Estimated processing time: <span id="estimatedTime"></span><br>
-                    The file will be processed in chunks to ensure optimal performance.
-                </div>
-
-                <!-- Compression Options -->
-                <div id="compressionOptions" class="compression-options hidden">
-                    <h4>🗜️ Processing Options</h4>
-                    <p>Choose how to handle the large file:</p>
-                    <div class="compression-grid">
-                        <div class="compression-option" data-option="chunk" onclick="selectCompressionOption('chunk')">
-                            <h5>📦 Chunked Processing</h5>
-                            <p>Process file in small chunks (Recommended for large files)</p>
-                            <small>✓ Better performance ✓ Progress tracking ✓ Resumable</small>
-                        </div>
-                        <div class="compression-option" data-option="stream" onclick="selectCompressionOption('stream')">
-                            <h5>🌊 Stream Processing</h5>
-                            <p>Process file as a continuous stream</p>
-                            <small>✓ Memory efficient ✓ Faster for smaller files</small>
-                        </div>
-                    </div>
+                    <strong>⚠️ Large File Detected:</strong> 
+                    <span id="fileSizeWarningText"></span>
+                    <br>Upload will use chunked transfer for better reliability. Please keep this tab active during upload.
                 </div>
 
                 <div class="upload-area" id="uploadArea">
                     <div>
                         <h3>📎 Drop ZIP file here or click to upload</h3>
-                        <p>Supported formats: .zip (containing .jpg, .jpeg, .png images)</p>
-                        <p><strong>Maximum file size: 1GB</strong></p>
+                        <p>Supported formats: .zip (containing .jpg, .jpeg, .png images)<br>
+                        <small>Maximum file size: 1GB | Optimized for large file transfers</small></p>
                         <input type="file" id="zipFile" accept=".zip" style="display: none;">
                         <button type="button" class="btn btn-primary" onclick="document.getElementById('zipFile').click()">
                             Choose ZIP File
@@ -615,84 +532,51 @@
                     </div>
                 </div>
 
-                <!-- File Analysis -->
-                <div id="fileAnalysis" class="file-analysis hidden">
-                    <h4>📋 File Analysis</h4>
-                    <div class="upload-details">
-                        <div class="detail-item">
-                            <div class="detail-value" id="fileSize">0 MB</div>
-                            <div class="detail-label">File Size</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-value" id="estimatedImages">0</div>
-                            <div class="detail-label">Est. Images</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-value" id="processingTime">0 min</div>
-                            <div class="detail-label">Est. Time</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-value" id="chunkCount">0</div>
-                            <div class="detail-label">Chunks</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Enhanced Progress Section -->
-                <div id="uploadProgress" class="hidden">
-                    <h4>📈 Upload Progress</h4>
+                <!-- Enhanced Upload Progress -->
+                <div id="uploadProgress" class="upload-progress-enhanced hidden">
+                    <h4>🚀 Upload Progress</h4>
                     
                     <!-- Overall Progress -->
-                    <div style="margin-bottom: 20px;">
-                        <label>Overall Progress</label>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progressFill"></div>
-                            <div class="progress-text" id="progressText">0%</div>
-                        </div>
+                    <div class="upload-status-detailed" id="uploadStatusDetailed">Preparing upload...</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 14px; margin-top: 5px;">
+                        <span id="uploadedBytes">0 MB</span>
+                        <span id="totalBytes">0 MB</span>
                     </div>
                     
-                    <!-- Chunk Progress -->
+                    <!-- Chunk Progress (for large files) -->
                     <div id="chunkProgressContainer" class="hidden">
-                        <label>Current Chunk Progress</label>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="chunkProgressFill"></div>
-                            <div class="progress-text" id="chunkProgressText">0%</div>
+                        <div style="font-size: 14px; color: #666; margin: 10px 0;">Chunk Progress:</div>
+                        <div class="chunk-progress">
+                            <div class="chunk-fill" id="chunkFill"></div>
                         </div>
-                        <div class="chunk-progress" id="chunkStatus">
-                            Preparing...
-                        </div>
+                        <div style="font-size: 12px; color: #666;" id="chunkInfo">Chunk 0 of 0</div>
                     </div>
                     
-                    <!-- Processing Queue -->
-                    <div id="processingQueueContainer" class="processing-queue hidden">
-                        <h5>🔄 Processing Queue</h5>
-                        <div id="queueList"></div>
+                    <!-- Upload Speed and ETA -->
+                    <div style="display: flex; justify-content: space-between; margin-top: 10px;">
+                        <div class="upload-speed" id="uploadSpeed">Speed: Calculating...</div>
+                        <div class="upload-eta" id="uploadETA">ETA: Calculating...</div>
                     </div>
                     
-                    <div id="uploadStatus">Preparing upload...</div>
-                    
-                    <!-- Speed and ETA -->
-                    <div style="display: flex; gap: 20px; margin-top: 10px; font-size: 14px; color: #6c757d;">
-                        <span>Speed: <span id="uploadSpeed">0 MB/s</span></span>
-                        <span>ETA: <span id="uploadETA">Calculating...</span></span>
-                        <span>Processed: <span id="processedImages">0</span> images</span>
+                    <!-- Control Buttons -->
+                    <div style="margin-top: 15px;">
+                        <button id="cancelUploadBtn" class="upload-cancel-btn" onclick="cancelUpload()">
+                            ❌ Cancel Upload
+                        </button>
+                        <button id="retryUploadBtn" class="retry-upload hidden" onclick="retryUpload()">
+                            🔄 Retry Upload
+                        </button>
                     </div>
                 </div>
 
-                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-                    <button type="button" class="btn btn-success" id="uploadBtn" onclick="uploadZipFile()" disabled>
-                        🚀 Upload & Assign Tasks
-                    </button>
-                    <button type="button" class="btn btn-warning" id="pauseBtn" onclick="pauseUpload()" disabled style="display: none;">
-                        ⏸️ Pause Upload
-                    </button>
-                    <button type="button" class="btn btn-danger" id="cancelBtn" onclick="cancelUpload()" disabled style="display: none;">
-                        ❌ Cancel Upload
-                    </button>
-                </div>
+                <button type="button" class="btn btn-success" id="uploadBtn" onclick="uploadZipFile()" disabled>
+                    🚀 Upload & Assign Tasks
+                </button>
             </div>
 
-            <!-- Rest of the sections remain the same as in the original code -->
             <!-- Export Data Section -->
             <div class="section">
                 <h2>📊 Export Submitted Data</h2>
@@ -785,6 +669,11 @@
                     <h3 style="color: #2e7d32; margin-top: 0;">✅ Agent Registered Successfully!</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0;">
                         <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
+                            <strong>Agent ID:</strong><br>
+                            <span id="newAgentId" style="font-size: 1.2em; color: #1976d2; font-family: monospace;"></span>
+                            <button onclick="copyToClipboard('newAgentId')" class="btn btn-info" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">Copy</button>
+                        </div>
+                        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
                             <strong>Password:</strong><br>
                             <span id="newAgentPassword" style="font-size: 1.2em; color: #d32f2f; font-family: monospace;"></span>
                             <button onclick="copyToClipboard('newAgentPassword')" class="btn btn-info" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">Copy</button>
@@ -793,6 +682,60 @@
                     <div class="alert alert-info">
                         <strong>⚠️ Important:</strong> Please save these credentials securely. The password cannot be recovered and will need to be shared with the agent.
                     </div>
+                </div>
+            </div>
+
+            <!-- Session Report Section -->
+            <div class="section">
+                <h2>⏰ Agent Session Report</h2>
+                <p>Track agent login/logout times and working hours.</p>
+                
+                <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="sessionAgent">Filter by Agent (Optional):</label>
+                        <select id="sessionAgent">
+                            <option value="">All Agents</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="sessionDateFrom">From Date:</label>
+                        <input type="date" id="sessionDateFrom">
+                    </div>
+                    
+                    <div class="form-group" style="flex: 1; min-width: 200px;">
+                        <label for="sessionDateTo">To Date:</label>
+                        <input type="date" id="sessionDateTo">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <button type="button" class="btn btn-primary" onclick="loadSessionReport()">
+                        📊 Load Session Report
+                    </button>
+                    <button type="button" class="btn btn-info" onclick="exportSessionReport()">
+                        📥 Export Sessions to Excel
+                    </button>
+                </div>
+
+                <!-- Session Report Table -->
+                <div class="table-container" id="sessionReportContainer" style="display: none;">
+                    <h3>Session Activity Report</h3>
+                    <table id="sessionReportTable">
+                        <thead>
+                            <tr>
+                                <th>Agent ID</th>
+                                <th>Agent Name</th>
+                                <th>Login Time</th>
+                                <th>Logout Time</th>
+                                <th>Duration (Minutes)</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessionReportBody">
+                            <!-- Session data will be loaded here -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -807,11 +750,12 @@
                                 <th>Agent ID</th>
                                 <th>Name</th>
                                 <th>Email</th>
+                                <th>Password</th>
                                 <th>Status</th>
                                 <th>Login Status</th>
                                 <th>Tasks Completed</th>
-                                <th>Tasks Pending</th>
                                 <th>Last Login</th>
+                                <th>Last Logout</th>
                                 <th>Session Duration</th>
                                 <th>Actions</th>
                             </tr>
@@ -826,31 +770,678 @@
                     🔄 Refresh Agents
                 </button>
             </div>
+
+            <!-- Data Preview Section -->
+            <div class="section hidden" id="dataPreviewSection">
+                <h2>📋 Data Preview</h2>
+                <div class="table-container">
+                    <table id="dataPreviewTable">
+                        <thead id="previewTableHead">
+                            <!-- Headers will be dynamically generated -->
+                        </thead>
+                        <tbody id="previewTableBody">
+                            <!-- Data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        // Enhanced Configuration
+        // Show upload progress
+        function showUploadProgress(isChunked = false) {
+            document.getElementById('uploadProgress').classList.remove('hidden');
+            document.getElementById('uploadBtn').disabled = true;
+            document.getElementById('cancelUploadBtn').classList.remove('hidden');
+            document.getElementById('retryUploadBtn').classList.add('hidden');
+            
+            if (isChunked) {
+                document.getElementById('chunkProgressContainer').classList.remove('hidden');
+                totalChunks = Math.ceil(selectedZipFile.size / CHUNK_SIZE);
+                document.getElementById('chunkInfo').textContent = `Chunk 0 of ${totalChunks}`;
+            } else {
+                document.getElementById('chunkProgressContainer').classList.add('hidden');
+            }
+            
+            // Initialize progress display
+            updateOverallProgress(0);
+            updateUploadSpeed(0);
+        }
+
+        // Hide upload progress
+        function hideUploadProgress() {
+            document.getElementById('uploadProgress').classList.add('hidden');
+            document.getElementById('uploadBtn').disabled = false;
+            updateUploadButtonState();
+        }
+
+        // Update overall progress
+        function updateOverallProgress(percentage) {
+            const progressFill = document.getElementById('progressFill');
+            const uploadedBytes = document.getElementById('uploadedBytes');
+            const totalBytes = document.getElementById('totalBytes');
+            const statusDetailed = document.getElementById('uploadStatusDetailed');
+            
+            progressFill.style.width = `${Math.min(percentage, 100)}%`;
+            
+            const uploaded = (selectedZipFile.size * percentage / 100);
+            uploadedBytes.textContent = `${(uploaded / (1024 * 1024)).toFixed(1)} MB`;
+            totalBytes.textContent = `${(selectedZipFile.size / (1024 * 1024)).toFixed(1)} MB`;
+            
+            if (percentage < 100) {
+                statusDetailed.textContent = `Uploading... ${percentage.toFixed(1)}%`;
+            } else {
+                statusDetailed.textContent = 'Processing uploaded file...';
+            }
+            
+            updateUploadSpeed(uploaded);
+            lastProgressUpdate = Date.now();
+        }
+
+        // Update chunk progress for large files
+        function updateChunkProgress() {
+            if (!isChunkedUpload) return;
+            
+            const chunkFill = document.getElementById('chunkFill');
+            const chunkInfo = document.getElementById('chunkInfo');
+            
+            const chunkPercentage = (currentChunk / totalChunks) * 100;
+            chunkFill.style.width = `${chunkPercentage}%`;
+            chunkInfo.textContent = `Chunk ${currentChunk} of ${totalChunks}`;
+        }
+
+        // Update upload speed and ETA
+        function updateUploadSpeed(uploadedBytes) {
+            if (!uploadStartTime) return;
+            
+            const elapsed = (Date.now() - uploadStartTime) / 1000; // seconds
+            const speed = uploadedBytes / elapsed; // bytes per second
+            const speedMBps = speed / (1024 * 1024); // MB per second
+            
+            const remaining = selectedZipFile.size - uploadedBytes;
+            const eta = remaining / speed; // seconds
+            
+            document.getElementById('uploadSpeed').textContent = 
+                `Speed: ${speedMBps.toFixed(2)} MB/s`;
+            
+            if (eta > 0 && eta < Infinity) {
+                const etaMinutes = Math.floor(eta / 60);
+                const etaSeconds = Math.floor(eta % 60);
+                document.getElementById('uploadETA').textContent = 
+                    `ETA: ${etaMinutes}m ${etaSeconds}s`;
+            } else {
+                document.getElementById('uploadETA').textContent = 'ETA: Calculating...';
+            }
+        }
+
+        // Cancel upload
+        function cancelUpload() {
+            if (uploadController) {
+                uploadController.abort();
+                hideUploadProgress();
+                showAlert('Upload cancelled', 'info');
+            }
+        }
+
+        // Show retry option
+        function showRetryOption() {
+            document.getElementById('retryUploadBtn').classList.remove('hidden');
+            document.getElementById('cancelUploadBtn').classList.add('hidden');
+        }
+
+        // Retry upload
+        function retryUpload() {
+            if (uploadRetryCount < MAX_RETRIES) {
+                uploadRetryCount++;
+                showAlert(`Retrying upload (attempt ${uploadRetryCount + 1})...`, 'info');
+                uploadZipFile();
+            } else {
+                showAlert('Maximum retry attempts reached. Please try again later.', 'error');
+                hideUploadProgress();
+            }
+        }
+
+        // Reset upload form
+        function resetUploadForm() {
+            selectedZipFile = null;
+            uploadRetryCount = 0;
+            document.getElementById('agentSelect').value = '';
+            document.getElementById('zipFile').value = '';
+            document.querySelector('#uploadArea h3').textContent = '📎 Drop ZIP file here or click to upload';
+            document.querySelector('#uploadArea p').innerHTML = 'Supported formats: .zip (containing .jpg, .jpeg, .png images)<br><small>Maximum file size: 1GB | Optimized for large file transfers</small>';
+            document.getElementById('fileSizeWarning').classList.add('hidden');
+            updateUploadButtonState();
+        }
+
+        // Export data to Excel (with authentication)
+        async function exportToExcel() {
+            const filters = {
+                agent_id: document.getElementById('exportAgent').value,
+                date_from: document.getElementById('dateFrom').value,
+                date_to: document.getElementById('dateTo').value
+            };
+
+            const queryParams = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) queryParams.append(key, value);
+            });
+
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/export-excel?${queryParams}`, {
+                    method: 'GET'
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `crime_records_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    showAlert('Excel file downloaded successfully!', 'success');
+                } else {
+                    const error = await response.json();
+                    showAlert(`Export failed: ${error.detail}`, 'error');
+                }
+
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Export error:', error);
+                    showAlert('Network error during export', 'error');
+                }
+            }
+        }
+
+        // Preview data (with authentication)
+        async function previewData() {
+            const filters = {
+                agent_id: document.getElementById('exportAgent').value,
+                date_from: document.getElementById('dateFrom').value,
+                date_to: document.getElementById('dateTo').value
+            };
+
+            const queryParams = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) queryParams.append(key, value);
+            });
+
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/preview-data?${queryParams}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayDataPreview(data);
+                    document.getElementById('dataPreviewSection').classList.remove('hidden');
+                } else {
+                    showAlert(`Preview failed: ${data.detail}`, 'error');
+                }
+
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Preview error:', error);
+                    showAlert('Network error during preview', 'error');
+                }
+            }
+        }
+
+        // Test data availability (with authentication)
+        async function testDataAvailability() {
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/test-data`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert(`Data test successful: ${data.message}`, 'success');
+                } else {
+                    showAlert(`Data test failed: ${data.detail}`, 'error');
+                }
+
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Data test error:', error);
+                    showAlert('Network error during data test', 'error');
+                }
+            }
+        }
+
+        // Load session report (with authentication)
+        async function loadSessionReport() {
+            const filters = {
+                agent_id: document.getElementById('sessionAgent').value,
+                date_from: document.getElementById('sessionDateFrom').value,
+                date_to: document.getElementById('sessionDateTo').value
+            };
+
+            const queryParams = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) queryParams.append(key, value);
+            });
+
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/session-report?${queryParams}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    displaySessionReport(data);
+                    document.getElementById('sessionReportContainer').style.display = 'block';
+                } else {
+                    showAlert(`Session report failed: ${data.detail}`, 'error');
+                }
+
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Session report error:', error);
+                    showAlert('Network error during session report', 'error');
+                }
+            }
+        }
+
+        // Export session report (with authentication)
+        async function exportSessionReport() {
+            const filters = {
+                agent_id: document.getElementById('sessionAgent').value,
+                date_from: document.getElementById('sessionDateFrom').value,
+                date_to: document.getElementById('sessionDateTo').value
+            };
+
+            const queryParams = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) queryParams.append(key, value);
+            });
+
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/export-sessions?${queryParams}`, {
+                    method: 'GET'
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `session_report_${new Date().toISOString().split('T')[0]}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    showAlert('Session report downloaded successfully!', 'success');
+                } else {
+                    const error = await response.json();
+                    showAlert(`Session export failed: ${error.detail}`, 'error');
+                }
+
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Session export error:', error);
+                    showAlert('Network error during session export', 'error');
+                }
+            }
+        }
+
+        // Display session report
+        function displaySessionReport(data) {
+            const tbody = document.getElementById('sessionReportBody');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6">No session data found with current filters</td></tr>';
+                return;
+            }
+
+            data.forEach(session => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${session.agent_id}</td>
+                    <td>${session.agent_name}</td>
+                    <td>${session.login_time || 'N/A'}</td>
+                    <td>${session.logout_time || 'Still logged in'}</td>
+                    <td>${session.duration_minutes || 0}</td>
+                    <td>
+                        <span class="badge ${session.logout_time ? 'badge-success' : 'badge-danger'}">
+                            ${session.logout_time ? 'Completed' : 'Active'}
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Display data preview
+        function displayDataPreview(data) {
+            const thead = document.getElementById('previewTableHead');
+            const tbody = document.getElementById('previewTableBody');
+
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="100%">No data found with current filters</td></tr>';
+                return;
+            }
+
+            const headers = Object.keys(data[0]);
+            const headerRow = document.createElement('tr');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header.replace(/_/g, ' ').toUpperCase();
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+
+            data.slice(0, 50).forEach(row => {
+                const tr = document.createElement('tr');
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    td.textContent = row[header] || '';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+
+            if (data.length > 50) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="${headers.length}" style="text-align: center; font-style: italic; color: #666;">Showing first 50 of ${data.length} records. Download Excel for complete data.</td>`;
+                tbody.appendChild(tr);
+            }
+        }
+
+        // View session history
+        function viewSessionHistory(agentId) {
+            const agent = agents.find(a => a.agent_id === agentId);
+            if (!agent || !agent.recent_sessions) {
+                showAlert('No session history available', 'info');
+                return;
+            }
+            
+            let historyHtml = `<h3>Session History for ${agent.name} (${agentId})</h3>`;
+            historyHtml += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
+            historyHtml += '<tr style="background: #f0f0f0;"><th style="padding: 8px; border: 1px solid #ddd;">Login Time</th><th style="padding: 8px; border: 1px solid #ddd;">Logout Time</th><th style="padding: 8px; border: 1px solid #ddd;">Duration</th></tr>';
+            
+            agent.recent_sessions.forEach(session => {
+                const duration = session.logout_time ? 
+                    `${session.duration_minutes || 0} minutes` : 
+                    'Still active';
+                
+                historyHtml += `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${session.login_time || 'N/A'}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${session.logout_time || 'Still logged in'}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${duration}</td>
+                    </tr>
+                `;
+            });
+            
+            historyHtml += '</table>';
+            
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.5); z-index: 1000; display: flex; 
+                align-items: center; justify-content: center;
+            `;
+            
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: white; padding: 20px; border-radius: 10px; 
+                max-width: 80%; max-height: 80%; overflow: auto;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            `;
+            
+            modalContent.innerHTML = historyHtml + 
+                '<button onclick="this.closest(\'.modal\').remove()" style="margin-top: 15px; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>';
+            
+            modal.className = 'modal';
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+        }
+
+        // Force logout agent (with authentication)
+        async function forceLogout(agentId) {
+            if (!confirm('Force logout this agent? This will end their current session.')) {
+                return;
+            }
+            
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/force-logout/${agentId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(`Agent ${agentId} has been logged out`, 'success');
+                    await loadAgents();
+                } else {
+                    showAlert(`Force logout failed: ${result.detail}`, 'error');
+                }
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    showAlert('Error during force logout', 'error');
+                }
+            }
+        }
+
+        // Toggle agent status (with authentication)
+        async function toggleAgentStatus(agentId, currentStatus) {
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+            
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/agents/${agentId}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                if (response.ok) {
+                    showAlert(`Agent status updated to ${newStatus}`, 'success');
+                    loadAgents();
+                } else {
+                    const error = await response.json();
+                    showAlert(`Failed to update status: ${error.detail}`, 'error');
+                }
+
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Status update error:', error);
+                    showAlert('Network error during status update', 'error');
+                }
+            }
+        }
+
+        // Refresh agents
+        function refreshAgents() {
+            loadDashboardData();
+            showAlert('Data refreshed successfully!', 'success');
+        }
+
+        // Show alert messages
+        function showAlert(message, type) {
+            const existingAlerts = document.querySelectorAll('.alert');
+            existingAlerts.forEach(alert => alert.remove());
+
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+
+            const content = document.querySelector('.content');
+            if (content) {
+                content.insertBefore(alert, content.firstChild);
+            } else {
+                // If on login screen
+                const loginForm = document.querySelector('.login-form');
+                if (loginForm) {
+                    loginForm.insertBefore(alert, loginForm.firstChild);
+                }
+            }
+
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.remove();
+                }
+            }, 5000);
+        }
+
+        // Security enhancements
+        
+        // Prevent right-click context menu on sensitive areas
+        document.addEventListener('contextmenu', function(e) {
+            if (e.target.closest('.credential-value') || e.target.closest('input[type="password"]')) {
+                e.preventDefault();
+            }
+        });
+
+        // Prevent drag and drop on password fields
+        document.addEventListener('dragstart', function(e) {
+            if (e.target.closest('.credential-value') || e.target.closest('input[type="password"]')) {
+                e.preventDefault();
+            }
+        });
+
+        // Clear sensitive data on page unload
+        window.addEventListener('beforeunload', function() {
+            // Clear any sensitive form data
+            const passwordInputs = document.querySelectorAll('input[type="password"]');
+            passwordInputs.forEach(input => input.value = '');
+            
+            // Clear credential displays
+            const credentialValues = document.querySelectorAll('.credential-value');
+            credentialValues.forEach(element => element.textContent = '••••••••');
+            
+            // Cancel any ongoing upload
+            if (uploadController) {
+                uploadController.abort();
+            }
+        });
+
+        // Disable browser back/forward navigation on sensitive pages
+        history.pushState(null, null, location.href);
+        window.addEventListener('popstate', function() {
+            history.pushState(null, null, location.href);
+        });
+
+        // Auto-logout on tab visibility change (optional security feature)
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // Page is hidden - could implement auto-logout after extended period
+                // For now, just extend session timeout when page becomes visible again
+                return;
+            } else {
+                // Page is visible again - refresh session if valid
+                const session = getSession();
+                if (session && session.expiry > Date.now()) {
+                    extendSession();
+                }
+            }
+        });
+
+        // Additional security: Check for suspicious activity
+        let suspiciousActivityCount = 0;
+        const MAX_SUSPICIOUS_ACTIVITIES = 5;
+
+        function detectSuspiciousActivity(activityType) {
+            suspiciousActivityCount++;
+            
+            if (suspiciousActivityCount >= MAX_SUSPICIOUS_ACTIVITIES) {
+                showAlert('Suspicious activity detected. Session will be terminated for security.', 'error');
+                setTimeout(() => {
+                    logout();
+                }, 3000);
+            }
+        }
+
+        // Monitor for rapid failed authentication attempts
+        document.getElementById('adminPassword').addEventListener('input', function() {
+            if (failedAttempts >= 2) {
+                // User is typing after failed attempts - this is normal, reset counter
+                if (this.value.length > 3) {
+                    suspiciousActivityCount = 0;
+                }
+            }
+        });
+
+        // Keyboard shortcuts for quick logout (Ctrl+Shift+L)
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.shiftKey && e.key === 'L') {
+                e.preventDefault();
+                if (getSession()) {
+                    logout();
+                    showAlert('Quick logout activated', 'info');
+                }
+            }
+            
+            // Cancel upload with Escape key
+            if (e.key === 'Escape' && uploadController) {
+                cancelUpload();
+            }
+        });
+
+        // Session info display (optional)
+        function showSessionInfo() {
+            const session = getSession();
+            if (session) {
+                const timeRemaining = Math.max(0, Math.floor((session.expiry - Date.now()) / 60000));
+                console.log(`Session active. Time remaining: ${timeRemaining} minutes`);
+            }
+        }
+
+        // Call session info every 10 minutes (for debugging)
+        setInterval(showSessionInfo, 10 * 60 * 1000);
+
+        // Network connectivity monitoring
+        window.addEventListener('online', function() {
+            showAlert('Internet connection restored', 'success');
+        });
+
+        window.addEventListener('offline', function() {
+            showAlert('Internet connection lost. Upload will pause.', 'error');
+        });
+
+        // Memory management for large files
+        function cleanupFileReferences() {
+            if (selectedZipFile && !uploadController) {
+                // Only cleanup if no upload is in progress
+                const fileName = selectedZipFile.name;
+                selectedZipFile = null;
+                console.log(`Cleaned up memory for file: ${fileName}`);
+            }
+        }
+
+        // Cleanup memory periodically (every 5 minutes)
+        setInterval(cleanupFileReferences, 5 * 60 * 1000);
+    </script>
+</body>
+</html> Configuration
         const BASE_URL = 'https://web-production-b3ef2.up.railway.app';
         const SESSION_KEY = 'admin_session';
         const REMEMBER_KEY = 'admin_remember';
-        const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
-        const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB limit
-        const AUTO_REFRESH_INTERVAL = 30000; // 30 seconds
         
-        // Enhanced Global Variables
+        // Enhanced upload configuration for large files
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks for better reliability
+        const MAX_RETRIES = 3;
+        const LARGE_FILE_THRESHOLD = 100 * 1024 * 1024; // 100MB threshold for chunked upload
+        
+        // Security and session management
         let sessionTimeout;
         let failedAttempts = 0;
         let lockoutTime = null;
         let agents = [];
         let selectedZipFile = null;
-        let uploadAbortController = null;
-        let uploadPaused = false;
-        let autoRefreshEnabled = true;
-        let autoRefreshInterval = null;
-        let currentUploadProgress = 0;
+        
+        // Enhanced upload state management
+        let uploadController = null;
         let uploadStartTime = null;
-        let selectedCompressionOption = 'chunk';
+        let lastProgressUpdate = null;
+        let uploadRetryCount = 0;
+        let isChunkedUpload = false;
+        let currentChunk = 0;
+        let totalChunks = 0;
 
         // Initialize application
         document.addEventListener('DOMContentLoaded', function() {
@@ -858,494 +1449,28 @@
             setupLoginForm();
             setupDragAndDrop();
             setupAgentRegistration();
+            
+            // Session activity monitoring
             setupSessionMonitoring();
-            initializeAutoRefresh();
         });
 
-        // Initialize auto-refresh system
-        function initializeAutoRefresh() {
-            if (autoRefreshEnabled) {
-                startAutoRefresh();
-            }
-            updateLastUpdateTime();
-        }
-
-        // Start auto-refresh
-        function startAutoRefresh() {
-            if (autoRefreshInterval) {
-                clearInterval(autoRefreshInterval);
-            }
-            
-            autoRefreshInterval = setInterval(async () => {
-                if (autoRefreshEnabled && document.getElementById('dashboard').style.display !== 'none') {
-                    await loadStatistics();
-                    await loadAgents();
-                    updateLastUpdateTime();
-                }
-            }, AUTO_REFRESH_INTERVAL);
-        }
-
-        // Toggle auto-refresh
-        function toggleAutoRefresh() {
-            autoRefreshEnabled = !autoRefreshEnabled;
-            const indicator = document.getElementById('refreshIndicator');
-            const status = document.getElementById('refreshStatus');
-            const toggleText = document.getElementById('toggleRefreshText');
-            
-            if (autoRefreshEnabled) {
-                startAutoRefresh();
-                indicator.style.animation = 'pulse 2s infinite';
-                status.textContent = 'Active';
-                toggleText.textContent = 'Disable Auto-refresh';
-            } else {
-                clearInterval(autoRefreshInterval);
-                indicator.style.animation = 'none';
-                status.textContent = 'Disabled';
-                toggleText.textContent = 'Enable Auto-refresh';
-            }
-        }
-
-        // Force refresh
-        async function forceRefresh() {
-            await loadDashboardData();
-            showAlert('Data refreshed successfully!', 'success');
-            updateLastUpdateTime();
-        }
-
-        // Update last update time
-        function updateLastUpdateTime() {
-            document.getElementById('lastUpdateTime').textContent = new Date().toLocaleTimeString();
-        }
-
-        // Enhanced file analysis
-        function analyzeFile(file) {
-            const sizeInMB = file.size / (1024 * 1024);
-            const estimatedImages = Math.floor(sizeInMB * 20); // Rough estimate: 50KB per image
-            const estimatedMinutes = Math.ceil(sizeInMB / 50); // Rough estimate: 50MB per minute
-            const chunkCount = Math.ceil(file.size / CHUNK_SIZE);
-            
-            // Update analysis display
-            document.getElementById('fileSize').textContent = sizeInMB.toFixed(1) + ' MB';
-            document.getElementById('estimatedImages').textContent = estimatedImages.toLocaleString();
-            document.getElementById('processingTime').textContent = estimatedMinutes + ' min';
-            document.getElementById('chunkCount').textContent = chunkCount.toLocaleString();
-            
-            // Show file analysis
-            document.getElementById('fileAnalysis').classList.remove('hidden');
-            
-            // Show warning for large files
-            if (sizeInMB > 100) {
-                document.getElementById('detectedFileSize').textContent = sizeInMB.toFixed(1) + ' MB';
-                document.getElementById('estimatedTime').textContent = estimatedMinutes + ' minutes';
-                document.getElementById('fileSizeWarning').classList.remove('hidden');
-                document.getElementById('compressionOptions').classList.remove('hidden');
-            } else {
-                document.getElementById('fileSizeWarning').classList.add('hidden');
-                document.getElementById('compressionOptions').classList.add('hidden');
-            }
-        }
-
-        // Select compression option
-        function selectCompressionOption(option) {
-            selectedCompressionOption = option;
-            
-            // Update UI
-            document.querySelectorAll('.compression-option').forEach(el => {
-                el.classList.remove('selected');
-            });
-            document.querySelector(`[data-option="${option}"]`).classList.add('selected');
-        }
-
-        // Enhanced drag and drop setup
-        function setupDragAndDrop() {
-            const uploadArea = document.getElementById('uploadArea');
-            const zipFileInput = document.getElementById('zipFile');
-
-            uploadArea.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                uploadArea.classList.add('dragover');
-            });
-
-            uploadArea.addEventListener('dragleave', () => {
-                uploadArea.classList.remove('dragover');
-            });
-
-            uploadArea.addEventListener('drop', (e) => {
-                e.preventDefault();
-                uploadArea.classList.remove('dragover');
-                
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    handleZipFileSelection(files[0]);
-                }
-            });
-
-            zipFileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    handleZipFileSelection(e.target.files[0]);
-                }
-            });
-        }
-
-        // Enhanced file selection handler
-        function handleZipFileSelection(file) {
-            // Validate file type
-            if (!file.name.toLowerCase().endsWith('.zip')) {
-                showAlert('Please select a valid ZIP file', 'error');
-                return;
-            }
-            
-            // Validate file size
-            if (file.size > MAX_FILE_SIZE) {
-                showAlert(`File too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024 * 1024)}GB`, 'error');
-                return;
-            }
-            
-            selectedZipFile = file;
-            
-            // Update UI
-            document.querySelector('#uploadArea h3').innerHTML = `📎 Selected: <strong>${file.name}</strong>`;
-            document.querySelector('#uploadArea p').textContent = `Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
-            
-            // Analyze file
-            analyzeFile(file);
-            
-            updateUploadButtonState();
-            showAlert(`ZIP file "${file.name}" selected and analyzed!`, 'success');
-        }
-
-        // Enhanced upload function with chunking
-        async function uploadZipFile() {
-            if (!selectedZipFile || !document.getElementById('agentSelect').value) {
-                showAlert('Please select both a ZIP file and an agent', 'error');
-                return;
-            }
-
-            // Reset progress
-            currentUploadProgress = 0;
-            uploadStartTime = Date.now();
-            uploadPaused = false;
-
-            // Setup UI
-            document.getElementById('uploadProgress').classList.remove('hidden');
-            document.getElementById('uploadBtn').disabled = true;
-            document.getElementById('pauseBtn').style.display = 'inline-block';
-            document.getElementById('pauseBtn').disabled = false;
-            document.getElementById('cancelBtn').style.display = 'inline-block';
-            document.getElementById('cancelBtn').disabled = false;
-
-            // Create abort controller
-            uploadAbortController = new AbortController();
-
-            try {
-                if (selectedCompressionOption === 'chunk' && selectedZipFile.size > CHUNK_SIZE) {
-                    await uploadFileInChunks();
-                } else {
-                    await uploadFileStream();
-                }
-            } catch (error) {
-                if (error.name !== 'AbortError') {
-                    console.error('Upload error:', error);
-                    showAlert('Upload failed: ' + error.message, 'error');
-                }
-            } finally {
-                resetUploadUI();
-            }
-        }
-
-        // Upload file in chunks
-        async function uploadFileInChunks() {
-            const totalChunks = Math.ceil(selectedZipFile.size / CHUNK_SIZE);
-            document.getElementById('chunkProgressContainer').classList.remove('hidden');
-            document.getElementById('processingQueueContainer').classList.remove('hidden');
-
-            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-                if (uploadAbortController.signal.aborted) {
-                    throw new Error('Upload cancelled');
-                }
-
-                while (uploadPaused) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-
-                const start = chunkIndex * CHUNK_SIZE;
-                const end = Math.min(start + CHUNK_SIZE, selectedZipFile.size);
-                const chunk = selectedZipFile.slice(start, end);
-
-                await uploadChunk(chunk, chunkIndex, totalChunks);
-                
-                // Update overall progress
-                currentUploadProgress = ((chunkIndex + 1) / totalChunks) * 100;
-                updateProgressDisplay();
-            }
-
-            showAlert('File uploaded successfully in chunks!', 'success');
-        }
-
-        // Upload single chunk
-        async function uploadChunk(chunk, chunkIndex, totalChunks) {
-            const formData = new FormData();
-            formData.append('chunk', chunk);
-            formData.append('chunk_index', chunkIndex);
-            formData.append('total_chunks', totalChunks);
-            formData.append('filename', selectedZipFile.name);
-            formData.append('agent_id', document.getElementById('agentSelect').value);
-
-            // Update chunk status
-            document.getElementById('chunkStatus').textContent = 
-                `Processing chunk ${chunkIndex + 1} of ${totalChunks} (${(chunk.size / 1024 / 1024).toFixed(2)} MB)`;
-
-            const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/upload-chunk`, {
-                method: 'POST',
-                body: formData,
-                signal: uploadAbortController.signal
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Chunk upload failed');
-            }
-
-            // Update chunk progress
-            const chunkProgress = ((chunkIndex + 1) / totalChunks) * 100;
-            document.getElementById('chunkProgressFill').style.width = chunkProgress + '%';
-            document.getElementById('chunkProgressText').textContent = Math.round(chunkProgress) + '%';
-
-            // Add to processing queue display
-            updateProcessingQueue(chunkIndex + 1, totalChunks);
-        }
-
-        // Upload file as stream
-        async function uploadFileStream() {
-            const formData = new FormData();
-            formData.append('zip_file', selectedZipFile);
-            formData.append('agent_id', document.getElementById('agentSelect').value);
-            formData.append('processing_mode', 'stream');
-
-            const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/upload-tasks`, {
-                method: 'POST',
-                body: formData,
-                signal: uploadAbortController.signal
-            });
-
-            if (response.ok) {
-                const result = await response.json();
-                showAlert(`Successfully uploaded ${result.images_processed} images!`, 'success');
-            } else {
-                const error = await response.json();
-                throw new Error(error.detail || 'Stream upload failed');
-            }
-        }
-
-        // Update progress display
-        function updateProgressDisplay() {
-            const progressFill = document.getElementById('progressFill');
-            const progressText = document.getElementById('progressText');
-            const uploadSpeed = document.getElementById('uploadSpeed');
-            const uploadETA = document.getElementById('uploadETA');
-
-            progressFill.style.width = currentUploadProgress + '%';
-            progressText.textContent = Math.round(currentUploadProgress) + '%';
-
-            // Calculate speed and ETA
-            if (uploadStartTime) {
-                const elapsedTime = (Date.now() - uploadStartTime) / 1000; // seconds
-                const uploadedBytes = (currentUploadProgress / 100) * selectedZipFile.size;
-                const speed = uploadedBytes / elapsedTime; // bytes per second
-                const remainingBytes = selectedZipFile.size - uploadedBytes;
-                const eta = remainingBytes / speed; // seconds
-
-                uploadSpeed.textContent = (speed / (1024 * 1024)).toFixed(2) + ' MB/s';
-                uploadETA.textContent = formatTime(eta);
-            }
-        }
-
-        // Update processing queue display
-        function updateProcessingQueue(processed, total) {
-            const queueList = document.getElementById('queueList');
-            queueList.innerHTML = '';
-
-            for (let i = 1; i <= total; i++) {
-                const queueItem = document.createElement('div');
-                queueItem.className = 'queue-item';
-                
-                let status = '';
-                if (i <= processed) {
-                    status = '<span class="badge badge-success">✓ Completed</span>';
-                } else if (i === processed + 1) {
-                    status = '<span class="badge badge-warning">🔄 Processing</span>';
-                } else {
-                    status = '<span class="badge badge-secondary">⏳ Pending</span>';
-                }
-
-                queueItem.innerHTML = `
-                    <span>Chunk ${i}</span>
-                    ${status}
-                `;
-                queueList.appendChild(queueItem);
-            }
-
-            document.getElementById('processedImages').textContent = Math.round((processed / total) * parseInt(document.getElementById('estimatedImages').textContent));
-        }
-
-        // Pause upload
-        function pauseUpload() {
-            uploadPaused = !uploadPaused;
-            const pauseBtn = document.getElementById('pauseBtn');
-            
-            if (uploadPaused) {
-                pauseBtn.textContent = '▶️ Resume Upload';
-                document.getElementById('uploadStatus').textContent = 'Upload paused...';
-            } else {
-                pauseBtn.textContent = '⏸️ Pause Upload';
-                document.getElementById('uploadStatus').textContent = 'Upload resumed...';
-            }
-        }
-
-        // Cancel upload
-        function cancelUpload() {
-            if (confirm('Are you sure you want to cancel the upload?')) {
-                if (uploadAbortController) {
-                    uploadAbortController.abort();
-                }
-                showAlert('Upload cancelled', 'warning');
-                resetUploadUI();
-            }
-        }
-
-        // Reset upload UI
-        function resetUploadUI() {
-            document.getElementById('uploadProgress').classList.add('hidden');
-            document.getElementById('chunkProgressContainer').classList.add('hidden');
-            document.getElementById('processingQueueContainer').classList.add('hidden');
-            document.getElementById('uploadBtn').disabled = false;
-            document.getElementById('pauseBtn').style.display = 'none';
-            document.getElementById('cancelBtn').style.display = 'none';
-            
-            // Reset file selection
-            selectedZipFile = null;
-            document.getElementById('zipFile').value = '';
-            document.getElementById('agentSelect').value = '';
-            document.querySelector('#uploadArea h3').textContent = '📎 Drop ZIP file here or click to upload';
-            document.querySelector('#uploadArea p').textContent = 'Supported formats: .zip (containing .jpg, .jpeg, .png images)';
-            document.getElementById('fileAnalysis').classList.add('hidden');
-            document.getElementById('fileSizeWarning').classList.add('hidden');
-            document.getElementById('compressionOptions').classList.add('hidden');
-            
-            updateUploadButtonState();
-            
-            // Refresh statistics
-            loadStatistics();
-        }
-
-        // Format time helper
-        function formatTime(seconds) {
-            if (!seconds || !isFinite(seconds)) return 'Calculating...';
-            
-            const hours = Math.floor(seconds / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-            const secs = Math.floor(seconds % 60);
-            
-            if (hours > 0) {
-                return `${hours}h ${minutes}m ${secs}s`;
-            } else if (minutes > 0) {
-                return `${minutes}m ${secs}s`;
-            } else {
-                return `${secs}s`;
-            }
-        }
-
-        // Enhanced agents table with task information
-        function updateAgentsTable() {
-            const tbody = document.getElementById('agentsTableBody');
-            tbody.innerHTML = '';
-            
-            agents.forEach(agent => {
-                const row = document.createElement('tr');
-                
-                let sessionDuration = 'N/A';
-                if (agent.is_currently_logged_in && agent.last_login) {
-                    const loginTime = new Date(agent.last_login);
-                    const now = new Date();
-                    const durationMs = now - loginTime;
-                    const hours = Math.floor(durationMs / (1000 * 60 * 60));
-                    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-                    sessionDuration = `${hours}h ${minutes}m`;
-                }
-                
-                row.innerHTML = `
-                    <td>${agent.agent_id}</td>
-                    <td>${agent.name}</td>
-                    <td>${agent.email}</td>
-                    <td><span class="badge ${agent.status === 'active' ? 'badge-success' : 'badge-danger'}">${agent.status}</span></td>
-                    <td>
-                        <span class="badge ${agent.is_currently_logged_in ? 'badge-success' : 'badge-secondary'}" 
-                              title="${agent.is_currently_logged_in ? 'Currently logged in' : 'Not logged in'}">
-                            ${agent.is_currently_logged_in ? '🟢 Online' : '🔴 Offline'}
-                        </span>
-                    </td>
-                    <td><span class="badge badge-success">${agent.tasks_completed || 0}</span></td>
-                    <td><span class="badge badge-warning">${agent.tasks_pending || 0}</span></td>
-                    <td>${agent.last_login || 'Never'}</td>
-                    <td>${sessionDuration}</td>
-                    <td>
-                        <button class="btn btn-sm ${agent.status === 'active' ? 'btn-danger' : 'btn-success'}" 
-                                onclick="toggleAgentStatus('${agent.agent_id}', '${agent.status}')">
-                            ${agent.status === 'active' ? 'Deactivate' : 'Activate'}
-                        </button>
-                        ${agent.is_currently_logged_in ? 
-                            `<button class="btn btn-sm btn-danger" 
-                                     onclick="forceLogout('${agent.agent_id}')" title="Force Logout">
-                                ⏹️
-                            </button>` : ''
-                        }
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        // Enhanced statistics loading with processing queue
-        async function loadStatistics() {
-            try {
-                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/statistics`);
-                const stats = await response.json();
-                
-                document.getElementById('totalAgents').textContent = stats.total_agents || 0;
-                document.getElementById('totalTasks').textContent = stats.total_tasks || 0;
-                document.getElementById('completedTasks').textContent = stats.completed_tasks || 0;
-                document.getElementById('pendingTasks').textContent = stats.pending_tasks || 0;
-                document.getElementById('processingQueue').textContent = stats.processing_queue || 0;
-                
-            } catch (error) {
-                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    console.error('Failed to load statistics:', error);
-                    showAlert('Failed to load statistics', 'error');
-                }
-            }
-        }
-
-        // All other functions remain the same as in the original code
-        // (checkExistingSession, setupLoginForm, handleLogin, etc.)
-        
-        // Copy the rest of the functions from the original code here...
-        // For brevity, I'm not repeating all the authentication and other functions
-        // as they remain unchanged from the original implementation
-        
-        // Authentication functions
+        // Check for existing valid session
         function checkExistingSession() {
             const session = getSession();
             const rememberToken = localStorage.getItem(REMEMBER_KEY);
             
             if (session && session.expiry > Date.now()) {
+                // Valid session exists
                 showDashboard();
                 return;
             }
             
             if (rememberToken) {
+                // Check if remember token is valid (7 days)
                 try {
                     const remembered = JSON.parse(rememberToken);
                     if (remembered.expiry > Date.now()) {
+                        // Auto-login with remember token
                         createSession(true);
                         showDashboard();
                         return;
@@ -1357,9 +1482,11 @@
                 }
             }
             
+            // No valid session, show login
             showLogin();
         }
 
+        // Setup login form
         function setupLoginForm() {
             document.getElementById('loginForm').addEventListener('submit', async function(e) {
                 e.preventDefault();
@@ -1367,7 +1494,9 @@
             });
         }
 
+        // Handle login attempt
         async function handleLogin() {
+            // Check lockout
             if (lockoutTime && Date.now() < lockoutTime) {
                 const remainingTime = Math.ceil((lockoutTime - Date.now()) / 1000);
                 showLoginError(`Too many failed attempts. Please wait ${remainingTime} seconds.`);
@@ -1379,23 +1508,28 @@
             const rememberMe = document.getElementById('rememberMe').checked;
             const loginBtn = document.getElementById('loginBtn');
 
+            // Show loading state
             loginBtn.innerHTML = '<div class="loading-spinner"></div>Logging in...';
             loginBtn.disabled = true;
 
             try {
+                // Simulate API call delay for security
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
+                // SECURE CREDENTIALS CHECK - CHANGE THESE PASSWORDS!
                 if (await validateCredentials(username, password)) {
+                    // Successful login
                     createSession(rememberMe);
                     failedAttempts = 0;
                     lockoutTime = null;
                     showDashboard();
                     showAlert('Login successful! Welcome to the admin dashboard.', 'success');
                 } else {
+                    // Failed login
                     failedAttempts++;
                     
                     if (failedAttempts >= 3) {
-                        lockoutTime = Date.now() + (30 * 1000);
+                        lockoutTime = Date.now() + (30 * 1000); // 30 seconds lockout
                         showLoginError('Too many failed attempts. Account locked for 30 seconds.');
                     } else {
                         showLoginError(`Invalid credentials. ${3 - failedAttempts} attempts remaining.`);
@@ -1404,16 +1538,19 @@
             } catch (error) {
                 showLoginError('Login error. Please try again.');
             } finally {
+                // Reset button
                 loginBtn.innerHTML = '🚀 Login to Dashboard';
                 loginBtn.disabled = false;
             }
         }
 
+        // SECURE CREDENTIAL VALIDATION - CHANGE THESE PASSWORDS IMMEDIATELY!
         async function validateCredentials(username, password) {
+            // ⚠️ CHANGE THESE PASSWORDS BEFORE DEPLOYMENT! ⚠️
             const validCredentials = [
-                { username: 'admin', password: 'Admin@2024!Secure' },
-                { username: 'manager', password: 'Manager@2024!Strong' },
-                { username: 'supervisor', password: 'Super@2024!Safe' }
+                { username: 'admin', password: 'Admin@2024!Secure' },           // CHANGE THIS PASSWORD
+                { username: 'manager', password: 'Manager@2024!Strong' },       // CHANGE THIS PASSWORD
+                { username: 'supervisor', password: 'Super@2024!Safe' }        // CHANGE THIS PASSWORD
             ];
             
             return validCredentials.some(cred => 
@@ -1421,11 +1558,12 @@
             );
         }
 
+        // Create session
         function createSession(rememberMe = false) {
             const session = {
                 authenticated: true,
                 loginTime: Date.now(),
-                expiry: Date.now() + (2 * 60 * 60 * 1000),
+                expiry: Date.now() + (2 * 60 * 60 * 1000), // 2 hours
                 username: document.getElementById('adminUsername').value
             };
             
@@ -1433,14 +1571,16 @@
             
             if (rememberMe) {
                 const rememberToken = {
-                    expiry: Date.now() + (7 * 24 * 60 * 60 * 1000)
+                    expiry: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
                 };
                 localStorage.setItem(REMEMBER_KEY, JSON.stringify(rememberToken));
             }
             
+            // Setup session timeout
             setupSessionTimeout();
         }
 
+        // Get current session
         function getSession() {
             try {
                 const session = sessionStorage.getItem(SESSION_KEY);
@@ -1450,31 +1590,37 @@
             }
         }
 
+        // Setup session timeout and monitoring
         function setupSessionTimeout() {
+            // Clear existing timeout
             if (sessionTimeout) {
                 clearTimeout(sessionTimeout);
             }
             
+            // Set 2-hour timeout
             sessionTimeout = setTimeout(() => {
                 showAlert('Session expired. Please login again.', 'info');
                 logout();
             }, 2 * 60 * 60 * 1000);
         }
 
+        // Setup session activity monitoring
         function setupSessionMonitoring() {
+            // Extend session on user activity
             const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
             let lastActivity = Date.now();
             
             activityEvents.forEach(event => {
                 document.addEventListener(event, () => {
                     const now = Date.now();
-                    if (now - lastActivity > 60000) {
+                    if (now - lastActivity > 60000) { // Only extend if more than 1 minute since last activity
                         lastActivity = now;
                         extendSession();
                     }
                 });
             });
             
+            // Check session validity every minute
             setInterval(() => {
                 const session = getSession();
                 if (!session || session.expiry <= Date.now()) {
@@ -1486,27 +1632,31 @@
             }, 60000);
         }
 
+        // Extend session
         function extendSession() {
             const session = getSession();
             if (session && session.expiry > Date.now()) {
-                session.expiry = Date.now() + (2 * 60 * 60 * 1000);
+                session.expiry = Date.now() + (2 * 60 * 60 * 1000); // Extend by 2 hours
                 sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
                 setupSessionTimeout();
             }
         }
 
+        // Show login screen
         function showLogin() {
             document.getElementById('loginScreen').classList.remove('hidden');
             document.getElementById('dashboard').classList.add('hidden');
             document.getElementById('adminUsername').focus();
         }
 
+        // Show dashboard
         function showDashboard() {
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('dashboard').classList.remove('hidden');
             loadDashboardData();
         }
 
+        // Show login error
         function showLoginError(message) {
             const errorDiv = document.getElementById('loginError');
             errorDiv.textContent = message;
@@ -1517,7 +1667,13 @@
             }, 5000);
         }
 
+        // Logout function
         function logout() {
+            // Cancel any ongoing upload
+            if (uploadController) {
+                uploadController.abort();
+            }
+            
             sessionStorage.removeItem(SESSION_KEY);
             localStorage.removeItem(REMEMBER_KEY);
             
@@ -1525,10 +1681,7 @@
                 clearTimeout(sessionTimeout);
             }
             
-            if (autoRefreshInterval) {
-                clearInterval(autoRefreshInterval);
-            }
-            
+            // Clear form data
             document.getElementById('loginForm').reset();
             document.getElementById('loginError').classList.add('hidden');
             
@@ -1536,6 +1689,7 @@
             showAlert('Logged out successfully.', 'info');
         }
 
+        // Enhanced API request function with auth
         async function makeAuthenticatedRequest(url, options = {}) {
             const session = getSession();
             
@@ -1545,18 +1699,20 @@
                 throw new Error('Session expired');
             }
             
+            // Add auth headers if needed (implement based on your backend)
             const authOptions = {
                 ...options,
                 headers: {
                     ...options.headers,
-                    'Authorization': `Bearer ${session.username}`,
-                    'X-Session-Token': session.loginTime
+                    'Authorization': `Bearer ${session.username}`, // Customize based on your auth system
+                    'X-Session-Token': session.loginTime // Additional security token
                 }
             };
             
             try {
                 const response = await fetch(url, authOptions);
                 
+                // Handle auth errors
                 if (response.status === 401 || response.status === 403) {
                     showAlert('Authentication failed. Please login again.', 'error');
                     logout();
@@ -1572,6 +1728,7 @@
             }
         }
 
+        // Setup agent registration form
         function setupAgentRegistration() {
             document.getElementById('agentRegistrationForm').addEventListener('submit', async function(e) {
                 e.preventDefault();
@@ -1579,6 +1736,7 @@
             });
         }
 
+        // Register new agent (with authentication)
         async function registerNewAgent() {
             const formData = new FormData(document.getElementById('agentRegistrationForm'));
             
@@ -1623,6 +1781,7 @@
             }
         }
 
+        // Load all dashboard data (with authentication)
         async function loadDashboardData() {
             await Promise.all([
                 loadStatistics(),
@@ -1631,6 +1790,26 @@
             ]);
         }
 
+        // Load system statistics (with authentication)
+        async function loadStatistics() {
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/statistics`);
+                const stats = await response.json();
+                
+                document.getElementById('totalAgents').textContent = stats.total_agents || 0;
+                document.getElementById('totalTasks').textContent = stats.total_tasks || 0;
+                document.getElementById('completedTasks').textContent = stats.completed_tasks || 0;
+                document.getElementById('pendingTasks').textContent = stats.pending_tasks || 0;
+                
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Failed to load statistics:', error);
+                    showAlert('Failed to load statistics', 'error');
+                }
+            }
+        }
+
+        // Load agents list (with authentication)
         async function loadAgents() {
             try {
                 const response = await makeAuthenticatedRequest(`${BASE_URL}/api/agents`);
@@ -1646,243 +1825,7 @@
             }
         }
 
-        function populateAgentSelects() {
-            const agentSelect = document.getElementById('agentSelect');
-            const exportAgentSelect = document.getElementById('exportAgent');
-            
-            agentSelect.innerHTML = '<option value="">Select an agent...</option>';
-            exportAgentSelect.innerHTML = '<option value="">All Agents</option>';
-            
-            agents.forEach(agent => {
-                if (agent.status === 'active') {
-                    const option1 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
-                    const option2 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
-                    agentSelect.appendChild(option1);
-                    exportAgentSelect.appendChild(option2);
-                }
-            });
-        }
-
-        function updateUploadButtonState() {
-            const uploadBtn = document.getElementById('uploadBtn');
-            const agentSelected = document.getElementById('agentSelect').value !== '';
-            uploadBtn.disabled = !(selectedZipFile && agentSelected);
-        }
-
-        document.getElementById('agentSelect').addEventListener('change', updateUploadButtonState);
-
-        async function exportToExcel() {
-            const filters = {
-                agent_id: document.getElementById('exportAgent').value,
-                date_from: document.getElementById('dateFrom').value,
-                date_to: document.getElementById('dateTo').value
-            };
-
-            const queryParams = new URLSearchParams();
-            Object.entries(filters).forEach(([key, value]) => {
-                if (value) queryParams.append(key, value);
-            });
-
-            try {
-                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/export-excel?${queryParams}`, {
-                    method: 'GET'
-                });
-
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `crime_records_export_${new Date().toISOString().split('T')[0]}.xlsx`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                    
-                    showAlert('Excel file downloaded successfully!', 'success');
-                } else {
-                    const error = await response.json();
-                    showAlert(`Export failed: ${error.detail}`, 'error');
-                }
-
-            } catch (error) {
-                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    console.error('Export error:', error);
-                    showAlert('Network error during export', 'error');
-                }
-            }
-        }
-
-        async function previewData() {
-            const filters = {
-                agent_id: document.getElementById('exportAgent').value,
-                date_from: document.getElementById('dateFrom').value,
-                date_to: document.getElementById('dateTo').value
-            };
-
-            const queryParams = new URLSearchParams();
-            Object.entries(filters).forEach(([key, value]) => {
-                if (value) queryParams.append(key, value);
-            });
-
-            try {
-                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/preview-data?${queryParams}`);
-                const data = await response.json();
-
-                if (response.ok) {
-                    displayDataPreview(data);
-                    document.getElementById('dataPreviewSection').classList.remove('hidden');
-                } else {
-                    showAlert(`Preview failed: ${data.detail}`, 'error');
-                }
-
-            } catch (error) {
-                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    console.error('Preview error:', error);
-                    showAlert('Network error during preview', 'error');
-                }
-            }
-        }
-
-        async function testDataAvailability() {
-            try {
-                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/test-data`);
-                const data = await response.json();
-
-                if (response.ok) {
-                    showAlert(`Data test successful: ${data.message}`, 'success');
-                } else {
-                    showAlert(`Data test failed: ${data.detail}`, 'error');
-                }
-
-            } catch (error) {
-                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    console.error('Data test error:', error);
-                    showAlert('Network error during data test', 'error');
-                }
-            }
-        }
-
-        function displayDataPreview(data) {
-            const thead = document.getElementById('previewTableHead');
-            const tbody = document.getElementById('previewTableBody');
-
-            thead.innerHTML = '';
-            tbody.innerHTML = '';
-
-            if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="100%">No data found with current filters</td></tr>';
-                return;
-            }
-
-            const headers = Object.keys(data[0]);
-            const headerRow = document.createElement('tr');
-            headers.forEach(header => {
-                const th = document.createElement('th');
-                th.textContent = header.replace(/_/g, ' ').toUpperCase();
-                headerRow.appendChild(th);
-            });
-            thead.appendChild(headerRow);
-
-            data.slice(0, 50).forEach(row => {
-                const tr = document.createElement('tr');
-                headers.forEach(header => {
-                    const td = document.createElement('td');
-                    td.textContent = row[header] || '';
-                    tr.appendChild(td);
-                });
-                tbody.appendChild(tr);
-            });
-
-            if (data.length > 50) {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td colspan="${headers.length}" style="text-align: center; font-style: italic; color: #666;">Showing first 50 of ${data.length} records. Download Excel for complete data.</td>`;
-                tbody.appendChild(tr);
-            }
-        }
-
-        async function toggleAgentStatus(agentId, currentStatus) {
-            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-            
-            try {
-                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/agents/${agentId}/status`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ status: newStatus })
-                });
-
-                if (response.ok) {
-                    showAlert(`Agent status updated to ${newStatus}`, 'success');
-                    loadAgents();
-                } else {
-                    const error = await response.json();
-                    showAlert(`Failed to update status: ${error.detail}`, 'error');
-                }
-
-            } catch (error) {
-                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    console.error('Status update error:', error);
-                    showAlert('Network error during status update', 'error');
-                }
-            }
-        }
-
-        async function forceLogout(agentId) {
-            if (!confirm('Force logout this agent? This will end their current session.')) {
-                return;
-            }
-            
-            try {
-                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/force-logout/${agentId}`, {
-                    method: 'POST'
-                });
-                const result = await response.json();
-                
-                if (response.ok) {
-                    showAlert(`Agent ${agentId} has been logged out`, 'success');
-                    await loadAgents();
-                } else {
-                    showAlert(`Force logout failed: ${result.detail}`, 'error');
-                }
-            } catch (error) {
-                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    showAlert('Error during force logout', 'error');
-                }
-            }
-        }
-
-        function refreshAgents() {
-            loadDashboardData();
-            showAlert('Data refreshed successfully!', 'success');
-        }
-
-        function showAlert(message, type) {
-            const existingAlerts = document.querySelectorAll('.alert');
-            existingAlerts.forEach(alert => alert.remove());
-
-            const alert = document.createElement('div');
-            alert.className = `alert alert-${type}`;
-            alert.textContent = message;
-
-            const content = document.querySelector('.content');
-            if (content) {
-                content.insertBefore(alert, content.firstChild);
-            } else {
-                const loginForm = document.querySelector('.login-form');
-                if (loginForm) {
-                    loginForm.insertBefore(alert, loginForm.firstChild);
-                }
-            }
-
-            setTimeout(() => {
-                if (alert.parentNode) {
-                    alert.remove();
-                }
-            }, 5000);
-        }
-
+        // Copy to clipboard function
         function copyToClipboard(elementId) {
             const element = document.getElementById(elementId);
             const text = element.textContent;
@@ -1908,111 +1851,398 @@
             });
         }
 
-        // Security enhancements
-        document.addEventListener('contextmenu', function(e) {
-            if (e.target.closest('.credential-value') || e.target.closest('input[type="password"]')) {
-                e.preventDefault();
-            }
-        });
-
-        document.addEventListener('dragstart', function(e) {
-            if (e.target.closest('.credential-value') || e.target.closest('input[type="password"]')) {
-                e.preventDefault();
-            }
-        });
-
-        window.addEventListener('beforeunload', function() {
-            const passwordInputs = document.querySelectorAll('input[type="password"]');
-            passwordInputs.forEach(input => input.value = '');
+        // Update agents table with password and session info
+        function updateAgentsTable() {
+            const tbody = document.getElementById('agentsTableBody');
+            tbody.innerHTML = '';
             
-            const credentialValues = document.querySelectorAll('.credential-value');
-            credentialValues.forEach(element => element.textContent = '••••••••');
-        });
-
-        history.pushState(null, null, location.href);
-        window.addEventListener('popstate', function() {
-            history.pushState(null, null, location.href);
-        });
-
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) {
-                const session = getSession();
-                if (session && session.expiry > Date.now()) {
-                    extendSession();
+            agents.forEach(agent => {
+                const row = document.createElement('tr');
+                
+                let sessionDuration = 'N/A';
+                if (agent.is_currently_logged_in && agent.last_login) {
+                    const loginTime = new Date(agent.last_login);
+                    const now = new Date();
+                    const durationMs = now - loginTime;
+                    const hours = Math.floor(durationMs / (1000 * 60 * 60));
+                    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+                    sessionDuration = `${hours}h ${minutes}m`;
                 }
-            }
-        });
-
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && e.shiftKey && e.key === 'L') {
-                e.preventDefault();
-                if (getSession()) {
-                    logout();
-                    showAlert('Quick logout activated', 'info');
-                }
-            }
-        });
-
-        // Performance monitoring
-        function monitorPerformance() {
-            if ('performance' in window) {
-                const navigationTiming = performance.getEntriesByType('navigation')[0];
-                if (navigationTiming) {
-                    console.log('Page load time:', navigationTiming.loadEventEnd - navigationTiming.loadEventStart, 'ms');
-                }
-            }
-        }
-
-        // Initialize performance monitoring
-        window.addEventListener('load', monitorPerformance);
-
-        // Memory usage monitoring (for development)
-        function checkMemoryUsage() {
-            if ('memory' in performance) {
-                const memory = performance.memory;
-                console.log('Memory usage:', {
-                    used: Math.round(memory.usedJSHeapSize / 1048576) + ' MB',
-                    total: Math.round(memory.totalJSHeapSize / 1048576) + ' MB',
-                    limit: Math.round(memory.jsHeapSizeLimit / 1048576) + ' MB'
-                });
-            }
-        }
-
-        // Check memory usage every 5 minutes in development
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            setInterval(checkMemoryUsage, 5 * 60 * 1000);
-        }
-
-        // Error handling for unhandled promises
-        window.addEventListener('unhandledrejection', function(event) {
-            console.error('Unhandled promise rejection:', event.reason);
-            showAlert('An unexpected error occurred. Please try again.', 'error');
-            event.preventDefault();
-        });
-
-        // Global error handler
-        window.addEventListener('error', function(event) {
-            console.error('Global error:', event.error);
-            showAlert('An error occurred. Please refresh the page if issues persist.', 'error');
-        });
-
-        // Service worker registration for caching (optional)
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(function(registration) {
-                        console.log('ServiceWorker registration successful');
-                    })
-                    .catch(function(err) {
-                        console.log('ServiceWorker registration failed');
-                    });
+                
+                row.innerHTML = `
+                    <td>${agent.agent_id}</td>
+                    <td>${agent.name}</td>
+                    <td>${agent.email}</td>
+                    <td>
+                        <span id="password-${agent.agent_id}" style="font-family: monospace; background: #f0f0f0; padding: 4px; border-radius: 4px;">
+                            ••••••••
+                        </span>
+                        <button class="btn btn-sm" style="padding: 2px 6px; margin-left: 5px;" 
+                                onclick="showPassword('${agent.agent_id}')" title="Show Password">
+                            👁️
+                        </button>
+                        <button class="btn btn-sm" style="padding: 2px 6px; margin-left: 2px;" 
+                                onclick="resetPassword('${agent.agent_id}')" title="Reset Password">
+                            🔄
+                        </button>
+                    </td>
+                    <td><span class="badge ${agent.status === 'active' ? 'badge-success' : 'badge-danger'}">${agent.status}</span></td>
+                    <td>
+                        <span class="badge ${agent.is_currently_logged_in ? 'badge-success' : 'badge-secondary'}" 
+                              title="${agent.is_currently_logged_in ? 'Currently logged in' : 'Not logged in'}">
+                            ${agent.is_currently_logged_in ? '🟢 Online' : '🔴 Offline'}
+                        </span>
+                    </td>
+                    <td>${agent.tasks_completed || 0}</td>
+                    <td>${agent.last_login || 'Never'}</td>
+                    <td>${agent.last_logout || 'Never'}</td>
+                    <td>${sessionDuration}</td>
+                    <td>
+                        <button class="btn btn-sm ${agent.status === 'active' ? 'btn-danger' : 'btn-success'}" 
+                                onclick="toggleAgentStatus('${agent.agent_id}', '${agent.status}')">
+                            ${agent.status === 'active' ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button class="btn btn-sm btn-info" 
+                                onclick="viewSessionHistory('${agent.agent_id}')" title="View Session History">
+                            📊
+                        </button>
+                        ${agent.is_currently_logged_in ? 
+                            `<button class="btn btn-sm btn-danger" 
+                                     onclick="forceLogout('${agent.agent_id}')" title="Force Logout">
+                                ⏹️
+                            </button>` : ''
+                        }
+                    </td>
+                `;
+                tbody.appendChild(row);
             });
         }
-    </script>
-</body>
-</html>radius: 8px; text-align: center;">
-                            <strong>Agent ID:</strong><br>
-                            <span id="newAgentId" style="font-size: 1.2em; color: #1976d2; font-family: monospace;"></span>
-                            <button onclick="copyToClipboard('newAgentId')" class="btn btn-info" style="margin-left: 10px; padding: 5px 10px; font-size: 12px;">Copy</button>
-                        </div>
-                        <div style="background: white; padding: 15px; border-
+
+        // Show agent password (with authentication)
+        async function showPassword(agentId) {
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/agent-password/${agentId}`);
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(result.message, 'info');
+                } else {
+                    showAlert(`Error: ${result.detail}`, 'error');
+                }
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    showAlert('Error retrieving password information', 'error');
+                }
+            }
+        }
+
+        // Reset agent password (with authentication)
+        async function resetPassword(agentId) {
+            if (!confirm('Are you sure you want to reset this agent\'s password? This will generate a new password.')) {
+                return;
+            }
+            
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/reset-password/${agentId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const passwordDisplay = `
+                        New Password for ${agentId}: 
+                        ${result.new_password}
+                        
+                        Please save this password securely and share it with the agent.
+                    `;
+                    
+                    alert(passwordDisplay);
+                    showAlert(`Password reset successfully for agent ${agentId}`, 'success');
+                    
+                    const passwordSpan = document.getElementById(`password-${agentId}`);
+                    if (passwordSpan) {
+                        passwordSpan.textContent = result.new_password;
+                        passwordSpan.style.background = '#e8f5e8';
+                        setTimeout(() => {
+                            passwordSpan.textContent = '••••••••';
+                            passwordSpan.style.background = '#f0f0f0';
+                        }, 10000);
+                    }
+                    
+                } else {
+                    showAlert(`Password reset failed: ${result.detail}`, 'error');
+                }
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    showAlert('Error resetting password', 'error');
+                }
+            }
+        }
+
+        // Populate agent select dropdowns
+        function populateAgentSelects() {
+            const agentSelect = document.getElementById('agentSelect');
+            const exportAgentSelect = document.getElementById('exportAgent');
+            const sessionAgentSelect = document.getElementById('sessionAgent');
+            
+            agentSelect.innerHTML = '<option value="">Select an agent...</option>';
+            exportAgentSelect.innerHTML = '<option value="">All Agents</option>';
+            sessionAgentSelect.innerHTML = '<option value="">All Agents</option>';
+            
+            agents.forEach(agent => {
+                if (agent.status === 'active') {
+                    const option1 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
+                    const option2 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
+                    const option3 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
+                    agentSelect.appendChild(option1);
+                    exportAgentSelect.appendChild(option2);
+                    sessionAgentSelect.appendChild(option3);
+                }
+            });
+        }
+
+        // Setup drag and drop functionality
+        function setupDragAndDrop() {
+            const uploadArea = document.getElementById('uploadArea');
+            const zipFileInput = document.getElementById('zipFile');
+
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].name.endsWith('.zip')) {
+                    handleZipFileSelection(files[0]);
+                } else {
+                    showAlert('Please drop a valid ZIP file', 'error');
+                }
+            });
+
+            zipFileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleZipFileSelection(e.target.files[0]);
+                }
+            });
+        }
+
+        // Enhanced ZIP file selection handler
+        function handleZipFileSelection(file) {
+            selectedZipFile = file;
+            
+            const fileSizeMB = file.size / (1024 * 1024);
+            
+            document.querySelector('#uploadArea h3').textContent = `📎 Selected: ${file.name}`;
+            document.querySelector('#uploadArea p').innerHTML = `
+                Size: ${fileSizeMB.toFixed(2)} MB<br>
+                <small>${fileSizeMB > 100 ? 'Large file detected - will use optimized chunked upload' : 'Standard upload will be used'}</small>
+            `;
+            
+            // Show file size warning for large files
+            if (fileSizeMB > 100) {
+                const warningDiv = document.getElementById('fileSizeWarning');
+                const warningText = document.getElementById('fileSizeWarningText');
+                warningText.textContent = `File size is ${fileSizeMB.toFixed(2)} MB. This is considered a large file.`;
+                warningDiv.classList.remove('hidden');
+            } else {
+                document.getElementById('fileSizeWarning').classList.add('hidden');
+            }
+            
+            updateUploadButtonState();
+            showAlert(`ZIP file "${file.name}" selected successfully!`, 'success');
+        }
+
+        // Update upload button state
+        function updateUploadButtonState() {
+            const uploadBtn = document.getElementById('uploadBtn');
+            const agentSelected = document.getElementById('agentSelect').value !== '';
+            uploadBtn.disabled = !(selectedZipFile && agentSelected);
+        }
+
+        // Agent selection change handler
+        document.getElementById('agentSelect').addEventListener('change', updateUploadButtonState);
+
+        // Enhanced upload function with chunking support
+        async function uploadZipFile() {
+            if (!selectedZipFile || !document.getElementById('agentSelect').value) {
+                showAlert('Please select both a ZIP file and an agent', 'error');
+                return;
+            }
+
+            const fileSize = selectedZipFile.size;
+            isChunkedUpload = fileSize > LARGE_FILE_THRESHOLD;
+            
+            if (isChunkedUpload) {
+                await uploadLargeFile();
+            } else {
+                await uploadStandardFile();
+            }
+        }
+
+        // Standard file upload for smaller files
+        async function uploadStandardFile() {
+            const formData = new FormData();
+            formData.append('zip_file', selectedZipFile);
+            formData.append('agent_id', document.getElementById('agentSelect').value);
+
+            showUploadProgress();
+            uploadStartTime = Date.now();
+
+            try {
+                uploadController = new AbortController();
+                
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/upload-tasks`, {
+                    method: 'POST',
+                    body: formData,
+                    signal: uploadController.signal
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    hideUploadProgress();
+                    showAlert(`Successfully uploaded ${result.images_processed} images and assigned tasks!`, 'success');
+                    resetUploadForm();
+                    await loadStatistics();
+                } else {
+                    throw new Error(result.detail || 'Upload failed');
+                }
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    showAlert('Upload cancelled by user', 'info');
+                } else if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    showAlert(`Upload failed: ${error.message}`, 'error');
+                    showRetryOption();
+                }
+            } finally {
+                uploadController = null;
+            }
+        }
+
+        // Enhanced large file upload with chunking
+        async function uploadLargeFile() {
+            totalChunks = Math.ceil(selectedZipFile.size / CHUNK_SIZE);
+            currentChunk = 0;
+            
+            showUploadProgress(true);
+            uploadStartTime = Date.now();
+
+            try {
+                // Initialize chunked upload
+                uploadController = new AbortController();
+                
+                const initResponse = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/init-chunked-upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        filename: selectedZipFile.name,
+                        filesize: selectedZipFile.size,
+                        total_chunks: totalChunks,
+                        agent_id: document.getElementById('agentSelect').value
+                    }),
+                    signal: uploadController.signal
+                });
+
+                if (!initResponse.ok) {
+                    throw new Error('Failed to initialize chunked upload');
+                }
+
+                const { upload_id } = await initResponse.json();
+
+                // Upload chunks
+                for (let i = 0; i < totalChunks; i++) {
+                    if (uploadController.signal.aborted) {
+                        throw new Error('Upload cancelled');
+                    }
+
+                    await uploadChunk(upload_id, i);
+                    currentChunk = i + 1;
+                    updateChunkProgress();
+                }
+
+                // Finalize upload
+                const finalizeResponse = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/finalize-chunked-upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        upload_id: upload_id
+                    }),
+                    signal: uploadController.signal
+                });
+
+                if (!finalizeResponse.ok) {
+                    throw new Error('Failed to finalize upload');
+                }
+
+                const result = await finalizeResponse.json();
+                
+                hideUploadProgress();
+                showAlert(`Successfully uploaded ${result.images_processed} images and assigned tasks!`, 'success');
+                resetUploadForm();
+                await loadStatistics();
+
+            } catch (error) {
+                if (error.name === 'AbortError' || error.message === 'Upload cancelled') {
+                    showAlert('Upload cancelled by user', 'info');
+                } else if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    showAlert(`Upload failed: ${error.message}`, 'error');
+                    showRetryOption();
+                }
+            } finally {
+                uploadController = null;
+            }
+        }
+
+        // Upload individual chunk
+        async function uploadChunk(uploadId, chunkIndex) {
+            const start = chunkIndex * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, selectedZipFile.size);
+            const chunk = selectedZipFile.slice(start, end);
+
+            let retries = 0;
+            while (retries < MAX_RETRIES) {
+                try {
+                    const formData = new FormData();
+                    formData.append('upload_id', uploadId);
+                    formData.append('chunk_index', chunkIndex);
+                    formData.append('chunk', chunk);
+
+                    const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/upload-chunk`, {
+                        method: 'POST',
+                        body: formData,
+                        signal: uploadController.signal
+                    });
+
+                    if (response.ok) {
+                        updateOverallProgress((chunkIndex + 1) / totalChunks * 100);
+                        break; // Success, exit retry loop
+                    } else {
+                        throw new Error(`Chunk ${chunkIndex} upload failed`);
+                    }
+
+                } catch (error) {
+                    retries++;
+                    if (retries >= MAX_RETRIES) {
+                        throw new Error(`Failed to upload chunk ${chunkIndex} after ${MAX_RETRIES} retries`);
+                    }
+                    
+                    // Wait before retry (exponential backoff)
+                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 1000));
+                }
+            }
+        }
+
+        //
