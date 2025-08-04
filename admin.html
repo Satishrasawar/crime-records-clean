@@ -458,7 +458,7 @@
             <!-- SECURE LOGIN NOTICE -->
             <div style="margin-top: 20px; padding: 15px; background: #e8f5e8; border-radius: 8px; text-align: center; font-size: 14px; color: #2e7d32; border: 1px solid #4caf50;">
                 <strong>🔒 Secure System</strong><br>
-                Contact administrator for login credentials<br>
+                Default credentials: admin / Admin@2024!Secure<br>
                 <em>Protected by enterprise security</em>
             </div>
         </div>
@@ -789,6 +789,807 @@
     </div>
 
     <script>
+        // Configuration
+        const BASE_URL = 'https://web-production-b3ef2.up.railway.app'; // ⚠️ UPDATE THIS TO YOUR RAILWAY URL
+        const SESSION_KEY = 'admin_session';
+        const REMEMBER_KEY = 'admin_remember';
+        
+        // Enhanced upload configuration for large files
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks for better reliability
+        const MAX_RETRIES = 3;
+        const LARGE_FILE_THRESHOLD = 100 * 1024 * 1024; // 100MB threshold for chunked upload
+        
+        // Security and session management
+        let sessionTimeout;
+        let failedAttempts = 0;
+        let lockoutTime = null;
+        let agents = [];
+        let selectedZipFile = null;
+        
+        // Enhanced upload state management
+        let uploadController = null;
+        let uploadStartTime = null;
+        let lastProgressUpdate = null;
+        let uploadRetryCount = 0;
+        let isChunkedUpload = false;
+        let currentChunk = 0;
+        let totalChunks = 0;
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Initializing Admin Dashboard...');
+            checkExistingSession();
+            setupLoginForm();
+            setupDragAndDrop();
+            setupAgentRegistration();
+            setupSessionMonitoring();
+        });
+
+        // Check for existing valid session
+        function checkExistingSession() {
+            const session = getSession();
+            const rememberToken = localStorage.getItem(REMEMBER_KEY);
+            
+            if (session && session.expiry > Date.now()) {
+                console.log('✅ Valid session found, showing dashboard');
+                showDashboard();
+                return;
+            }
+            
+            if (rememberToken) {
+                try {
+                    const remembered = JSON.parse(rememberToken);
+                    if (remembered.expiry > Date.now()) {
+                        console.log('✅ Remember token valid, auto-login');
+                        createSession(true);
+                        showDashboard();
+                        return;
+                    } else {
+                        localStorage.removeItem(REMEMBER_KEY);
+                    }
+                } catch (e) {
+                    localStorage.removeItem(REMEMBER_KEY);
+                }
+            }
+            
+            console.log('🔐 No valid session, showing login');
+            showLogin();
+        }
+
+        // Setup login form
+        function setupLoginForm() {
+            document.getElementById('loginForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await handleLogin();
+            });
+        }
+
+        // Handle login attempt
+        async function handleLogin() {
+            if (lockoutTime && Date.now() < lockoutTime) {
+                const remainingTime = Math.ceil((lockoutTime - Date.now()) / 1000);
+                showLoginError(`Too many failed attempts. Please wait ${remainingTime} seconds.`);
+                return;
+            }
+
+            const username = document.getElementById('adminUsername').value;
+            const password = document.getElementById('adminPassword').value;
+            const rememberMe = document.getElementById('rememberMe').checked;
+            const loginBtn = document.getElementById('loginBtn');
+
+            loginBtn.innerHTML = '<div class="loading-spinner"></div>Logging in...';
+            loginBtn.disabled = true;
+
+            try {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                if (await validateCredentials(username, password)) {
+                    createSession(rememberMe);
+                    failedAttempts = 0;
+                    lockoutTime = null;
+                    showDashboard();
+                    showAlert('Login successful! Welcome to the admin dashboard.', 'success');
+                } else {
+                    failedAttempts++;
+                    
+                    if (failedAttempts >= 3) {
+                        lockoutTime = Date.now() + (30 * 1000);
+                        showLoginError('Too many failed attempts. Account locked for 30 seconds.');
+                    } else {
+                        showLoginError(`Invalid credentials. ${3 - failedAttempts} attempts remaining.`);
+                    }
+                }
+            } catch (error) {
+                showLoginError('Login error. Please try again.');
+            } finally {
+                loginBtn.innerHTML = '🚀 Login to Dashboard';
+                loginBtn.disabled = false;
+            }
+        }
+
+        // SECURE CREDENTIAL VALIDATION - CHANGE THESE PASSWORDS!
+        async function validateCredentials(username, password) {
+            const validCredentials = [
+                { username: 'admin', password: 'Admin@2024!Secure' },
+                { username: 'manager', password: 'Manager@2024!Strong' },
+                { username: 'supervisor', password: 'Super@2024!Safe' }
+            ];
+            
+            return validCredentials.some(cred => 
+                cred.username === username && cred.password === password
+            );
+        }
+
+        // Create session
+        function createSession(rememberMe = false) {
+            const session = {
+                authenticated: true,
+                loginTime: Date.now(),
+                expiry: Date.now() + (2 * 60 * 60 * 1000), // 2 hours
+                username: document.getElementById('adminUsername').value
+            };
+            
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+            
+            if (rememberMe) {
+                const rememberToken = {
+                    expiry: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+                };
+                localStorage.setItem(REMEMBER_KEY, JSON.stringify(rememberToken));
+            }
+            
+            setupSessionTimeout();
+        }
+
+        // Get current session
+        function getSession() {
+            try {
+                const session = sessionStorage.getItem(SESSION_KEY);
+                return session ? JSON.parse(session) : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // Setup session timeout and monitoring
+        function setupSessionTimeout() {
+            if (sessionTimeout) {
+                clearTimeout(sessionTimeout);
+            }
+            
+            sessionTimeout = setTimeout(() => {
+                showAlert('Session expired. Please login again.', 'info');
+                logout();
+            }, 2 * 60 * 60 * 1000);
+        }
+
+        // Setup session activity monitoring
+        function setupSessionMonitoring() {
+            const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+            let lastActivity = Date.now();
+            
+            activityEvents.forEach(event => {
+                document.addEventListener(event, () => {
+                    const now = Date.now();
+                    if (now - lastActivity > 60000) {
+                        lastActivity = now;
+                        extendSession();
+                    }
+                });
+            });
+            
+            setInterval(() => {
+                const session = getSession();
+                if (!session || session.expiry <= Date.now()) {
+                    if (!document.getElementById('dashboard').classList.contains('hidden')) {
+                        showAlert('Session expired. Please login again.', 'info');
+                        logout();
+                    }
+                }
+            }, 60000);
+        }
+
+        // Extend session
+        function extendSession() {
+            const session = getSession();
+            if (session && session.expiry > Date.now()) {
+                session.expiry = Date.now() + (2 * 60 * 60 * 1000);
+                sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+                setupSessionTimeout();
+            }
+        }
+
+        // Show login screen
+        function showLogin() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('adminUsername').focus();
+        }
+
+        // Show dashboard
+        function showDashboard() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            loadDashboardData();
+        }
+
+        // Show login error
+        function showLoginError(message) {
+            const errorDiv = document.getElementById('loginError');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                errorDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Logout function
+        function logout() {
+            if (uploadController) {
+                uploadController.abort();
+            }
+            
+            sessionStorage.removeItem(SESSION_KEY);
+            localStorage.removeItem(REMEMBER_KEY);
+            
+            if (sessionTimeout) {
+                clearTimeout(sessionTimeout);
+            }
+            
+            document.getElementById('loginForm').reset();
+            document.getElementById('loginError').classList.add('hidden');
+            
+            showLogin();
+            showAlert('Logged out successfully.', 'info');
+        }
+
+        // Enhanced API request function with auth
+        async function makeAuthenticatedRequest(url, options = {}) {
+            const session = getSession();
+            
+            if (!session || session.expiry <= Date.now()) {
+                showAlert('Session expired. Please login again.', 'error');
+                logout();
+                throw new Error('Session expired');
+            }
+            
+            const authOptions = {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'Authorization': `Bearer ${session.username}`,
+                    'X-Session-Token': session.loginTime
+                }
+            };
+            
+            try {
+                const response = await fetch(url, authOptions);
+                
+                if (response.status === 401 || response.status === 403) {
+                    showAlert('Authentication failed. Please login again.', 'error');
+                    logout();
+                    throw new Error('Authentication failed');
+                }
+                
+                return response;
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    showAlert('Network error. Please check your connection.', 'error');
+                }
+                throw error;
+            }
+        }
+
+        // Setup agent registration form
+        function setupAgentRegistration() {
+            document.getElementById('agentRegistrationForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await registerNewAgent();
+            });
+        }
+
+        // Register new agent
+        async function registerNewAgent() {
+            const formData = new FormData(document.getElementById('agentRegistrationForm'));
+            
+            const submitBtn = document.querySelector('#agentRegistrationForm button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Registering...';
+            submitBtn.disabled = true;
+
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/agents/register`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('newAgentId').textContent = result.agent_id;
+                    document.getElementById('newAgentPassword').textContent = result.password;
+                    document.getElementById('newAgentCredentials').classList.remove('hidden');
+                    
+                    document.getElementById('agentRegistrationForm').reset();
+                    
+                    await loadAgents();
+                    populateAgentSelects();
+                    
+                    showAlert(`Agent registered successfully! ID: ${result.agent_id}`, 'success');
+                    document.getElementById('newAgentCredentials').scrollIntoView({ behavior: 'smooth' });
+                    
+                } else {
+                    showAlert(`Registration failed: ${result.detail}`, 'error');
+                }
+
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Registration error:', error);
+                    showAlert('Network error during registration', 'error');
+                }
+            } finally {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        }
+
+        // Load all dashboard data
+        async function loadDashboardData() {
+            console.log('📊 Loading dashboard data...');
+            await Promise.all([
+                loadStatistics(),
+                loadAgents(),
+                populateAgentSelects()
+            ]);
+        }
+
+        // Load system statistics
+        async function loadStatistics() {
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/statistics`);
+                const stats = await response.json();
+                
+                document.getElementById('totalAgents').textContent = stats.total_agents || 0;
+                document.getElementById('totalTasks').textContent = stats.total_tasks || 0;
+                document.getElementById('completedTasks').textContent = stats.completed_tasks || 0;
+                document.getElementById('pendingTasks').textContent = stats.pending_tasks || 0;
+                
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Failed to load statistics:', error);
+                    showAlert('Failed to load statistics', 'error');
+                }
+            }
+        }
+
+        // Load agents list
+        async function loadAgents() {
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/agents`);
+                agents = await response.json();
+                
+                updateAgentsTable();
+                
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    console.error('Failed to load agents:', error);
+                    showAlert('Failed to load agents', 'error');
+                }
+            }
+        }
+
+        // Copy to clipboard function
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = element.nextElementSibling.textContent;
+                element.nextElementSibling.textContent = 'Copied!';
+                element.nextElementSibling.style.background = '#4caf50';
+                
+                setTimeout(() => {
+                    element.nextElementSibling.textContent = originalText;
+                    element.nextElementSibling.style.background = '';
+                }, 2000);
+            }).catch(() => {
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                showAlert('Credentials copied to clipboard!', 'success');
+            });
+        }
+
+        // Update agents table
+        function updateAgentsTable() {
+            const tbody = document.getElementById('agentsTableBody');
+            tbody.innerHTML = '';
+            
+            agents.forEach(agent => {
+                const row = document.createElement('tr');
+                
+                let sessionDuration = 'N/A';
+                if (agent.is_currently_logged_in && agent.last_login) {
+                    const loginTime = new Date(agent.last_login);
+                    const now = new Date();
+                    const durationMs = now - loginTime;
+                    const hours = Math.floor(durationMs / (1000 * 60 * 60));
+                    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+                    sessionDuration = `${hours}h ${minutes}m`;
+                }
+                
+                row.innerHTML = `
+                    <td>${agent.agent_id}</td>
+                    <td>${agent.name}</td>
+                    <td>${agent.email}</td>
+                    <td>
+                        <span id="password-${agent.agent_id}" style="font-family: monospace; background: #f0f0f0; padding: 4px; border-radius: 4px;">
+                            ••••••••
+                        </span>
+                        <button class="btn btn-sm" style="padding: 2px 6px; margin-left: 5px;" 
+                                onclick="showPassword('${agent.agent_id}')" title="Show Password">
+                            👁️
+                        </button>
+                        <button class="btn btn-sm" style="padding: 2px 6px; margin-left: 2px;" 
+                                onclick="resetPassword('${agent.agent_id}')" title="Reset Password">
+                            🔄
+                        </button>
+                    </td>
+                    <td><span class="badge ${agent.status === 'active' ? 'badge-success' : 'badge-danger'}">${agent.status}</span></td>
+                    <td>
+                        <span class="badge ${agent.is_currently_logged_in ? 'badge-success' : 'badge-secondary'}" 
+                              title="${agent.is_currently_logged_in ? 'Currently logged in' : 'Not logged in'}">
+                            ${agent.is_currently_logged_in ? '🟢 Online' : '🔴 Offline'}
+                        </span>
+                    </td>
+                    <td>${agent.tasks_completed || 0}</td>
+                    <td>${agent.last_login || 'Never'}</td>
+                    <td>${agent.last_logout || 'Never'}</td>
+                    <td>${sessionDuration}</td>
+                    <td>
+                        <button class="btn btn-sm ${agent.status === 'active' ? 'btn-danger' : 'btn-success'}" 
+                                onclick="toggleAgentStatus('${agent.agent_id}', '${agent.status}')">
+                            ${agent.status === 'active' ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button class="btn btn-sm btn-info" 
+                                onclick="viewSessionHistory('${agent.agent_id}')" title="View Session History">
+                            📊
+                        </button>
+                        ${agent.is_currently_logged_in ? 
+                            `<button class="btn btn-sm btn-danger" 
+                                     onclick="forceLogout('${agent.agent_id}')" title="Force Logout">
+                                ⏹️
+                            </button>` : ''
+                        }
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Show agent password
+        async function showPassword(agentId) {
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/agent-password/${agentId}`);
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert(result.message, 'info');
+                } else {
+                    showAlert(`Error: ${result.detail}`, 'error');
+                }
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    showAlert('Error retrieving password information', 'error');
+                }
+            }
+        }
+
+        // Reset agent password
+        async function resetPassword(agentId) {
+            if (!confirm('Are you sure you want to reset this agent\'s password? This will generate a new password.')) {
+                return;
+            }
+            
+            try {
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/reset-password/${agentId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const passwordDisplay = `
+                        New Password for ${agentId}: 
+                        ${result.new_password}
+                        
+                        Please save this password securely and share it with the agent.
+                    `;
+                    
+                    alert(passwordDisplay);
+                    showAlert(`Password reset successfully for agent ${agentId}`, 'success');
+                    
+                    const passwordSpan = document.getElementById(`password-${agentId}`);
+                    if (passwordSpan) {
+                        passwordSpan.textContent = result.new_password;
+                        passwordSpan.style.background = '#e8f5e8';
+                        setTimeout(() => {
+                            passwordSpan.textContent = '••••••••';
+                            passwordSpan.style.background = '#f0f0f0';
+                        }, 10000);
+                    }
+                    
+                } else {
+                    showAlert(`Password reset failed: ${result.detail}`, 'error');
+                }
+            } catch (error) {
+                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    showAlert('Error resetting password', 'error');
+                }
+            }
+        }
+
+        // Populate agent select dropdowns
+        function populateAgentSelects() {
+            const agentSelect = document.getElementById('agentSelect');
+            const exportAgentSelect = document.getElementById('exportAgent');
+            const sessionAgentSelect = document.getElementById('sessionAgent');
+            
+            agentSelect.innerHTML = '<option value="">Select an agent...</option>';
+            exportAgentSelect.innerHTML = '<option value="">All Agents</option>';
+            sessionAgentSelect.innerHTML = '<option value="">All Agents</option>';
+            
+            agents.forEach(agent => {
+                if (agent.status === 'active') {
+                    const option1 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
+                    const option2 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
+                    const option3 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
+                    agentSelect.appendChild(option1);
+                    exportAgentSelect.appendChild(option2);
+                    sessionAgentSelect.appendChild(option3);
+                }
+            });
+        }
+
+        // Setup drag and drop functionality
+        function setupDragAndDrop() {
+            const uploadArea = document.getElementById('uploadArea');
+            const zipFileInput = document.getElementById('zipFile');
+
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].name.endsWith('.zip')) {
+                    handleZipFileSelection(files[0]);
+                } else {
+                    showAlert('Please drop a valid ZIP file', 'error');
+                }
+            });
+
+            zipFileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleZipFileSelection(e.target.files[0]);
+                }
+            });
+        }
+
+        // Enhanced ZIP file selection handler
+        function handleZipFileSelection(file) {
+            selectedZipFile = file;
+            
+            const fileSizeMB = file.size / (1024 * 1024);
+            
+            document.querySelector('#uploadArea h3').textContent = `📎 Selected: ${file.name}`;
+            document.querySelector('#uploadArea p').innerHTML = `
+                Size: ${fileSizeMB.toFixed(2)} MB<br>
+                <small>${fileSizeMB > 100 ? 'Large file detected - will use optimized chunked upload' : 'Standard upload will be used'}</small>
+            `;
+            
+            if (fileSizeMB > 100) {
+                const warningDiv = document.getElementById('fileSizeWarning');
+                const warningText = document.getElementById('fileSizeWarningText');
+                warningText.textContent = `File size is ${fileSizeMB.toFixed(2)} MB. This is considered a large file.`;
+                warningDiv.classList.remove('hidden');
+            } else {
+                document.getElementById('fileSizeWarning').classList.add('hidden');
+            }
+            
+            updateUploadButtonState();
+            showAlert(`ZIP file "${file.name}" selected successfully!`, 'success');
+        }
+
+        // Update upload button state
+        function updateUploadButtonState() {
+            const uploadBtn = document.getElementById('uploadBtn');
+            const agentSelected = document.getElementById('agentSelect').value !== '';
+            uploadBtn.disabled = !(selectedZipFile && agentSelected);
+        }
+
+        // Agent selection change handler
+        document.getElementById('agentSelect').addEventListener('change', updateUploadButtonState);
+
+        // Enhanced upload function with chunking support
+        async function uploadZipFile() {
+            if (!selectedZipFile || !document.getElementById('agentSelect').value) {
+                showAlert('Please select both a ZIP file and an agent', 'error');
+                return;
+            }
+
+            const fileSize = selectedZipFile.size;
+            isChunkedUpload = fileSize > LARGE_FILE_THRESHOLD;
+            
+            if (isChunkedUpload) {
+                await uploadLargeFile();
+            } else {
+                await uploadStandardFile();
+            }
+        }
+
+        // Standard file upload for smaller files
+        async function uploadStandardFile() {
+            const formData = new FormData();
+            formData.append('zip_file', selectedZipFile);
+            formData.append('agent_id', document.getElementById('agentSelect').value);
+
+            showUploadProgress();
+            uploadStartTime = Date.now();
+
+            try {
+                uploadController = new AbortController();
+                
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/upload-tasks`, {
+                    method: 'POST',
+                    body: formData,
+                    signal: uploadController.signal
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    hideUploadProgress();
+                    showAlert(`Successfully uploaded ${result.images_processed} images and assigned tasks!`, 'success');
+                    resetUploadForm();
+                    await loadStatistics();
+                } else {
+                    throw new Error(result.detail || 'Upload failed');
+                }
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    showAlert('Upload cancelled by user', 'info');
+                } else if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    showAlert(`Upload failed: ${error.message}`, 'error');
+                    showRetryOption();
+                }
+            } finally {
+                uploadController = null;
+            }
+        }
+
+        // Enhanced large file upload with chunking
+        async function uploadLargeFile() {
+            totalChunks = Math.ceil(selectedZipFile.size / CHUNK_SIZE);
+            currentChunk = 0;
+            
+            showUploadProgress(true);
+            uploadStartTime = Date.now();
+
+            try {
+                uploadController = new AbortController();
+                
+                const initData = new FormData();
+                initData.append('filename', selectedZipFile.name);
+                initData.append('filesize', selectedZipFile.size);
+                initData.append('total_chunks', totalChunks);
+                initData.append('agent_id', document.getElementById('agentSelect').value);
+
+                const initResponse = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/init-chunked-upload`, {
+                    method: 'POST',
+                    body: initData,
+                    signal: uploadController.signal
+                });
+
+                if (!initResponse.ok) {
+                    throw new Error('Failed to initialize chunked upload');
+                }
+
+                const { upload_id } = await initResponse.json();
+
+                for (let i = 0; i < totalChunks; i++) {
+                    if (uploadController.signal.aborted) {
+                        throw new Error('Upload cancelled');
+                    }
+
+                    await uploadChunk(upload_id, i);
+                    currentChunk = i + 1;
+                    updateChunkProgress();
+                }
+
+                const finalizeData = new FormData();
+                finalizeData.append('upload_id', upload_id);
+
+                const finalizeResponse = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/finalize-chunked-upload`, {
+                    method: 'POST',
+                    body: finalizeData,
+                    signal: uploadController.signal
+                });
+
+                if (!finalizeResponse.ok) {
+                    throw new Error('Failed to finalize upload');
+                }
+
+                const result = await finalizeResponse.json();
+                
+                hideUploadProgress();
+                showAlert(`Successfully uploaded ${result.images_processed} images and assigned tasks!`, 'success');
+                resetUploadForm();
+                await loadStatistics();
+
+            } catch (error) {
+                if (error.name === 'AbortError' || error.message === 'Upload cancelled') {
+                    showAlert('Upload cancelled by user', 'info');
+                } else if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
+                    showAlert(`Upload failed: ${error.message}`, 'error');
+                    showRetryOption();
+                }
+            } finally {
+                uploadController = null;
+            }
+        }
+
+        // Upload individual chunk
+        async function uploadChunk(uploadId, chunkIndex) {
+            const start = chunkIndex * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, selectedZipFile.size);
+            const chunk = selectedZipFile.slice(start, end);
+
+            let retries = 0;
+            while (retries < MAX_RETRIES) {
+                try {
+                    const formData = new FormData();
+                    formData.append('upload_id', uploadId);
+                    formData.append('chunk_index', chunkIndex);
+                    formData.append('chunk', chunk);
+
+                    const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/upload-chunk`, {
+                        method: 'POST',
+                        body: formData,
+                        signal: uploadController.signal
+                    });
+
+                    if (response.ok) {
+                        updateOverallProgress((chunkIndex + 1) / totalChunks * 100);
+                        break;
+                    } else {
+                        throw new Error(`Chunk ${chunkIndex} upload failed`);
+                    }
+
+                } catch (error) {
+                    retries++;
+                    if (retries >= MAX_RETRIES) {
+                        throw new Error(`Failed to upload chunk ${chunkIndex} after ${MAX_RETRIES} retries`);
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 1000));
+                }
+            }
+        }
+
         // Show upload progress
         function showUploadProgress(isChunked = false) {
             document.getElementById('uploadProgress').classList.remove('hidden');
@@ -804,7 +1605,6 @@
                 document.getElementById('chunkProgressContainer').classList.add('hidden');
             }
             
-            // Initialize progress display
             updateOverallProgress(0);
             updateUploadSpeed(0);
         }
@@ -855,12 +1655,12 @@
         function updateUploadSpeed(uploadedBytes) {
             if (!uploadStartTime) return;
             
-            const elapsed = (Date.now() - uploadStartTime) / 1000; // seconds
-            const speed = uploadedBytes / elapsed; // bytes per second
-            const speedMBps = speed / (1024 * 1024); // MB per second
+            const elapsed = (Date.now() - uploadStartTime) / 1000;
+            const speed = uploadedBytes / elapsed;
+            const speedMBps = speed / (1024 * 1024);
             
             const remaining = selectedZipFile.size - uploadedBytes;
-            const eta = remaining / speed; // seconds
+            const eta = remaining / speed;
             
             document.getElementById('uploadSpeed').textContent = 
                 `Speed: ${speedMBps.toFixed(2)} MB/s`;
@@ -914,7 +1714,7 @@
             updateUploadButtonState();
         }
 
-        // Export data to Excel (with authentication)
+        // Export data to Excel
         async function exportToExcel() {
             const filters = {
                 agent_id: document.getElementById('exportAgent').value,
@@ -957,7 +1757,7 @@
             }
         }
 
-        // Preview data (with authentication)
+        // Preview data
         async function previewData() {
             const filters = {
                 agent_id: document.getElementById('exportAgent').value,
@@ -989,7 +1789,7 @@
             }
         }
 
-        // Test data availability (with authentication)
+        // Test data availability
         async function testDataAvailability() {
             try {
                 const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/test-data`);
@@ -1009,7 +1809,7 @@
             }
         }
 
-        // Load session report (with authentication)
+        // Load session report
         async function loadSessionReport() {
             const filters = {
                 agent_id: document.getElementById('sessionAgent').value,
@@ -1041,7 +1841,7 @@
             }
         }
 
-        // Export session report (with authentication)
+        // Export session report
         async function exportSessionReport() {
             const filters = {
                 agent_id: document.getElementById('sessionAgent').value,
@@ -1201,7 +2001,7 @@
             document.body.appendChild(modal);
         }
 
-        // Force logout agent (with authentication)
+        // Force logout agent
         async function forceLogout(agentId) {
             if (!confirm('Force logout this agent? This will end their current session.')) {
                 return;
@@ -1226,7 +2026,7 @@
             }
         }
 
-        // Toggle agent status (with authentication)
+        // Toggle agent status
         async function toggleAgentStatus(agentId, currentStatus) {
             const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
             
@@ -1274,7 +2074,6 @@
             if (content) {
                 content.insertBefore(alert, content.firstChild);
             } else {
-                // If on login screen
                 const loginForm = document.querySelector('.login-form');
                 if (loginForm) {
                     loginForm.insertBefore(alert, loginForm.firstChild);
@@ -1289,51 +2088,37 @@
         }
 
         // Security enhancements
-        
-        // Prevent right-click context menu on sensitive areas
         document.addEventListener('contextmenu', function(e) {
             if (e.target.closest('.credential-value') || e.target.closest('input[type="password"]')) {
                 e.preventDefault();
             }
         });
 
-        // Prevent drag and drop on password fields
         document.addEventListener('dragstart', function(e) {
             if (e.target.closest('.credential-value') || e.target.closest('input[type="password"]')) {
                 e.preventDefault();
             }
         });
 
-        // Clear sensitive data on page unload
         window.addEventListener('beforeunload', function() {
-            // Clear any sensitive form data
             const passwordInputs = document.querySelectorAll('input[type="password"]');
             passwordInputs.forEach(input => input.value = '');
             
-            // Clear credential displays
             const credentialValues = document.querySelectorAll('.credential-value');
             credentialValues.forEach(element => element.textContent = '••••••••');
             
-            // Cancel any ongoing upload
             if (uploadController) {
                 uploadController.abort();
             }
         });
 
-        // Disable browser back/forward navigation on sensitive pages
         history.pushState(null, null, location.href);
         window.addEventListener('popstate', function() {
             history.pushState(null, null, location.href);
         });
 
-        // Auto-logout on tab visibility change (optional security feature)
         document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                // Page is hidden - could implement auto-logout after extended period
-                // For now, just extend session timeout when page becomes visible again
-                return;
-            } else {
-                // Page is visible again - refresh session if valid
+            if (!document.hidden) {
                 const session = getSession();
                 if (session && session.expiry > Date.now()) {
                     extendSession();
@@ -1341,7 +2126,6 @@
             }
         });
 
-        // Additional security: Check for suspicious activity
         let suspiciousActivityCount = 0;
         const MAX_SUSPICIOUS_ACTIVITIES = 5;
 
@@ -1356,17 +2140,14 @@
             }
         }
 
-        // Monitor for rapid failed authentication attempts
         document.getElementById('adminPassword').addEventListener('input', function() {
             if (failedAttempts >= 2) {
-                // User is typing after failed attempts - this is normal, reset counter
                 if (this.value.length > 3) {
                     suspiciousActivityCount = 0;
                 }
             }
         });
 
-        // Keyboard shortcuts for quick logout (Ctrl+Shift+L)
         document.addEventListener('keydown', function(e) {
             if (e.ctrlKey && e.shiftKey && e.key === 'L') {
                 e.preventDefault();
@@ -1376,13 +2157,11 @@
                 }
             }
             
-            // Cancel upload with Escape key
             if (e.key === 'Escape' && uploadController) {
                 cancelUpload();
             }
         });
 
-        // Session info display (optional)
         function showSessionInfo() {
             const session = getSession();
             if (session) {
@@ -1391,10 +2170,8 @@
             }
         }
 
-        // Call session info every 10 minutes (for debugging)
         setInterval(showSessionInfo, 10 * 60 * 1000);
 
-        // Network connectivity monitoring
         window.addEventListener('online', function() {
             showAlert('Internet connection restored', 'success');
         });
@@ -1403,846 +2180,17 @@
             showAlert('Internet connection lost. Upload will pause.', 'error');
         });
 
-        // Memory management for large files
         function cleanupFileReferences() {
             if (selectedZipFile && !uploadController) {
-                // Only cleanup if no upload is in progress
                 const fileName = selectedZipFile.name;
                 selectedZipFile = null;
                 console.log(`Cleaned up memory for file: ${fileName}`);
             }
         }
 
-        // Cleanup memory periodically (every 5 minutes)
         setInterval(cleanupFileReferences, 5 * 60 * 1000);
+
+        console.log('✅ Admin Dashboard initialized successfully');
     </script>
 </body>
-</html> Configuration
-        const BASE_URL = 'https://web-production-b3ef2.up.railway.app';
-        const SESSION_KEY = 'admin_session';
-        const REMEMBER_KEY = 'admin_remember';
-        
-        // Enhanced upload configuration for large files
-        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks for better reliability
-        const MAX_RETRIES = 3;
-        const LARGE_FILE_THRESHOLD = 100 * 1024 * 1024; // 100MB threshold for chunked upload
-        
-        // Security and session management
-        let sessionTimeout;
-        let failedAttempts = 0;
-        let lockoutTime = null;
-        let agents = [];
-        let selectedZipFile = null;
-        
-        // Enhanced upload state management
-        let uploadController = null;
-        let uploadStartTime = null;
-        let lastProgressUpdate = null;
-        let uploadRetryCount = 0;
-        let isChunkedUpload = false;
-        let currentChunk = 0;
-        let totalChunks = 0;
-
-        // Initialize application
-        document.addEventListener('DOMContentLoaded', function() {
-            checkExistingSession();
-            setupLoginForm();
-            setupDragAndDrop();
-            setupAgentRegistration();
-            
-            // Session activity monitoring
-            setupSessionMonitoring();
-        });
-
-        // Check for existing valid session
-        function checkExistingSession() {
-            const session = getSession();
-            const rememberToken = localStorage.getItem(REMEMBER_KEY);
-            
-            if (session && session.expiry > Date.now()) {
-                // Valid session exists
-                showDashboard();
-                return;
-            }
-            
-            if (rememberToken) {
-                // Check if remember token is valid (7 days)
-                try {
-                    const remembered = JSON.parse(rememberToken);
-                    if (remembered.expiry > Date.now()) {
-                        // Auto-login with remember token
-                        createSession(true);
-                        showDashboard();
-                        return;
-                    } else {
-                        localStorage.removeItem(REMEMBER_KEY);
-                    }
-                } catch (e) {
-                    localStorage.removeItem(REMEMBER_KEY);
-                }
-            }
-            
-            // No valid session, show login
-            showLogin();
-        }
-
-        // Setup login form
-        function setupLoginForm() {
-            document.getElementById('loginForm').addEventListener('submit', async function(e) {
-                e.preventDefault();
-                await handleLogin();
-            });
-        }
-
-        // Handle login attempt
-        async function handleLogin() {
-            // Check lockout
-            if (lockoutTime && Date.now() < lockoutTime) {
-                const remainingTime = Math.ceil((lockoutTime - Date.now()) / 1000);
-                showLoginError(`Too many failed attempts. Please wait ${remainingTime} seconds.`);
-                return;
-            }
-
-            const username = document.getElementById('adminUsername').value;
-            const password = document.getElementById('adminPassword').value;
-            const rememberMe = document.getElementById('rememberMe').checked;
-            const loginBtn = document.getElementById('loginBtn');
-
-            // Show loading state
-            loginBtn.innerHTML = '<div class="loading-spinner"></div>Logging in...';
-            loginBtn.disabled = true;
-
-            try {
-                // Simulate API call delay for security
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                // SECURE CREDENTIALS CHECK - CHANGE THESE PASSWORDS!
-                if (await validateCredentials(username, password)) {
-                    // Successful login
-                    createSession(rememberMe);
-                    failedAttempts = 0;
-                    lockoutTime = null;
-                    showDashboard();
-                    showAlert('Login successful! Welcome to the admin dashboard.', 'success');
-                } else {
-                    // Failed login
-                    failedAttempts++;
-                    
-                    if (failedAttempts >= 3) {
-                        lockoutTime = Date.now() + (30 * 1000); // 30 seconds lockout
-                        showLoginError('Too many failed attempts. Account locked for 30 seconds.');
-                    } else {
-                        showLoginError(`Invalid credentials. ${3 - failedAttempts} attempts remaining.`);
-                    }
-                }
-            } catch (error) {
-                showLoginError('Login error. Please try again.');
-            } finally {
-                // Reset button
-                loginBtn.innerHTML = '🚀 Login to Dashboard';
-                loginBtn.disabled = false;
-            }
-        }
-
-        // SECURE CREDENTIAL VALIDATION - CHANGE THESE PASSWORDS IMMEDIATELY!
-        async function validateCredentials(username, password) {
-            // ⚠️ CHANGE THESE PASSWORDS BEFORE DEPLOYMENT! ⚠️
-            const validCredentials = [
-                { username: 'admin', password: 'Admin@2024!Secure' },           // CHANGE THIS PASSWORD
-                { username: 'manager', password: 'Manager@2024!Strong' },       // CHANGE THIS PASSWORD
-                { username: 'supervisor', password: 'Super@2024!Safe' }        // CHANGE THIS PASSWORD
-            ];
-            
-            return validCredentials.some(cred => 
-                cred.username === username && cred.password === password
-            );
-        }
-
-        // Create session
-        function createSession(rememberMe = false) {
-            const session = {
-                authenticated: true,
-                loginTime: Date.now(),
-                expiry: Date.now() + (2 * 60 * 60 * 1000), // 2 hours
-                username: document.getElementById('adminUsername').value
-            };
-            
-            sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-            
-            if (rememberMe) {
-                const rememberToken = {
-                    expiry: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
-                };
-                localStorage.setItem(REMEMBER_KEY, JSON.stringify(rememberToken));
-            }
-            
-            // Setup session timeout
-            setupSessionTimeout();
-        }
-
-        // Get current session
-        function getSession() {
-            try {
-                const session = sessionStorage.getItem(SESSION_KEY);
-                return session ? JSON.parse(session) : null;
-            } catch (e) {
-                return null;
-            }
-        }
-
-        // Setup session timeout and monitoring
-        function setupSessionTimeout() {
-            // Clear existing timeout
-            if (sessionTimeout) {
-                clearTimeout(sessionTimeout);
-            }
-            
-            // Set 2-hour timeout
-            sessionTimeout = setTimeout(() => {
-                showAlert('Session expired. Please login again.', 'info');
-                logout();
-            }, 2 * 60 * 60 * 1000);
-        }
-
-        // Setup session activity monitoring
-        function setupSessionMonitoring() {
-            // Extend session on user activity
-            const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-            let lastActivity = Date.now();
-            
-            activityEvents.forEach(event => {
-                document.addEventListener(event, () => {
-                    const now = Date.now();
-                    if (now - lastActivity > 60000) { // Only extend if more than 1 minute since last activity
-                        lastActivity = now;
-                        extendSession();
-                    }
-                });
-            });
-            
-            // Check session validity every minute
-            setInterval(() => {
-                const session = getSession();
-                if (!session || session.expiry <= Date.now()) {
-                    if (document.getElementById('dashboard').style.display !== 'none') {
-                        showAlert('Session expired. Please login again.', 'info');
-                        logout();
-                    }
-                }
-            }, 60000);
-        }
-
-        // Extend session
-        function extendSession() {
-            const session = getSession();
-            if (session && session.expiry > Date.now()) {
-                session.expiry = Date.now() + (2 * 60 * 60 * 1000); // Extend by 2 hours
-                sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-                setupSessionTimeout();
-            }
-        }
-
-        // Show login screen
-        function showLogin() {
-            document.getElementById('loginScreen').classList.remove('hidden');
-            document.getElementById('dashboard').classList.add('hidden');
-            document.getElementById('adminUsername').focus();
-        }
-
-        // Show dashboard
-        function showDashboard() {
-            document.getElementById('loginScreen').classList.add('hidden');
-            document.getElementById('dashboard').classList.remove('hidden');
-            loadDashboardData();
-        }
-
-        // Show login error
-        function showLoginError(message) {
-            const errorDiv = document.getElementById('loginError');
-            errorDiv.textContent = message;
-            errorDiv.classList.remove('hidden');
-            
-            setTimeout(() => {
-                errorDiv.classList.add('hidden');
-            }, 5000);
-        }
-
-        // Logout function
-        function logout() {
-            // Cancel any ongoing upload
-            if (uploadController) {
-                uploadController.abort();
-            }
-            
-            sessionStorage.removeItem(SESSION_KEY);
-            localStorage.removeItem(REMEMBER_KEY);
-            
-            if (sessionTimeout) {
-                clearTimeout(sessionTimeout);
-            }
-            
-            // Clear form data
-            document.getElementById('loginForm').reset();
-            document.getElementById('loginError').classList.add('hidden');
-            
-            showLogin();
-            showAlert('Logged out successfully.', 'info');
-        }
-
-        // Enhanced API request function with auth
-        async function makeAuthenticatedRequest(url, options = {}) {
-            const session = getSession();
-            
-            if (!session || session.expiry <= Date.now()) {
-                showAlert('Session expired. Please login again.', 'error');
-                logout();
-                throw new Error('Session expired');
-            }
-            
-            // Add auth headers if needed (implement based on your backend)
-            const authOptions = {
-                ...options,
-                headers: {
-                    ...options.headers,
-                    'Authorization': `Bearer ${session.username}`, // Customize based on your auth system
-                    'X-Session-Token': session.loginTime // Additional security token
-                }
-            };
-            
-            try {
-                const response = await fetch(url, authOptions);
-                
-                // Handle auth errors
-                if (response.status === 401 || response.status === 403) {
-                    showAlert('Authentication failed. Please login again.', 'error');
-                    logout();
-                    throw new Error('Authentication failed');
-                }
-                
-                return response;
-            } catch (error) {
-                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    showAlert('Network error. Please check your connection.', 'error');
-                }
-                throw error;
-            }
-        }
-
-        // Setup agent registration form
-        function setupAgentRegistration() {
-            document.getElementById('agentRegistrationForm').addEventListener('submit', async function(e) {
-                e.preventDefault();
-                await registerNewAgent();
-            });
-        }
-
-        // Register new agent (with authentication)
-        async function registerNewAgent() {
-            const formData = new FormData(document.getElementById('agentRegistrationForm'));
-            
-            const submitBtn = document.querySelector('#agentRegistrationForm button[type="submit"]');
-            const originalText = submitBtn.textContent;
-            submitBtn.textContent = 'Registering...';
-            submitBtn.disabled = true;
-
-            try {
-                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/agents/register`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    document.getElementById('newAgentId').textContent = result.agent_id;
-                    document.getElementById('newAgentPassword').textContent = result.password;
-                    document.getElementById('newAgentCredentials').classList.remove('hidden');
-                    
-                    document.getElementById('agentRegistrationForm').reset();
-                    
-                    await loadAgents();
-                    populateAgentSelects();
-                    
-                    showAlert(`Agent registered successfully! ID: ${result.agent_id}`, 'success');
-                    document.getElementById('newAgentCredentials').scrollIntoView({ behavior: 'smooth' });
-                    
-                } else {
-                    showAlert(`Registration failed: ${result.detail}`, 'error');
-                }
-
-            } catch (error) {
-                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    console.error('Registration error:', error);
-                    showAlert('Network error during registration', 'error');
-                }
-            } finally {
-                submitBtn.textContent = originalText;
-                submitBtn.disabled = false;
-            }
-        }
-
-        // Load all dashboard data (with authentication)
-        async function loadDashboardData() {
-            await Promise.all([
-                loadStatistics(),
-                loadAgents(),
-                populateAgentSelects()
-            ]);
-        }
-
-        // Load system statistics (with authentication)
-        async function loadStatistics() {
-            try {
-                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/statistics`);
-                const stats = await response.json();
-                
-                document.getElementById('totalAgents').textContent = stats.total_agents || 0;
-                document.getElementById('totalTasks').textContent = stats.total_tasks || 0;
-                document.getElementById('completedTasks').textContent = stats.completed_tasks || 0;
-                document.getElementById('pendingTasks').textContent = stats.pending_tasks || 0;
-                
-            } catch (error) {
-                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    console.error('Failed to load statistics:', error);
-                    showAlert('Failed to load statistics', 'error');
-                }
-            }
-        }
-
-        // Load agents list (with authentication)
-        async function loadAgents() {
-            try {
-                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/agents`);
-                agents = await response.json();
-                
-                updateAgentsTable();
-                
-            } catch (error) {
-                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    console.error('Failed to load agents:', error);
-                    showAlert('Failed to load agents', 'error');
-                }
-            }
-        }
-
-        // Copy to clipboard function
-        function copyToClipboard(elementId) {
-            const element = document.getElementById(elementId);
-            const text = element.textContent;
-            
-            navigator.clipboard.writeText(text).then(() => {
-                const originalText = element.nextElementSibling.textContent;
-                element.nextElementSibling.textContent = 'Copied!';
-                element.nextElementSibling.style.background = '#4caf50';
-                
-                setTimeout(() => {
-                    element.nextElementSibling.textContent = originalText;
-                    element.nextElementSibling.style.background = '';
-                }, 2000);
-            }).catch(() => {
-                const textArea = document.createElement('textarea');
-                textArea.value = text;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                
-                showAlert('Credentials copied to clipboard!', 'success');
-            });
-        }
-
-        // Update agents table with password and session info
-        function updateAgentsTable() {
-            const tbody = document.getElementById('agentsTableBody');
-            tbody.innerHTML = '';
-            
-            agents.forEach(agent => {
-                const row = document.createElement('tr');
-                
-                let sessionDuration = 'N/A';
-                if (agent.is_currently_logged_in && agent.last_login) {
-                    const loginTime = new Date(agent.last_login);
-                    const now = new Date();
-                    const durationMs = now - loginTime;
-                    const hours = Math.floor(durationMs / (1000 * 60 * 60));
-                    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-                    sessionDuration = `${hours}h ${minutes}m`;
-                }
-                
-                row.innerHTML = `
-                    <td>${agent.agent_id}</td>
-                    <td>${agent.name}</td>
-                    <td>${agent.email}</td>
-                    <td>
-                        <span id="password-${agent.agent_id}" style="font-family: monospace; background: #f0f0f0; padding: 4px; border-radius: 4px;">
-                            ••••••••
-                        </span>
-                        <button class="btn btn-sm" style="padding: 2px 6px; margin-left: 5px;" 
-                                onclick="showPassword('${agent.agent_id}')" title="Show Password">
-                            👁️
-                        </button>
-                        <button class="btn btn-sm" style="padding: 2px 6px; margin-left: 2px;" 
-                                onclick="resetPassword('${agent.agent_id}')" title="Reset Password">
-                            🔄
-                        </button>
-                    </td>
-                    <td><span class="badge ${agent.status === 'active' ? 'badge-success' : 'badge-danger'}">${agent.status}</span></td>
-                    <td>
-                        <span class="badge ${agent.is_currently_logged_in ? 'badge-success' : 'badge-secondary'}" 
-                              title="${agent.is_currently_logged_in ? 'Currently logged in' : 'Not logged in'}">
-                            ${agent.is_currently_logged_in ? '🟢 Online' : '🔴 Offline'}
-                        </span>
-                    </td>
-                    <td>${agent.tasks_completed || 0}</td>
-                    <td>${agent.last_login || 'Never'}</td>
-                    <td>${agent.last_logout || 'Never'}</td>
-                    <td>${sessionDuration}</td>
-                    <td>
-                        <button class="btn btn-sm ${agent.status === 'active' ? 'btn-danger' : 'btn-success'}" 
-                                onclick="toggleAgentStatus('${agent.agent_id}', '${agent.status}')">
-                            ${agent.status === 'active' ? 'Deactivate' : 'Activate'}
-                        </button>
-                        <button class="btn btn-sm btn-info" 
-                                onclick="viewSessionHistory('${agent.agent_id}')" title="View Session History">
-                            📊
-                        </button>
-                        ${agent.is_currently_logged_in ? 
-                            `<button class="btn btn-sm btn-danger" 
-                                     onclick="forceLogout('${agent.agent_id}')" title="Force Logout">
-                                ⏹️
-                            </button>` : ''
-                        }
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        // Show agent password (with authentication)
-        async function showPassword(agentId) {
-            try {
-                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/agent-password/${agentId}`);
-                const result = await response.json();
-                
-                if (response.ok) {
-                    showAlert(result.message, 'info');
-                } else {
-                    showAlert(`Error: ${result.detail}`, 'error');
-                }
-            } catch (error) {
-                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    showAlert('Error retrieving password information', 'error');
-                }
-            }
-        }
-
-        // Reset agent password (with authentication)
-        async function resetPassword(agentId) {
-            if (!confirm('Are you sure you want to reset this agent\'s password? This will generate a new password.')) {
-                return;
-            }
-            
-            try {
-                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/reset-password/${agentId}`, {
-                    method: 'POST'
-                });
-                const result = await response.json();
-                
-                if (response.ok) {
-                    const passwordDisplay = `
-                        New Password for ${agentId}: 
-                        ${result.new_password}
-                        
-                        Please save this password securely and share it with the agent.
-                    `;
-                    
-                    alert(passwordDisplay);
-                    showAlert(`Password reset successfully for agent ${agentId}`, 'success');
-                    
-                    const passwordSpan = document.getElementById(`password-${agentId}`);
-                    if (passwordSpan) {
-                        passwordSpan.textContent = result.new_password;
-                        passwordSpan.style.background = '#e8f5e8';
-                        setTimeout(() => {
-                            passwordSpan.textContent = '••••••••';
-                            passwordSpan.style.background = '#f0f0f0';
-                        }, 10000);
-                    }
-                    
-                } else {
-                    showAlert(`Password reset failed: ${result.detail}`, 'error');
-                }
-            } catch (error) {
-                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    showAlert('Error resetting password', 'error');
-                }
-            }
-        }
-
-        // Populate agent select dropdowns
-        function populateAgentSelects() {
-            const agentSelect = document.getElementById('agentSelect');
-            const exportAgentSelect = document.getElementById('exportAgent');
-            const sessionAgentSelect = document.getElementById('sessionAgent');
-            
-            agentSelect.innerHTML = '<option value="">Select an agent...</option>';
-            exportAgentSelect.innerHTML = '<option value="">All Agents</option>';
-            sessionAgentSelect.innerHTML = '<option value="">All Agents</option>';
-            
-            agents.forEach(agent => {
-                if (agent.status === 'active') {
-                    const option1 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
-                    const option2 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
-                    const option3 = new Option(`${agent.name} (${agent.agent_id})`, agent.agent_id);
-                    agentSelect.appendChild(option1);
-                    exportAgentSelect.appendChild(option2);
-                    sessionAgentSelect.appendChild(option3);
-                }
-            });
-        }
-
-        // Setup drag and drop functionality
-        function setupDragAndDrop() {
-            const uploadArea = document.getElementById('uploadArea');
-            const zipFileInput = document.getElementById('zipFile');
-
-            uploadArea.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                uploadArea.classList.add('dragover');
-            });
-
-            uploadArea.addEventListener('dragleave', () => {
-                uploadArea.classList.remove('dragover');
-            });
-
-            uploadArea.addEventListener('drop', (e) => {
-                e.preventDefault();
-                uploadArea.classList.remove('dragover');
-                
-                const files = e.dataTransfer.files;
-                if (files.length > 0 && files[0].name.endsWith('.zip')) {
-                    handleZipFileSelection(files[0]);
-                } else {
-                    showAlert('Please drop a valid ZIP file', 'error');
-                }
-            });
-
-            zipFileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    handleZipFileSelection(e.target.files[0]);
-                }
-            });
-        }
-
-        // Enhanced ZIP file selection handler
-        function handleZipFileSelection(file) {
-            selectedZipFile = file;
-            
-            const fileSizeMB = file.size / (1024 * 1024);
-            
-            document.querySelector('#uploadArea h3').textContent = `📎 Selected: ${file.name}`;
-            document.querySelector('#uploadArea p').innerHTML = `
-                Size: ${fileSizeMB.toFixed(2)} MB<br>
-                <small>${fileSizeMB > 100 ? 'Large file detected - will use optimized chunked upload' : 'Standard upload will be used'}</small>
-            `;
-            
-            // Show file size warning for large files
-            if (fileSizeMB > 100) {
-                const warningDiv = document.getElementById('fileSizeWarning');
-                const warningText = document.getElementById('fileSizeWarningText');
-                warningText.textContent = `File size is ${fileSizeMB.toFixed(2)} MB. This is considered a large file.`;
-                warningDiv.classList.remove('hidden');
-            } else {
-                document.getElementById('fileSizeWarning').classList.add('hidden');
-            }
-            
-            updateUploadButtonState();
-            showAlert(`ZIP file "${file.name}" selected successfully!`, 'success');
-        }
-
-        // Update upload button state
-        function updateUploadButtonState() {
-            const uploadBtn = document.getElementById('uploadBtn');
-            const agentSelected = document.getElementById('agentSelect').value !== '';
-            uploadBtn.disabled = !(selectedZipFile && agentSelected);
-        }
-
-        // Agent selection change handler
-        document.getElementById('agentSelect').addEventListener('change', updateUploadButtonState);
-
-        // Enhanced upload function with chunking support
-        async function uploadZipFile() {
-            if (!selectedZipFile || !document.getElementById('agentSelect').value) {
-                showAlert('Please select both a ZIP file and an agent', 'error');
-                return;
-            }
-
-            const fileSize = selectedZipFile.size;
-            isChunkedUpload = fileSize > LARGE_FILE_THRESHOLD;
-            
-            if (isChunkedUpload) {
-                await uploadLargeFile();
-            } else {
-                await uploadStandardFile();
-            }
-        }
-
-        // Standard file upload for smaller files
-        async function uploadStandardFile() {
-            const formData = new FormData();
-            formData.append('zip_file', selectedZipFile);
-            formData.append('agent_id', document.getElementById('agentSelect').value);
-
-            showUploadProgress();
-            uploadStartTime = Date.now();
-
-            try {
-                uploadController = new AbortController();
-                
-                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/upload-tasks`, {
-                    method: 'POST',
-                    body: formData,
-                    signal: uploadController.signal
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    hideUploadProgress();
-                    showAlert(`Successfully uploaded ${result.images_processed} images and assigned tasks!`, 'success');
-                    resetUploadForm();
-                    await loadStatistics();
-                } else {
-                    throw new Error(result.detail || 'Upload failed');
-                }
-
-            } catch (error) {
-                if (error.name === 'AbortError') {
-                    showAlert('Upload cancelled by user', 'info');
-                } else if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    showAlert(`Upload failed: ${error.message}`, 'error');
-                    showRetryOption();
-                }
-            } finally {
-                uploadController = null;
-            }
-        }
-
-        // Enhanced large file upload with chunking
-        async function uploadLargeFile() {
-            totalChunks = Math.ceil(selectedZipFile.size / CHUNK_SIZE);
-            currentChunk = 0;
-            
-            showUploadProgress(true);
-            uploadStartTime = Date.now();
-
-            try {
-                // Initialize chunked upload
-                uploadController = new AbortController();
-                
-                const initResponse = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/init-chunked-upload`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        filename: selectedZipFile.name,
-                        filesize: selectedZipFile.size,
-                        total_chunks: totalChunks,
-                        agent_id: document.getElementById('agentSelect').value
-                    }),
-                    signal: uploadController.signal
-                });
-
-                if (!initResponse.ok) {
-                    throw new Error('Failed to initialize chunked upload');
-                }
-
-                const { upload_id } = await initResponse.json();
-
-                // Upload chunks
-                for (let i = 0; i < totalChunks; i++) {
-                    if (uploadController.signal.aborted) {
-                        throw new Error('Upload cancelled');
-                    }
-
-                    await uploadChunk(upload_id, i);
-                    currentChunk = i + 1;
-                    updateChunkProgress();
-                }
-
-                // Finalize upload
-                const finalizeResponse = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/finalize-chunked-upload`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        upload_id: upload_id
-                    }),
-                    signal: uploadController.signal
-                });
-
-                if (!finalizeResponse.ok) {
-                    throw new Error('Failed to finalize upload');
-                }
-
-                const result = await finalizeResponse.json();
-                
-                hideUploadProgress();
-                showAlert(`Successfully uploaded ${result.images_processed} images and assigned tasks!`, 'success');
-                resetUploadForm();
-                await loadStatistics();
-
-            } catch (error) {
-                if (error.name === 'AbortError' || error.message === 'Upload cancelled') {
-                    showAlert('Upload cancelled by user', 'info');
-                } else if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    showAlert(`Upload failed: ${error.message}`, 'error');
-                    showRetryOption();
-                }
-            } finally {
-                uploadController = null;
-            }
-        }
-
-        // Upload individual chunk
-        async function uploadChunk(uploadId, chunkIndex) {
-            const start = chunkIndex * CHUNK_SIZE;
-            const end = Math.min(start + CHUNK_SIZE, selectedZipFile.size);
-            const chunk = selectedZipFile.slice(start, end);
-
-            let retries = 0;
-            while (retries < MAX_RETRIES) {
-                try {
-                    const formData = new FormData();
-                    formData.append('upload_id', uploadId);
-                    formData.append('chunk_index', chunkIndex);
-                    formData.append('chunk', chunk);
-
-                    const response = await makeAuthenticatedRequest(`${BASE_URL}/api/admin/upload-chunk`, {
-                        method: 'POST',
-                        body: formData,
-                        signal: uploadController.signal
-                    });
-
-                    if (response.ok) {
-                        updateOverallProgress((chunkIndex + 1) / totalChunks * 100);
-                        break; // Success, exit retry loop
-                    } else {
-                        throw new Error(`Chunk ${chunkIndex} upload failed`);
-                    }
-
-                } catch (error) {
-                    retries++;
-                    if (retries >= MAX_RETRIES) {
-                        throw new Error(`Failed to upload chunk ${chunkIndex} after ${MAX_RETRIES} retries`);
-                    }
-                    
-                    // Wait before retry (exponential backoff)
-                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 1000));
-                }
-            }
-        }
-
-        //
+</html>
