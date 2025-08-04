@@ -64,6 +64,7 @@ def root():
     }
 
 # Try to import and setup database
+# Try to import and setup database
 try:
     print("📦 Importing database modules...")
     from database import Base, engine, get_db
@@ -73,11 +74,17 @@ try:
     Base.metadata.create_all(bind=engine)
     print("✅ Database tables created successfully!")
     
+    # Enhanced logging for upload debugging
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
     database_ready = True
 except Exception as e:
     print(f"❌ Database setup failed: {e}")
+    import traceback
+    traceback.print_exc()
     database_ready = False
-
 # Try to import and include agent routes
 try:
     print("📦 Importing agent routes...")
@@ -1152,3 +1159,4 @@ if __name__ == "__main__":
     print(f"🚀 Starting server on port {port}")
     print(f"📁 Chunk upload directory: {CHUNK_UPLOAD_DIR}")
     uvicorn.run(app, host="0.0.0.0", port=port)
+
