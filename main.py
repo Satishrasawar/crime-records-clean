@@ -14,7 +14,7 @@ from sqlalchemy import func
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 
 # Initialize FastAPI app first
 app = FastAPI(
@@ -51,19 +51,81 @@ def health_check():
         "chunked_upload": "enabled"
     }
 
-# Root endpoint
-@app.get("/")
-def root():
-    """Root endpoint"""
+# ===================== FRONTEND ROUTES =====================
+@app.get("/", response_class=HTMLResponse)
+async def serve_agent_homepage():
+    """Serve agent.html as the homepage"""
+    try:
+        if os.path.exists("agent.html"):
+            with open("agent.html", "r", encoding="utf-8") as f:
+                content = f.read()
+            # Update the BASE_URL to use the current domain
+            content = content.replace(
+                "https://web-production-b3ef2.up.railway.app", 
+                ""  # Use relative URLs
+            )
+            return HTMLResponse(content=content)
+        else:
+            return HTMLResponse("<h1>Agent interface not found</h1>", status_code=404)
+    except Exception as e:
+        return HTMLResponse(f"<h1>Error loading agent interface: {e}</h1>", status_code=500)
+
+@app.get("/admin", response_class=HTMLResponse)
+@app.get("/admin.html", response_class=HTMLResponse)
+async def serve_admin_dashboard():
+    """Serve admin.html with updated configuration"""
+    try:
+        if os.path.exists("admin.html"):
+            with open("admin.html", "r", encoding="utf-8") as f:
+                content = f.read()
+            # Update the BASE_URL to use the current domain
+            content = content.replace(
+                "https://web-production-b3ef2.up.railway.app", 
+                ""  # Use relative URLs
+            )
+            return HTMLResponse(content=content)
+        else:
+            return HTMLResponse("<h1>Admin dashboard not found</h1>", status_code=404)
+    except Exception as e:
+        return HTMLResponse(f"<h1>Error loading admin dashboard: {e}</h1>", status_code=500)
+
+@app.get("/agent", response_class=HTMLResponse)
+@app.get("/agent.html", response_class=HTMLResponse)
+async def serve_agent_interface():
+    """Serve agent.html with updated configuration"""
+    try:
+        if os.path.exists("agent.html"):
+            with open("agent.html", "r", encoding="utf-8") as f:
+                content = f.read()
+            # Update the BASE_URL to use the current domain
+            content = content.replace(
+                "https://web-production-b3ef2.up.railway.app", 
+                ""  # Use relative URLs
+            )
+            return HTMLResponse(content=content)
+        else:
+            return HTMLResponse("<h1>Agent interface not found</h1>", status_code=404)
+    except Exception as e:
+        return HTMLResponse(f"<h1>Error loading agent interface: {e}</h1>", status_code=500)
+
+# API info endpoint
+@app.get("/api")
+def api_info():
+    """API information endpoint"""
     return {
         "message": "Client Records Data Entry System API v2.0",
         "status": "running",
         "platform": "Railway",
         "health_check": "/health",
-        "features": ["chunked_upload", "large_file_support"]
+        "features": ["chunked_upload", "large_file_support"],
+        "endpoints": {
+            "admin": "/admin or /admin.html",
+            "agent": "/agent or /agent.html or /",
+            "health": "/health",
+            "api_docs": "/docs"
+        }
     }
 
-# Try to import and setup database
 # Try to import and setup database
 try:
     print("📦 Importing database modules...")
@@ -85,6 +147,7 @@ except Exception as e:
     import traceback
     traceback.print_exc()
     database_ready = False
+
 # Try to import and include agent routes
 try:
     print("📦 Importing agent routes...")
@@ -294,178 +357,6 @@ async def get_agent_tasks(agent_id: str, db: Session = Depends(get_db)):
     except Exception as e:
         print(f"❌ Error getting tasks for {agent_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting tasks: {str(e)}")
-
-@app.get("/api/agents/{agent_id}/statistics")
-async def get_agent_statistics(agent_id: str, db: Session = Depends(get_db)):
-    """Get statistics for a specific agent"""
-    try:
-        if not database_ready:
-            return {
-                "total_tasks": 0,
-                "completed_tasks": 0,
-                "pending_tasks": 0,
-                "in_progress_tasks": 0
-            }
-        
-        # Verify agent exists
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        # Count tasks by status
-        total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).count()
-        completed_tasks = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id,
-            TaskProgress.status == 'completed'
-        ).count()
-        pending_tasks = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id,
-            TaskProgress.status == 'pending'
-        ).count()
-        in_progress_tasks = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id,
-            TaskProgress.status == 'in_progress'
-        ).count()
-        
-        return {
-            "total_tasks": total_tasks,
-            "completed_tasks": completed_tasks,
-            "pending_tasks": pending_tasks,
-            "in_progress_tasks": in_progress_tasks
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error getting statistics for {agent_id}: {e}")
-        return {
-            "total_tasks": 0,
-            "completed_tasks": 0,
-            "pending_tasks": 0,
-            "in_progress_tasks": 0
-        }
-
-# ===================== AGENT REGISTRATION ENDPOINT =====================
-@app.post("/api/agents/register")
-async def register_agent(
-    name: str = Form(...),
-    email: str = Form(...),
-    mobile: str = Form(...),
-    dob: str = Form(...),
-    country: str = Form(...),
-    gender: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    """Register a new agent"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        # Generate unique agent ID
-        agent_id = f"AG{datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:4].upper()}"
-        
-        # Generate secure password
-        import secrets
-        import string
-        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-        password = ''.join(secrets.choice(alphabet) for _ in range(12))
-        
-        # Create agent record
-        new_agent = Agent(
-            agent_id=agent_id,
-            name=name,
-            email=email,
-            mobile=mobile,
-            dob=datetime.strptime(dob, '%Y-%m-%d').date(),
-            country=country,
-            gender=gender,
-            password=password,  # In production, hash this password
-            status="active",
-            created_at=datetime.now()
-        )
-        
-        db.add(new_agent)
-        db.commit()
-        
-        print(f"✅ New agent registered: {agent_id}")
-        
-        return {
-            "success": True,
-            "agent_id": agent_id,
-            "password": password,
-            "message": "Agent registered successfully"
-        }
-        
-    except Exception as e:
-        print(f"❌ Error registering agent: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
-
-# ===================== FORM SUBMISSION ENDPOINT =====================
-@app.post("/api/agents/{agent_id}/submit")
-async def submit_task_form(
-    agent_id: str, 
-    data: dict,
-    db: Session = Depends(get_db)
-):
-    """Submit completed task form"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        # Verify agent exists
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        # Get the current in-progress task for this agent
-        current_task = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id,
-            TaskProgress.status == 'in_progress'
-        ).order_by(TaskProgress.assigned_at).first()
-        
-        if not current_task:
-            # If no in-progress task, try to find a pending one
-            current_task = db.query(TaskProgress).filter(
-                TaskProgress.agent_id == agent_id,
-                TaskProgress.status == 'pending'
-            ).order_by(TaskProgress.assigned_at).first()
-        
-        if not current_task:
-            raise HTTPException(status_code=404, detail="No active task found for submission")
-        
-        # Create submitted form record
-        submitted_form = SubmittedForm(
-            agent_id=agent_id,
-            task_id=current_task.id,
-            image_filename=current_task.image_filename,
-            form_data=data,  # Store as JSON
-            submitted_at=datetime.now()
-        )
-        
-        db.add(submitted_form)
-        
-        # Mark task as completed
-        current_task.status = 'completed'
-        current_task.completed_at = datetime.now()
-        
-        # Commit changes
-        db.commit()
-        
-        print(f"✅ Task {current_task.id} completed by agent {agent_id}")
-        
-        return {
-            "success": True,
-            "message": "Task submitted successfully",
-            "task_id": current_task.id
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error submitting task for {agent_id}: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error submitting task: {str(e)}")
 
 # ===================== STANDARD UPLOAD ENDPOINT =====================
 @app.post("/api/admin/upload-tasks")
@@ -801,30 +692,8 @@ async def periodic_cleanup():
         # Wait 1 hour before next cleanup
         await asyncio.sleep(3600)
 
-# ===================== EXISTING ENDPOINTS =====================
+# ===================== DEBUG AND STATUS ENDPOINTS =====================
 
-# Serve HTML files
-@app.get("/admin.html")
-async def serve_admin_panel():
-    """Serve admin dashboard"""
-    try:
-        if os.path.exists("admin.html"):
-            return FileResponse("admin.html")
-        return {"error": "Admin panel not found", "files": os.listdir(".")}
-    except Exception as e:
-        return {"error": f"Could not serve admin panel: {e}"}
-
-@app.get("/agent.html")
-async def serve_agent_panel():
-    """Serve agent interface"""
-    try:
-        if os.path.exists("agent.html"):
-            return FileResponse("agent.html")
-        return {"error": "Agent panel not found", "files": os.listdir(".")}
-    except Exception as e:
-        return {"error": f"Could not serve agent panel: {e}"}
-
-# Debug endpoint
 @app.get("/debug")
 def debug_info():
     """Debug endpoint to check system status"""
@@ -840,7 +709,6 @@ def debug_info():
         "chunk_upload_dir": os.path.exists(CHUNK_UPLOAD_DIR)
     }
 
-# Status endpoint
 @app.get("/status")
 def system_status():
     """System status endpoint"""
@@ -869,294 +737,9 @@ def get_upload_sessions():
         }
     return {"upload_sessions": sessions_info}
 
-# ===================== ADDITIONAL MISSING ENDPOINTS =====================
-
-# Password reset endpoint
-@app.post("/api/admin/reset-password/{agent_id}")
-async def reset_agent_password(agent_id: str, db: Session = Depends(get_db)):
-    """Reset agent password"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        # Generate new password
-        import secrets
-        import string
-        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-        new_password = ''.join(secrets.choice(alphabet) for _ in range(12))
-        
-        # Update password
-        agent.password = new_password
-        db.commit()
-        
-        return {
-            "success": True,
-            "new_password": new_password,
-            "message": f"Password reset successfully for agent {agent_id}"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error resetting password for {agent_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Password reset failed: {str(e)}")
-
-# Get agent password info
-@app.get("/api/admin/agent-password/{agent_id}")
-async def get_agent_password(agent_id: str, db: Session = Depends(get_db)):
-    """Get agent password information"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        return {
-            "message": f"Password for agent {agent_id} is: {agent.password}",
-            "agent_id": agent_id,
-            "password": agent.password
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error getting password for {agent_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error retrieving password: {str(e)}")
-
-# Update agent status
-@app.patch("/api/agents/{agent_id}/status")
-async def update_agent_status(agent_id: str, status_data: dict, db: Session = Depends(get_db)):
-    """Update agent status"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        new_status = status_data.get("status")
-        if new_status not in ["active", "inactive"]:
-            raise HTTPException(status_code=400, detail="Status must be 'active' or 'inactive'")
-        
-        agent.status = new_status
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": f"Agent {agent_id} status updated to {new_status}"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error updating status for {agent_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Status update failed: {str(e)}")
-
-# Force logout agent
-@app.post("/api/admin/force-logout/{agent_id}")
-async def force_logout_agent(agent_id: str, db: Session = Depends(get_db)):
-    """Force logout an agent"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        # Find active session and close it
-        active_session = db.query(AgentSession).filter(
-            AgentSession.agent_id == agent_id,
-            AgentSession.logout_time.is_(None)
-        ).first()
-        
-        if active_session:
-            active_session.logout_time = datetime.now()
-            db.commit()
-            return {"success": True, "message": f"Agent {agent_id} logged out successfully"}
-        else:
-            return {"success": True, "message": f"Agent {agent_id} was not logged in"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error forcing logout for {agent_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Force logout failed: {str(e)}")
-
-# Export data endpoints
-@app.get("/api/admin/export-excel")
-async def export_excel(
-    agent_id: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    """Export submitted data to Excel"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        # For now, return a simple response indicating the feature is available
-        # You'll need to implement actual Excel generation based on your SubmittedForm model
-        return JSONResponse(
-            content={"message": "Excel export feature available - implement based on your specific requirements"},
-            status_code=501
-        )
-        
-    except Exception as e:
-        print(f"❌ Error in Excel export: {e}")
-        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
-
-@app.get("/api/admin/preview-data")
-async def preview_data(
-    agent_id: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    """Preview submitted data"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        query = db.query(SubmittedForm)
-        
-        if agent_id:
-            query = query.filter(SubmittedForm.agent_id == agent_id)
-        
-        if date_from:
-            query = query.filter(SubmittedForm.submitted_at >= datetime.strptime(date_from, '%Y-%m-%d'))
-        
-        if date_to:
-            query = query.filter(SubmittedForm.submitted_at <= datetime.strptime(date_to, '%Y-%m-%d'))
-        
-        submissions = query.limit(100).all()
-        
-        result = []
-        for submission in submissions:
-            result.append({
-                "id": submission.id,
-                "agent_id": submission.agent_id,
-                "task_id": submission.task_id,
-                "image_filename": submission.image_filename,
-                "submitted_at": submission.submitted_at.isoformat(),
-                "form_data": submission.form_data
-            })
-        
-        return result
-        
-    except Exception as e:
-        print(f"❌ Error in data preview: {e}")
-        raise HTTPException(status_code=500, detail=f"Preview failed: {str(e)}")
-
-@app.get("/api/admin/test-data")
-async def test_data_availability(db: Session = Depends(get_db)):
-    """Test data availability"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        # Count records in each table
-        agent_count = db.query(Agent).count()
-        task_count = db.query(TaskProgress).count()
-        submission_count = db.query(SubmittedForm).count()
-        session_count = db.query(AgentSession).count()
-        
-        return {
-            "success": True,
-            "message": f"Data available - Agents: {agent_count}, Tasks: {task_count}, Submissions: {submission_count}, Sessions: {session_count}",
-            "counts": {
-                "agents": agent_count,
-                "tasks": task_count,
-                "submissions": submission_count,
-                "sessions": session_count
-            }
-        }
-        
-    except Exception as e:
-        print(f"❌ Error testing data: {e}")
-        raise HTTPException(status_code=500, detail=f"Data test failed: {str(e)}")
-
-# Session report endpoints
-@app.get("/api/admin/session-report")
-async def get_session_report(
-    agent_id: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    """Get session report"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        query = db.query(AgentSession).join(Agent)
-        
-        if agent_id:
-            query = query.filter(AgentSession.agent_id == agent_id)
-        
-        if date_from:
-            query = query.filter(AgentSession.login_time >= datetime.strptime(date_from, '%Y-%m-%d'))
-        
-        if date_to:
-            query = query.filter(AgentSession.login_time <= datetime.strptime(date_to, '%Y-%m-%d'))
-        
-        sessions = query.order_by(AgentSession.login_time.desc()).limit(100).all()
-        
-        result = []
-        for session in sessions:
-            duration_minutes = None
-            if session.logout_time and session.login_time:
-                duration = session.logout_time - session.login_time
-                duration_minutes = int(duration.total_seconds() / 60)
-            
-            result.append({
-                "agent_id": session.agent_id,
-                "agent_name": session.agent.name if session.agent else "Unknown",
-                "login_time": session.login_time.isoformat() if session.login_time else None,
-                "logout_time": session.logout_time.isoformat() if session.logout_time else None,
-                "duration_minutes": duration_minutes
-            })
-        
-        return result
-        
-    except Exception as e:
-        print(f"❌ Error in session report: {e}")
-        raise HTTPException(status_code=500, detail=f"Session report failed: {str(e)}")
-
-@app.get("/api/admin/export-sessions")
-async def export_sessions(
-    agent_id: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    """Export session report to Excel"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        # For now, return a simple response indicating the feature is available
-        return JSONResponse(
-            content={"message": "Session export feature available - implement based on your specific requirements"},
-            status_code=501
-        )
-        
-    except Exception as e:
-        print(f"❌ Error in session export: {e}")
-        raise HTTPException(status_code=500, detail=f"Session export failed: {str(e)}")
-
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     print(f"🚀 Starting server on port {port}")
     print(f"📁 Chunk upload directory: {CHUNK_UPLOAD_DIR}")
     uvicorn.run(app, host="0.0.0.0", port=port)
-
