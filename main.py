@@ -4,37 +4,14 @@ import uuid
 import shutil
 import zipfile
 import asyncio
-import aiofiles
 from datetime import datetime
-from typing import Optional, Dict, Any, List
-from pathlib import Path
+from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
-
-# Initialize FastAPI app first
-app = FastAPI(
-    title="Client Records Data Entry System", 
-    version="2.0.0",
-    description="Enhanced system for agent-task-system.com with chunked upload support"
-)
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all for testing
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Chunked upload configuration
-CHUNK_UPLOAD_DIR = "temp_chunks"
-os.makedirs(CHUNK_UPLOAD_DIR, exist_ok=True)
 
 # In-memory storage for upload sessions (use Redis in production)
 upload_sessions: Dict[str, Dict[str, Any]] = {}
@@ -73,11 +50,6 @@ try:
     Base.metadata.create_all(bind=engine)
     print("✅ Database tables created successfully!")
     
-    # Enhanced logging for upload debugging
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
-    
     database_ready = True
 except Exception as e:
     print(f"❌ Database setup failed: {e}")
@@ -94,6 +66,8 @@ try:
     routes_ready = True
 except Exception as e:
     print(f"❌ Agent routes failed: {e}")
+    import traceback
+    traceback.print_exc()
     routes_ready = False
 
 # Create directories
@@ -269,9 +243,9 @@ async def upload_chunk(
         chunk_path = os.path.join(session["upload_dir"], f"chunk_{chunk_index:06d}")
         
         # Save chunk to disk
-        async with aiofiles.open(chunk_path, 'wb') as f:
+        with open(chunk_path, 'wb') as f:
             content = await chunk.read()
-            await f.write(content)
+            f.write(content)
         
         # Mark chunk as received
         session["received_chunks"].add(chunk_index)
@@ -485,7 +459,6 @@ async def periodic_cleanup():
 
 # ===================== HTML FILE SERVING =====================
 
-# Serve HTML files
 @app.get("/admin.html")
 async def serve_admin_panel():
     """Serve admin dashboard"""
@@ -508,23 +481,22 @@ async def serve_agent_panel():
 
 # ===================== SYSTEM INFO ENDPOINTS =====================
 
-# Debug endpoint
 @app.get("/debug")
 def debug_info():
     """Debug endpoint to check system status"""
     import sys
     return {
         "files": os.listdir("."),
-        "python_path": sys.path,
-        "modules": list(sys.modules.keys()),
+        "python_modules": list(sys.modules.keys())[:20],  # First 20 modules
         "database_ready": database_ready,
         "routes_ready": routes_ready,
         "port": os.environ.get("PORT", "not set"),
         "upload_sessions": len(upload_sessions),
-        "chunk_upload_dir": os.path.exists(CHUNK_UPLOAD_DIR)
+        "chunk_upload_dir": os.path.exists(CHUNK_UPLOAD_DIR),
+        "static_dir_exists": os.path.exists("static/task_images"),
+        "database_url": os.environ.get("DATABASE_URL", "not set")[:50] + "..." if os.environ.get("DATABASE_URL") else "not set"
     }
 
-# Status endpoint
 @app.get("/status")
 def system_status():
     """System status endpoint"""
@@ -533,7 +505,12 @@ def system_status():
         "routes": "ready" if routes_ready else "failed",
         "health": "ok",
         "chunked_upload": "enabled",
-        "active_uploads": len(upload_sessions)
+        "active_uploads": len(upload_sessions),
+        "environment": {
+            "python_version": sys.version.split()[0],
+            "platform": sys.platform,
+            "cwd": os.getcwd()
+        }
     }
 
 # Upload sessions management (for debugging)
@@ -553,6 +530,56 @@ def get_upload_sessions():
         }
     return {"upload_sessions": sessions_info}
 
+# ===================== FALLBACK ENDPOINTS (if agent_routes fails to load) =====================
+
+if not routes_ready:
+    print("⚠️ Agent routes not loaded, creating fallback endpoints...")
+    
+    @app.get("/api/agents")
+    def fallback_agents():
+        return {"error": "Agent routes not loaded properly", "database_ready": database_ready}
+    
+    @app.post("/api/agents/login")
+    def fallback_login():
+        return {"error": "Agent routes not loaded properly", "database_ready": database_ready}
+    
+    @app.get("/api/agents/{agent_id}/current-task")
+    def fallback_current_task(agent_id: str):
+        return {"error": "Agent routes not loaded properly", "agent_id": agent_id, "database_ready": database_ready}
+    
+    @app.post("/api/agents/{agent_id}/submit")
+    def fallback_submit(agent_id: str):
+        return {"error": "Agent routes not loaded properly", "agent_id": agent_id, "database_ready": database_ready}
+
+# ===================== SIMPLE TEST ENDPOINTS =====================
+
+@app.get("/test/simple")
+def simple_test():
+    """Simple test endpoint"""
+    return {
+        "message": "Simple test endpoint working",
+        "timestamp": datetime.now().isoformat(),
+        "database_ready": database_ready,
+        "routes_ready": routes_ready
+    }
+
+@app.post("/test/echo")
+async def echo_test(request: Request):
+    """Echo test for form data"""
+    try:
+        form_data = await request.form()
+        return {
+            "message": "Echo test successful",
+            "form_data": dict(form_data),
+            "content_type": request.headers.get("content-type", "unknown")
+        }
+    except Exception as e:
+        return {
+            "message": "Echo test failed",
+            "error": str(e),
+            "content_type": request.headers.get("content-type", "unknown")
+        }
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
@@ -560,4 +587,31 @@ if __name__ == "__main__":
     print(f"📁 Chunk upload directory: {CHUNK_UPLOAD_DIR}")
     print(f"🔗 Database ready: {database_ready}")
     print(f"📋 Routes ready: {routes_ready}")
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    print(f"📂 Current directory: {os.getcwd()}")
+    print(f"📄 Files in current directory: {os.listdir('.')}")
+    
+    # Create required directories
+    os.makedirs("static", exist_ok=True)
+    os.makedirs("static/task_images", exist_ok=True)
+    
+    uvicorn.run(app, host="0.0.0.0", port=port)itialize FastAPI app
+app = FastAPI(
+    title="Client Records Data Entry System", 
+    version="2.0.0",
+    description="Data entry system for agent-task management"
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all for testing
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Chunked upload configuration
+CHUNK_UPLOAD_DIR = "temp_chunks"
+os.makedirs(CHUNK_UPLOAD_DIR, exist_ok=True)
+
+# In
