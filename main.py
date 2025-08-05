@@ -11,10 +11,10 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 # Initialize FastAPI app first
 app = FastAPI(
@@ -51,79 +51,16 @@ def health_check():
         "chunked_upload": "enabled"
     }
 
-# ===================== FRONTEND ROUTES =====================
-@app.get("/", response_class=HTMLResponse)
-async def serve_agent_homepage():
-    """Serve agent.html as the homepage"""
-    try:
-        if os.path.exists("agent.html"):
-            with open("agent.html", "r", encoding="utf-8") as f:
-                content = f.read()
-            # Update the BASE_URL to use the current domain
-            content = content.replace(
-                "https://web-production-b3ef2.up.railway.app", 
-                ""  # Use relative URLs
-            )
-            return HTMLResponse(content=content)
-        else:
-            return HTMLResponse("<h1>Agent interface not found</h1>", status_code=404)
-    except Exception as e:
-        return HTMLResponse(f"<h1>Error loading agent interface: {e}</h1>", status_code=500)
-
-@app.get("/admin", response_class=HTMLResponse)
-@app.get("/admin.html", response_class=HTMLResponse)
-async def serve_admin_dashboard():
-    """Serve admin.html with updated configuration"""
-    try:
-        if os.path.exists("admin.html"):
-            with open("admin.html", "r", encoding="utf-8") as f:
-                content = f.read()
-            # Update the BASE_URL to use the current domain
-            content = content.replace(
-                "https://web-production-b3ef2.up.railway.app", 
-                ""  # Use relative URLs
-            )
-            return HTMLResponse(content=content)
-        else:
-            return HTMLResponse("<h1>Admin dashboard not found</h1>", status_code=404)
-    except Exception as e:
-        return HTMLResponse(f"<h1>Error loading admin dashboard: {e}</h1>", status_code=500)
-
-@app.get("/agent", response_class=HTMLResponse)
-@app.get("/agent.html", response_class=HTMLResponse)
-async def serve_agent_interface():
-    """Serve agent.html with updated configuration"""
-    try:
-        if os.path.exists("agent.html"):
-            with open("agent.html", "r", encoding="utf-8") as f:
-                content = f.read()
-            # Update the BASE_URL to use the current domain
-            content = content.replace(
-                "https://web-production-b3ef2.up.railway.app", 
-                ""  # Use relative URLs
-            )
-            return HTMLResponse(content=content)
-        else:
-            return HTMLResponse("<h1>Agent interface not found</h1>", status_code=404)
-    except Exception as e:
-        return HTMLResponse(f"<h1>Error loading agent interface: {e}</h1>", status_code=500)
-
-# API info endpoint
-@app.get("/api")
-def api_info():
-    """API information endpoint"""
+# Root endpoint
+@app.get("/")
+def root():
+    """Root endpoint"""
     return {
         "message": "Client Records Data Entry System API v2.0",
         "status": "running",
         "platform": "Railway",
         "health_check": "/health",
-        "features": ["chunked_upload", "large_file_support"],
-        "endpoints": {
-            "admin": "/admin or /admin.html",
-            "agent": "/agent or /agent.html or /",
-            "health": "/health",
-            "api_docs": "/docs"
-        }
+        "features": ["chunked_upload", "large_file_support"]
     }
 
 # Try to import and setup database
@@ -167,196 +104,50 @@ try:
 except Exception as e:
     print(f"❌ Static files setup failed: {e}")
 
-# ===================== STATISTICS ENDPOINT =====================
-@app.get("/api/admin/statistics")
-async def get_admin_statistics(db: Session = Depends(get_db)):
-    """Get admin dashboard statistics"""
+# ===================== DEBUG AND TEST ENDPOINTS =====================
+
+@app.get("/api/debug/endpoints")
+def list_endpoints():
+    """Debug endpoint to see all available routes"""
+    routes = []
+    for route in app.routes:
+        if hasattr(route, 'methods') and hasattr(route, 'path'):
+            routes.append({
+                "path": route.path,
+                "methods": list(route.methods) if route.methods else [],
+                "name": getattr(route, 'name', 'Unknown')
+            })
+    return {"routes": routes, "total_routes": len(routes)}
+
+@app.post("/api/test/form-parser")
+async def test_form_parser(request: Request):
+    """Test endpoint to debug form parsing"""
     try:
-        if not database_ready:
-            return {
-                "total_agents": 0,
-                "total_tasks": 0,
-                "completed_tasks": 0,
-                "pending_tasks": 0,
-                "in_progress_tasks": 0
-            }
+        content_type = request.headers.get("content-type", "")
         
-        # Count agents
-        total_agents = db.query(Agent).count()
-        
-        # Count tasks from TaskProgress table
-        total_tasks = db.query(TaskProgress).count()
-        completed_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'completed').count()
-        pending_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'pending').count()
-        in_progress_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'in_progress').count()
+        if "application/json" in content_type:
+            data = await request.json()
+            data_type = "JSON"
+        else:
+            form_data = await request.form()
+            data = dict(form_data)
+            data_type = "Form Data"
         
         return {
-            "total_agents": total_agents,
-            "total_tasks": total_tasks,
-            "completed_tasks": completed_tasks,
-            "pending_tasks": pending_tasks,
-            "in_progress_tasks": in_progress_tasks
+            "success": True,
+            "content_type": content_type,
+            "data_type": data_type,
+            "field_count": len(data),
+            "fields": list(data.keys())[:10],  # First 10 fields
+            "sample_data": {k: v for k, v in list(data.items())[:3]}  # First 3 key-value pairs
         }
+        
     except Exception as e:
-        print(f"❌ Error getting statistics: {e}")
         return {
-            "total_agents": 0,
-            "total_tasks": 0,
-            "completed_tasks": 0,
-            "pending_tasks": 0,
-            "in_progress_tasks": 0
+            "success": False,
+            "error": str(e),
+            "content_type": request.headers.get("content-type", "")
         }
-
-# ===================== AGENTS ENDPOINTS =====================
-@app.get("/api/agents")
-async def list_agents(db: Session = Depends(get_db)):
-    """List all agents with their statistics"""
-    try:
-        if not database_ready:
-            return []
-        
-        agents = db.query(Agent).all()
-        
-        agent_list = []
-        for agent in agents:
-            # Count tasks for this agent
-            total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent.agent_id).count()
-            completed_tasks = db.query(TaskProgress).filter(
-                TaskProgress.agent_id == agent.agent_id,
-                TaskProgress.status == 'completed'
-            ).count()
-            
-            # Get latest session info
-            latest_session = db.query(AgentSession).filter(
-                AgentSession.agent_id == agent.agent_id
-            ).order_by(AgentSession.login_time.desc()).first()
-            
-            agent_data = {
-                "agent_id": agent.agent_id,
-                "name": agent.name,
-                "email": agent.email,
-                "status": agent.status,
-                "tasks_completed": completed_tasks,
-                "total_tasks": total_tasks,
-                "last_login": latest_session.login_time.isoformat() if latest_session and latest_session.login_time else None,
-                "last_logout": latest_session.logout_time.isoformat() if latest_session and latest_session.logout_time else None,
-                "is_currently_logged_in": latest_session.logout_time is None if latest_session else False
-            }
-            agent_list.append(agent_data)
-        
-        return agent_list
-    except Exception as e:
-        print(f"❌ Error listing agents: {e}")
-        return []
-
-# ===================== TASK ENDPOINTS FOR AGENTS =====================
-@app.get("/api/agents/{agent_id}/tasks/current")
-async def get_current_task(agent_id: str, db: Session = Depends(get_db)):
-    """Get current task for an agent"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        # Verify agent exists
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        # Find next pending task
-        next_task = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id,
-            TaskProgress.status.in_(['pending', 'in_progress'])
-        ).order_by(TaskProgress.assigned_at).first()
-        
-        if not next_task:
-            # Check if there are any completed tasks to show progress
-            total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).count()
-            completed_tasks = db.query(TaskProgress).filter(
-                TaskProgress.agent_id == agent_id,
-                TaskProgress.status == 'completed'
-            ).count()
-            
-            return {
-                "completed": True,
-                "message": "All tasks completed",
-                "total_completed": completed_tasks,
-                "total_tasks": total_tasks
-            }
-        
-        # Mark task as in_progress if it was pending
-        if next_task.status == 'pending':
-            next_task.status = 'in_progress'
-            next_task.started_at = datetime.now()
-            db.commit()
-        
-        # Get task statistics
-        total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).count()
-        completed_tasks = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id,
-            TaskProgress.status == 'completed'
-        ).count()
-        current_index = completed_tasks  # Current task index
-        
-        return {
-            "task": {
-                "id": next_task.id,
-                "agent_id": next_task.agent_id,
-                "image_path": next_task.image_path,
-                "image_filename": next_task.image_filename,
-                "status": next_task.status,
-                "assigned_at": next_task.assigned_at.isoformat()
-            },
-            "image_url": next_task.image_path,
-            "image_name": next_task.image_filename,
-            "current_index": current_index,
-            "total_images": total_tasks,
-            "progress": f"{current_index + 1}/{total_tasks}"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error getting current task for {agent_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting current task: {str(e)}")
-
-@app.get("/api/agents/{agent_id}/tasks")
-async def get_agent_tasks(agent_id: str, db: Session = Depends(get_db)):
-    """Get all tasks for an agent"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        # Verify agent exists
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        # Get all tasks for this agent
-        tasks = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id
-        ).order_by(TaskProgress.assigned_at).all()
-        
-        task_list = []
-        for task in tasks:
-            task_data = {
-                "id": task.id,
-                "agent_id": task.agent_id,
-                "image_path": task.image_path,
-                "image_filename": task.image_filename,
-                "status": task.status,
-                "assigned_at": task.assigned_at.isoformat(),
-                "started_at": task.started_at.isoformat() if task.started_at else None,
-                "completed_at": task.completed_at.isoformat() if task.completed_at else None
-            }
-            task_list.append(task_data)
-        
-        return task_list
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error getting tasks for {agent_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting tasks: {str(e)}")
 
 # ===================== STANDARD UPLOAD ENDPOINT =====================
 @app.post("/api/admin/upload-tasks")
@@ -692,8 +483,32 @@ async def periodic_cleanup():
         # Wait 1 hour before next cleanup
         await asyncio.sleep(3600)
 
-# ===================== DEBUG AND STATUS ENDPOINTS =====================
+# ===================== HTML FILE SERVING =====================
 
+# Serve HTML files
+@app.get("/admin.html")
+async def serve_admin_panel():
+    """Serve admin dashboard"""
+    try:
+        if os.path.exists("admin.html"):
+            return FileResponse("admin.html")
+        return {"error": "Admin panel not found", "files": os.listdir(".")}
+    except Exception as e:
+        return {"error": f"Could not serve admin panel: {e}"}
+
+@app.get("/agent.html")
+async def serve_agent_panel():
+    """Serve agent interface"""
+    try:
+        if os.path.exists("agent.html"):
+            return FileResponse("agent.html")
+        return {"error": "Agent panel not found", "files": os.listdir(".")}
+    except Exception as e:
+        return {"error": f"Could not serve agent panel: {e}"}
+
+# ===================== SYSTEM INFO ENDPOINTS =====================
+
+# Debug endpoint
 @app.get("/debug")
 def debug_info():
     """Debug endpoint to check system status"""
@@ -709,6 +524,7 @@ def debug_info():
         "chunk_upload_dir": os.path.exists(CHUNK_UPLOAD_DIR)
     }
 
+# Status endpoint
 @app.get("/status")
 def system_status():
     """System status endpoint"""
@@ -742,4 +558,6 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     print(f"🚀 Starting server on port {port}")
     print(f"📁 Chunk upload directory: {CHUNK_UPLOAD_DIR}")
+    print(f"🔗 Database ready: {database_ready}")
+    print(f"📋 Routes ready: {routes_ready}")
     uvicorn.run(app, host="0.0.0.0", port=port)
