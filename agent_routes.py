@@ -215,11 +215,8 @@ async def login_agent(
     db: Session = Depends(get_db)
 ):
     """Agent login - check both password formats for compatibility"""
-    print(f"🔑 Login attempt for agent: {agent_id}")
-    
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
     if not agent:
-        print(f"❌ Agent {agent_id} not found")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Check password - try direct password first, then hashed
@@ -230,11 +227,9 @@ async def login_agent(
         password_valid = True
     
     if not password_valid:
-        print(f"❌ Invalid password for agent {agent_id}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     if agent.status != "active":
-        print(f"❌ Agent {agent_id} is not active")
         raise HTTPException(status_code=403, detail="Agent account is not active")
     
     try:
@@ -260,8 +255,6 @@ async def login_agent(
         db.add(new_session)
         db.commit()
         
-        print(f"✅ Agent {agent_id} logged in successfully")
-        
         return {
             "message": "Login successful", 
             "agent_id": agent.agent_id, 
@@ -281,8 +274,6 @@ async def login_agent(
 @router.post("/api/agents/{agent_id}/logout")
 async def logout_agent(agent_id: str, db: Session = Depends(get_db)):
     """Handle agent logout and update session"""
-    print(f"👋 Logout request for agent: {agent_id}")
-    
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -380,17 +371,14 @@ async def get_session_report(
         print(f"Session report error: {e}")
         return []
 
-# ===== ENHANCED TASK ENDPOINTS - FIXED FOR SUBMIT & NEXT =====
+# ===== NEW COMPATIBLE TASK ENDPOINTS =====
 
 @router.get("/api/agents/{agent_id}/current-task")
 def get_current_task(agent_id: str, db: Session = Depends(get_db)):
-    """Get current task for an agent - ENHANCED VERSION"""
-    print(f"🔄 Getting current task for agent: {agent_id}")
-    
+    """Get current task for an agent - NEW SYSTEM"""
     # Verify agent exists
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
     if not agent:
-        print(f"❌ Agent {agent_id} not found")
         raise HTTPException(status_code=404, detail="Agent not found")
     
     # Find next pending or in-progress task
@@ -407,8 +395,6 @@ def get_current_task(agent_id: str, db: Session = Depends(get_db)):
             TaskProgress.status == 'completed'
         ).count()
         
-        print(f"✅ All tasks completed for agent {agent_id}: {completed_tasks}/{total_tasks}")
-        
         return {
             "completed": True,
             "message": "All tasks completed",
@@ -421,7 +407,6 @@ def get_current_task(agent_id: str, db: Session = Depends(get_db)):
         next_task.status = 'in_progress'
         next_task.started_at = datetime.utcnow()
         db.commit()
-        print(f"📋 Marked task {next_task.id} as in_progress")
     
     # Get task statistics
     total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).count()
@@ -431,28 +416,20 @@ def get_current_task(agent_id: str, db: Session = Depends(get_db)):
     ).count()
     current_index = completed_tasks  # Current task index
     
-    print(f"📊 Task stats for agent {agent_id}: {completed_tasks}/{total_tasks} completed")
-    
-    # Ensure image path starts with /
-    image_path = next_task.image_path
-    if not image_path.startswith('/'):
-        image_path = '/' + image_path
-    
     return {
         "task": {
             "id": next_task.id,
             "agent_id": next_task.agent_id,
-            "image_path": image_path,
+            "image_path": next_task.image_path,
             "image_filename": next_task.image_filename,
             "status": next_task.status,
             "assigned_at": next_task.assigned_at.isoformat()
         },
-        "image_url": image_path,
+        "image_url": next_task.image_path,
         "image_name": next_task.image_filename,
         "current_index": current_index,
         "total_images": total_tasks,
-        "progress": f"{current_index + 1}/{total_tasks}",
-        "next_available": True  # Indicates there are more tasks
+        "progress": f"{current_index + 1}/{total_tasks}"
     }
 
 @router.get("/api/agents/{agent_id}/tasks")
@@ -484,21 +461,16 @@ def get_agent_tasks(agent_id: str, db: Session = Depends(get_db)):
     
     return task_list
 
-# ===== FIXED SUBMIT ENDPOINTS =====
-
 @router.post("/api/agents/{agent_id}/submit")
 async def submit_task_data(
     agent_id: str,
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """Submit task data - FIXED VERSION with proper form parsing and next task logic"""
-    print(f"🔄 Processing submission for agent: {agent_id}")
-    
+    """Submit task data - NEW SYSTEM compatible with form data"""
     # Verify agent exists
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
     if not agent:
-        print(f"❌ Agent {agent_id} not found")
         raise HTTPException(status_code=404, detail="Agent not found")
     
     # Get the current in-progress task for this agent
@@ -515,172 +487,68 @@ async def submit_task_data(
         ).order_by(TaskProgress.assigned_at).first()
     
     if not current_task:
-        print(f"❌ No active task found for agent {agent_id}")
         raise HTTPException(status_code=404, detail="No active task found for submission")
     
-    # FIXED: Parse form data properly
+    # Get form data from request
     try:
-        # Handle both JSON and form data
-        content_type = request.headers.get("content-type", "")
-        if "application/json" in content_type:
+        if request.headers.get("content-type", "").startswith("application/json"):
             form_data = await request.json()
         else:
-            # Parse form data (multipart/form-data or application/x-www-form-urlencoded)
             form_data_raw = await request.form()
-            form_data = {}
-            for key, value in form_data_raw.items():
-                if key not in ['agent_id', 'task_id']:  # Skip metadata
-                    form_data[key] = str(value)  # Convert to string for consistency
-        
-        print(f"📝 Parsed form data: {len(form_data)} fields")
-        
+            form_data = dict(form_data_raw)
+            # Remove agent_id and task_id from form data
+            form_data.pop('agent_id', None)
+            form_data.pop('task_id', None)
     except Exception as e:
-        print(f"❌ Error parsing form data: {e}")
+        print(f"Error parsing form data: {e}")
         form_data = {}
     
-    # Validate that we have some data
-    if not form_data:
-        print(f"❌ No form data received for agent {agent_id}")
-        raise HTTPException(status_code=400, detail="No form data received")
+    # Create submitted form record
+    submission = SubmittedForm(
+        agent_id=agent_id,
+        task_id=current_task.id,
+        image_filename=current_task.image_filename,
+        form_data=form_data,  # Store as JSON object
+        submitted_at=datetime.utcnow()
+    )
+    db.add(submission)
     
-    try:
-        # Create submitted form record
-        submission = SubmittedForm(
-            agent_id=agent_id,
-            task_id=current_task.id,
-            image_filename=current_task.image_filename,
-            form_data=form_data,  # Store as JSON object
-            submitted_at=datetime.utcnow()
-        )
-        db.add(submission)
-        
-        # Mark current task as completed
-        current_task.status = 'completed'
-        current_task.completed_at = datetime.utcnow()
-        
-        # Commit the changes
-        db.commit()
-        
-        print(f"✅ Task {current_task.id} completed successfully by agent {agent_id}")
-        
-        return {
-            "message": "Task submitted successfully", 
-            "success": True,
-            "status": "success",
-            "submission_id": submission.id,
-            "task_id": current_task.id,
-            "completed_task": current_task.image_filename
-        }
-        
-    except Exception as e:
-        print(f"❌ Database error during submission: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Submission failed: {str(e)}")
-
-# ADD these additional endpoints that the frontend is trying to call:
-
-@router.post("/api/submit")
-async def submit_generic(request: Request, db: Session = Depends(get_db)):
-    """Generic submit endpoint - routes to agent-specific submit"""
-    try:
-        # Parse form data to get agent_id
-        form_data = await request.form()
-        agent_id = form_data.get('agent_id')
-        
-        if not agent_id:
-            raise HTTPException(status_code=400, detail="Agent ID required")
-        
-        # Create new request object and call the main submit function
-        return await submit_task_data(agent_id, request, db)
-        
-    except Exception as e:
-        print(f"❌ Generic submit error: {e}")
-        raise HTTPException(status_code=500, detail=f"Submit failed: {str(e)}")
-
-@router.post("/api/agents/submit")
-async def submit_agents_generic(request: Request, db: Session = Depends(get_db)):
-    """Generic agents submit endpoint"""
-    try:
-        # Parse form data to get agent_id
-        form_data = await request.form()
-        agent_id = form_data.get('agent_id')
-        
-        if not agent_id:
-            raise HTTPException(status_code=400, detail="Agent ID required")
-        
-        return await submit_task_data(agent_id, request, db)
-        
-    except Exception as e:
-        print(f"❌ Agents submit error: {e}")
-        raise HTTPException(status_code=500, detail=f"Submit failed: {str(e)}")
-
-@router.post("/api/agents/tasks/{task_id}/submit")
-async def submit_by_task_id(task_id: int, request: Request, db: Session = Depends(get_db)):
-    """Submit by task ID"""
-    try:
-        # Find the task and get agent_id
-        task = db.query(TaskProgress).filter(TaskProgress.id == task_id).first()
-        if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
-        
-        return await submit_task_data(task.agent_id, request, db)
-        
-    except Exception as e:
-        print(f"❌ Task submit error: {e}")
-        raise HTTPException(status_code=500, detail=f"Submit failed: {str(e)}")
-
-# ENHANCE the existing current task endpoint to handle "next" functionality:
-@router.get("/api/agents/{agent_id}/tasks/next")
-def get_next_task(agent_id: str, db: Session = Depends(get_db)):
-    """Get next available task for agent - same as current task"""
-    return get_current_task(agent_id, db)
-
-@router.get("/api/tasks/current/{agent_id}")
-def get_current_task_alt(agent_id: str, db: Session = Depends(get_db)):
-    """Alternative endpoint for getting current task"""
-    return get_current_task(agent_id, db)
-
-@router.get("/api/tasks/next/{agent_id}")
-def get_next_task_alt(agent_id: str, db: Session = Depends(get_db)):
-    """Alternative endpoint for getting next task"""
-    return get_current_task(agent_id, db)
+    # Mark task as completed
+    current_task.status = 'completed'
+    current_task.completed_at = datetime.utcnow()
+    
+    db.commit()
+    
+    return {
+        "message": "Task submitted successfully", 
+        "success": True,
+        "submission_id": submission.id,
+        "task_id": current_task.id
+    }
 
 # ===== ADMIN ROUTES =====
 
 @router.get("/api/admin/statistics")
 def get_admin_statistics(db: Session = Depends(get_db)):
     """Get system statistics for admin dashboard"""
-    try:
-        total_agents = db.query(Agent).count()
-        active_agents = db.query(Agent).filter(Agent.status == "active").count()
-        total_submissions = db.query(SubmittedForm).count()
-        
-        # Get task statistics from TaskProgress table
-        total_tasks = db.query(TaskProgress).count()
-        completed_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'completed').count()
-        pending_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'pending').count()
-        in_progress_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'in_progress').count()
-        
-        return {
-            "total_agents": total_agents,
-            "active_agents": active_agents,
-            "total_tasks": total_tasks,
-            "completed_tasks": completed_tasks,
-            "pending_tasks": pending_tasks,
-            "in_progress_tasks": in_progress_tasks,
-            "total_submissions": total_submissions
-        }
-    except Exception as e:
-        print(f"❌ Error getting statistics: {e}")
-        return {
-            "total_agents": 0,
-            "active_agents": 0,
-            "total_tasks": 0,
-            "completed_tasks": 0,
-            "pending_tasks": 0,
-            "in_progress_tasks": 0,
-            "total_submissions": 0
-        }
+    total_agents = db.query(Agent).count()
+    active_agents = db.query(Agent).filter(Agent.status == "active").count()
+    total_submissions = db.query(SubmittedForm).count()
+    
+    # Get task statistics from TaskProgress table
+    total_tasks = db.query(TaskProgress).count()
+    completed_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'completed').count()
+    pending_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'pending').count()
+    in_progress_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'in_progress').count()
+    
+    return {
+        "total_agents": total_agents,
+        "active_agents": active_agents,
+        "total_tasks": total_tasks,
+        "completed_tasks": completed_tasks,
+        "pending_tasks": pending_tasks,
+        "in_progress_tasks": in_progress_tasks
+    }
 
 @router.get("/api/admin/export-excel")
 def export_to_excel(
@@ -850,13 +718,10 @@ async def preview_data(
         result = []
         for submission in submissions:
             # Handle both JSON and string format
-            try:
-                if isinstance(submission.form_data, str):
-                    form_data = json.loads(submission.form_data)
-                else:
-                    form_data = submission.form_data
-            except (json.JSONDecodeError, TypeError):
-                form_data = {}
+            if isinstance(submission.form_data, str):
+                form_data = json.loads(submission.form_data)
+            else:
+                form_data = submission.form_data
                 
             result.append({
                 "id": submission.id,
@@ -916,49 +781,3 @@ async def export_sessions(
     except Exception as e:
         print(f"❌ Error in session export: {e}")
         raise HTTPException(status_code=500, detail=f"Session export failed: {str(e)}")
-
-# ===== ADDITIONAL MISSING ENDPOINTS =====
-
-@router.get("/api/agents/{agent_id}/statistics")
-async def get_agent_statistics(agent_id: str, db: Session = Depends(get_db)):
-    """Get statistics for a specific agent"""
-    try:
-        # Verify agent exists
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        # Count tasks by status
-        total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).count()
-        completed_tasks = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id,
-            TaskProgress.status == 'completed'
-        ).count()
-        pending_tasks = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id,
-            TaskProgress.status == 'pending'
-        ).count()
-        in_progress_tasks = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id,
-            TaskProgress.status == 'in_progress'
-        ).count()
-        
-        return {
-            "total_tasks": total_tasks,
-            "completed_tasks": completed_tasks,
-            "pending_tasks": pending_tasks,
-            "in_progress_tasks": in_progress_tasks,
-            "completion_rate": (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error getting statistics for {agent_id}: {e}")
-        return {
-            "total_tasks": 0,
-            "completed_tasks": 0,
-            "pending_tasks": 0,
-            "in_progress_tasks": 0,
-            "completion_rate": 0
-        }
