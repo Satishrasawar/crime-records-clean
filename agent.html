@@ -611,7 +611,7 @@
             </div>
         </div>
 
-        <!-- Task Section -->
+        <!-- Task Section (same as before) -->
         <div id="taskSection" class="task-section hidden">
             <div class="progress-info">
                 <div>
@@ -833,9 +833,9 @@
         let totalTasks = 0;
         let isSubmitting = false; // Prevent double submissions
 
-        // Global configuration object - Updated to use relative URLs
+        // Global configuration object for international deployment
         const CONFIG = {
-            API_BASE_URL: '', // Use relative URLs instead of hardcoded Railway URL
+            API_BASE_URL: 'https://web-production-b3ef2.up.railway.app', // ⚠️ UPDATE THIS TO YOUR RAILWAY URL
             LANGUAGE: 'en',
             DATE_FORMAT: 'DD/MM/YYYY',
             TIME_FORMAT: '24h',
@@ -1015,7 +1015,7 @@
             }
         });
 
-        // IMPROVED Submit function with comprehensive error handling and logging
+        // FIXED Submit and Next function
         async function submitAndNext() {
             console.log('🚀 submitAndNext called');
             
@@ -1062,139 +1062,61 @@
             // Set submitting flag
             isSubmitting = true;
             
-            // Create FormData
-            const formData = new FormData(form);
-            formData.append('agent_id', currentAgentId);
-            
-            // Add current task ID if available
-            if (currentTaskId) {
-                formData.append('task_id', currentTaskId);
-                console.log('📋 Added task_id:', currentTaskId);
-            }
-            
-            // Log form data being sent (for debugging)
-            console.log('📤 Form data being submitted:');
-            let dataCount = 0;
-            for (let [key, value] of formData.entries()) {
-                if (value && value.toString().trim() !== '') {
-                    console.log(`  ${key}: ${value}`);
-                    dataCount++;
-                }
-            }
-            console.log(`📊 Total data fields: ${dataCount}`);
-            
-            // Show loading state
+            // Show loading state immediately
             const submitBtn = document.getElementById('submitBtn');
             const originalText = submitBtn.textContent;
             submitBtn.textContent = 'Submitting...';
             submitBtn.disabled = true;
+            showLoadingSpinner(true);
             
             try {
                 console.log('📤 Starting submission process...');
                 
-                // Try multiple endpoints for better compatibility
-                const endpoints = [
-                    `/api/agents/${currentAgentId}/submit`,
-                    '/api/submit',
-                    `/api/agents/submit`,
-                    currentTaskId ? `/api/agents/tasks/${currentTaskId}/submit` : null
-                ].filter(Boolean);
+                // Create FormData
+                const formData = new FormData(form);
+                formData.append('agent_id', currentAgentId);
                 
-                let response = null;
-                let data = null;
-                let lastError = null;
+                // Add current task ID if available
+                if (currentTaskId) {
+                    formData.append('task_id', currentTaskId);
+                    console.log('📋 Added task_id:', currentTaskId);
+                }
                 
-                for (let i = 0; i < endpoints.length; i++) {
-                    const endpoint = endpoints[i];
-                    const submitUrl = getApiUrl(endpoint);
-                    
-                    try {
-                        console.log(`🔄 Trying endpoint ${i + 1}/${endpoints.length}: ${endpoint}`);
-                        
-                        response = await fetch(submitUrl, {
-                            method: 'POST',
-                            body: formData
-                        });
-                        
-                        console.log(`📡 Response status: ${response.status} for ${endpoint}`);
-                        
-                        // Try to parse response
-                        const responseText = await response.text();
-                        console.log(`📥 Raw response: ${responseText.substring(0, 200)}...`);
-                        
-                        try {
-                            data = JSON.parse(responseText);
-                        } catch (parseError) {
-                            console.log('⚠️ JSON parse failed, treating as plain text');
-                            data = { message: responseText, raw: true };
-                        }
-                        
-                        console.log(`📥 Parsed response:`, data);
-                        
-                        // If we got a successful response, break out of the loop
-                        if (response.ok) {
-                            console.log(`✅ Success with endpoint: ${endpoint}`);
-                            break;
-                        } else {
-                            lastError = data.detail || data.message || data.error || `HTTP ${response.status}`;
-                            console.log(`❌ Failed with ${endpoint}: ${lastError}`);
-                        }
-                        
-                    } catch (fetchError) {
-                        console.log(`❌ Network error with ${endpoint}:`, fetchError.message);
-                        lastError = fetchError.message;
-                        continue;
+                // Log form data being sent (for debugging)
+                console.log('📤 Form data being submitted:');
+                let dataCount = 0;
+                for (let [key, value] of formData.entries()) {
+                    if (value && value.toString().trim() !== '') {
+                        console.log(`  ${key}: ${value}`);
+                        dataCount++;
                     }
                 }
+                console.log(`📊 Total data fields: ${dataCount}`);
                 
-                // Check if any endpoint succeeded
-                if (!response || !response.ok) {
-                    throw new Error(lastError || 'All submit endpoints failed');
-                }
+                // Submit the form
+                const success = await submitFormData(formData);
                 
-                // Check for success in response
-                const isSuccess = response.ok && (
-                    data.success === true ||
-                    data.status === 'success' ||
-                    (data.message && (
-                        data.message.toLowerCase().includes('success') ||
-                        data.message.toLowerCase().includes('submitted') ||
-                        data.message.toLowerCase().includes('saved') ||
-                        data.message.toLowerCase().includes('complete')
-                    )) ||
-                    data.raw === true // For plain text responses
-                );
-                
-                if (isSuccess) {
+                if (success) {
                     console.log('✅ Submission successful!');
                     showAlert(CONFIG.MESSAGES.TASK_SUBMITTED, 'success');
                     
-                    // Clear form
-                    form.reset();
+                    // Clear form but keep task ID
+                    clearFormButKeepTaskId();
                     
-                    // Keep task ID if available
-                    if (currentTaskId) {
-                        document.getElementById('currentTaskId').value = currentTaskId;
-                    }
-                    
-                    // Show loading spinner and load next task
-                    showLoadingSpinner(true);
+                    // Wait a moment then load next task
                     setTimeout(async () => {
                         try {
-                            await loadCurrentTask();
+                            await loadNextTask();
                             console.log('✅ Next task loaded');
                         } catch (error) {
                             console.error('❌ Error loading next task:', error);
                             showAlert('Error loading next task: ' + error.message, 'error');
-                        } finally {
-                            showLoadingSpinner(false);
                         }
-                    }, 800);
+                    }, 1000);
                     
                 } else {
-                    console.log('❌ Submission failed - no success indicator found');
-                    const errorMsg = data.detail || data.message || data.error || 'Unknown error occurred';
-                    showAlert('Submission failed: ' + errorMsg, 'error');
+                    console.log('❌ Submission failed');
+                    showAlert('Submission failed. Please try again.', 'error');
                 }
                 
             } catch (error) {
@@ -1205,39 +1127,114 @@
                 submitBtn.textContent = originalText;
                 submitBtn.disabled = false;
                 isSubmitting = false;
+                showLoadingSpinner(false);
                 console.log('🔄 Submit process completed');
             }
         }
 
-        // Enhanced task loading function to work with chunked upload system
-        async function loadCurrentTask() {
+        // Separate function to handle the actual form submission
+        async function submitFormData(formData) {
+            // Try multiple endpoints for better compatibility
+            const endpoints = [
+                `/api/agents/${currentAgentId}/submit`,
+                '/api/submit',
+                `/api/agents/submit`,
+                currentTaskId ? `/api/agents/tasks/${currentTaskId}/submit` : null
+            ].filter(Boolean);
+            
+            let lastError = null;
+            
+            for (let i = 0; i < endpoints.length; i++) {
+                const endpoint = endpoints[i];
+                const submitUrl = getApiUrl(endpoint);
+                
+                try {
+                    console.log(`🔄 Trying endpoint ${i + 1}/${endpoints.length}: ${endpoint}`);
+                    
+                    const response = await fetch(submitUrl, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    console.log(`📡 Response status: ${response.status} for ${endpoint}`);
+                    
+                    // Try to parse response
+                    const responseText = await response.text();
+                    console.log(`📥 Raw response: ${responseText.substring(0, 200)}...`);
+                    
+                    let data;
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseError) {
+                        console.log('⚠️ JSON parse failed, treating as plain text');
+                        data = { message: responseText, raw: true };
+                    }
+                    
+                    console.log(`📥 Parsed response:`, data);
+                    
+                    // If we got a successful response, return true
+                    if (response.ok) {
+                        console.log(`✅ Success with endpoint: ${endpoint}`);
+                        return true;
+                    } else {
+                        lastError = data.detail || data.message || data.error || `HTTP ${response.status}`;
+                        console.log(`❌ Failed with ${endpoint}: ${lastError}`);
+                    }
+                    
+                } catch (fetchError) {
+                    console.log(`❌ Network error with ${endpoint}:`, fetchError.message);
+                    lastError = fetchError.message;
+                    continue;
+                }
+            }
+            
+            // If we get here, all endpoints failed
+            throw new Error(lastError || 'All submit endpoints failed');
+        }
+
+        // Function to clear form but keep task ID
+        function clearFormButKeepTaskId() {
+            const form = document.getElementById('taskForm');
+            const taskId = currentTaskId;
+            form.reset();
+            if (taskId) {
+                document.getElementById('currentTaskId').value = taskId;
+            }
+        }
+
+        // Enhanced function to load next task
+        async function loadNextTask() {
             if (!currentAgentId) {
                 console.log('❌ No agent ID for loading task');
                 return;
             }
             
             try {
-                console.log('📋 Loading current task for agent:', currentAgentId);
+                console.log('📋 Loading next task for agent:', currentAgentId);
+                showLoadingSpinner(true);
                 
-                // Try multiple endpoints to find tasks
+                // Try multiple endpoints to find next task
                 const endpoints = [
+                    `/api/agents/${currentAgentId}/tasks/next`,
                     `/api/agents/${currentAgentId}/tasks/current`,
                     `/api/agents/${currentAgentId}/current-task`,
                     `/api/agents/${currentAgentId}/tasks`,
+                    `/api/tasks/next/${currentAgentId}`,
                     `/api/tasks/current/${currentAgentId}`
                 ];
                 
-                let response = null;
                 let result = null;
+                let success = false;
                 
                 for (const endpoint of endpoints) {
                     try {
                         console.log(`🔄 Trying task endpoint: ${endpoint}`);
-                        response = await fetch(getApiUrl(endpoint));
+                        const response = await fetch(getApiUrl(endpoint));
                         
                         if (response.ok) {
                             result = await response.json();
                             console.log(`✅ Success with ${endpoint}:`, result);
+                            success = true;
                             break;
                         } else {
                             console.log(`❌ Failed ${endpoint}: ${response.status}`);
@@ -1248,114 +1245,140 @@
                     }
                 }
                 
-                if (!response || !response.ok || !result) {
+                if (!success || !result) {
                     throw new Error('All task loading endpoints failed');
                 }
                 
                 console.log('📊 Task data received:', result);
                 
-                // Handle different response formats
-                if (Array.isArray(result)) {
-                    // If we got an array of tasks, find the first pending one
-                    const pendingTask = result.find(task => 
-                        task.status === 'pending' || 
-                        task.status === 'in_progress' || 
-                        task.status === 'assigned'
-                    );
-                    
-                    if (pendingTask) {
-                        result = {
-                            task: pendingTask,
-                            image_url: pendingTask.image_path || pendingTask.image_url,
-                            image_name: pendingTask.image_filename || pendingTask.filename,
-                            current_index: result.findIndex(t => t.id === pendingTask.id),
-                            total_images: result.length
-                        };
-                    } else {
-                        // All tasks completed
-                        result = { 
-                            completed: true, 
-                            total_completed: result.filter(t => t.status === 'completed').length 
-                        };
-                    }
-                } else if (result.task) {
-                    // New format with task object
-                    currentTaskId = result.task.id;
-                } else if (result.id) {
-                    // Direct task object
-                    currentTaskId = result.id;
-                    result = {
-                        task: result,
-                        image_url: result.image_path || result.image_url,
-                        image_name: result.image_filename || result.filename
-                    };
-                }
+                // Process the response and load the task
+                await processTaskResponse(result);
+                
+            } catch (error) {
+                console.error('❌ Failed to load next task:', error);
+                showAlert('Failed to load next task: ' + error.message, 'error');
                 
                 // Check if all tasks are completed
-                if (result.completed || result.message === 'All tasks completed' || 
-                    (result.task && result.task.status === 'completed' && !result.next_available)) {
-                    
-                    console.log('✅ All tasks completed');
-                    document.getElementById('totalCompleted').textContent = result.total_completed || 'All';
-                    showCompletedSection();
-                    
-                } else if (result.image_url || (result.task && (result.task.image_path || result.task.image_url))) {
-                    // Load the task
-                    const imageUrl = result.image_url || result.task.image_path || result.task.image_url;
-                    const fullImageUrl = imageUrl.startsWith('http') ? imageUrl : `${CONFIG.API_BASE_URL}${imageUrl}`;
-                    
-                    console.log('🖼️ Loading image:', fullImageUrl);
-                    
-                    const taskImage = document.getElementById('taskImage');
-                    taskImage.src = fullImageUrl;
-                    
-                    // Handle image load errors
-                    taskImage.onerror = function() {
-                        console.error('❌ Failed to load image:', fullImageUrl);
-                        this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkltYWdlIG5vdCBmb3VuZDwvdGV4dD48L3N2Zz4=';
-                        showAlert('Image could not be loaded. Please contact admin.', 'error');
-                    };
-                    
-                    taskImage.onload = function() {
-                        console.log('✅ Image loaded successfully');
-                    };
-                    
-                    document.getElementById('imageName').textContent = 
-                        result.image_name || 
-                        result.task?.image_filename || 
-                        result.task?.filename || 
-                        'Task Image';
-                    
-                    // Update task ID for form submission
-                    if (result.task?.id) {
-                        currentTaskId = result.task.id;
-                        document.getElementById('currentTaskId').value = currentTaskId;
-                        console.log('📋 Set current task ID to:', currentTaskId);
-                    }
-                    
-                    // Update progress
-                    currentTaskIndex = result.current_index || 0;
-                    totalTasks = result.total_images || 0;
-                    const progressText = result.progress || `${currentTaskIndex + 1}/${totalTasks}`;
-                    document.getElementById('progressInfo').textContent = `Progress: ${progressText}`;
-                    
-                    console.log('✅ Task loaded successfully');
-                    
-                } else {
-                    console.log('❌ No tasks available or invalid response format');
-                    showAlert('No tasks available. Please contact your administrator.', 'error');
-                    setTimeout(() => {
-                        showCompletedSection();
-                    }, 2000);
-                }
-            } catch (error) {
-                console.error('❌ Failed to load task:', error);
-                showAlert('Failed to load task: ' + error.message, 'error');
+                setTimeout(() => {
+                    checkIfCompleted();
+                }, 2000);
+            } finally {
+                showLoadingSpinner(false);
             }
         }
 
+        // Process task response and load task data
+        async function processTaskResponse(result) {
+            // Handle different response formats
+            if (Array.isArray(result)) {
+                // If we got an array of tasks, find the first pending one
+                const pendingTask = result.find(task => 
+                    task.status === 'pending' || 
+                    task.status === 'in_progress' || 
+                    task.status === 'assigned'
+                );
+                
+                if (pendingTask) {
+                    result = {
+                        task: pendingTask,
+                        image_url: pendingTask.image_path || pendingTask.image_url,
+                        image_name: pendingTask.image_filename || pendingTask.filename,
+                        current_index: result.findIndex(t => t.id === pendingTask.id),
+                        total_images: result.length
+                    };
+                } else {
+                    // All tasks completed
+                    showCompletedSection();
+                    return;
+                }
+            } else if (result.task) {
+                // New format with task object
+                currentTaskId = result.task.id;
+            } else if (result.id) {
+                // Direct task object
+                currentTaskId = result.id;
+                result = {
+                    task: result,
+                    image_url: result.image_path || result.image_url,
+                    image_name: result.image_filename || result.filename
+                };
+            }
+            
+            // Check if all tasks are completed
+            if (result.completed || result.message === 'All tasks completed' || 
+                (result.task && result.task.status === 'completed' && !result.next_available)) {
+                
+                console.log('✅ All tasks completed');
+                document.getElementById('totalCompleted').textContent = result.total_completed || 'All';
+                showCompletedSection();
+                return;
+            }
+            
+            // Load the task image and data
+            if (result.image_url || (result.task && (result.task.image_path || result.task.image_url))) {
+                const imageUrl = result.image_url || result.task.image_path || result.task.image_url;
+                const fullImageUrl = imageUrl.startsWith('http') ? imageUrl : `${CONFIG.API_BASE_URL}${imageUrl}`;
+                
+                console.log('🖼️ Loading image:', fullImageUrl);
+                
+                const taskImage = document.getElementById('taskImage');
+                taskImage.src = fullImageUrl;
+                
+                // Handle image load errors
+                taskImage.onerror = function() {
+                    console.error('❌ Failed to load image:', fullImageUrl);
+                    this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkltYWdlIG5vdCBmb3VuZDwvdGV4dD48L3N2Zz4=';
+                    showAlert('Image could not be loaded. Please contact admin.', 'error');
+                };
+                
+                taskImage.onload = function() {
+                    console.log('✅ Image loaded successfully');
+                };
+                
+                document.getElementById('imageName').textContent = 
+                    result.image_name || 
+                    result.task?.image_filename || 
+                    result.task?.filename || 
+                    'Task Image';
+                
+                // Update task ID for form submission
+                if (result.task?.id) {
+                    currentTaskId = result.task.id;
+                    document.getElementById('currentTaskId').value = currentTaskId;
+                    console.log('📋 Set current task ID to:', currentTaskId);
+                }
+                
+                // Update progress
+                currentTaskIndex = result.current_index || 0;
+                totalTasks = result.total_images || 1;
+                const progressText = result.progress || `${currentTaskIndex + 1}/${totalTasks}`;
+                document.getElementById('progressInfo').textContent = `Progress: ${progressText}`;
+                
+                console.log('✅ Task loaded successfully');
+            } else {
+                console.log('❌ No image URL found in response');
+                showAlert('No image found for this task. Please contact admin.', 'error');
+            }
+        }
+
+        // Function to check if all tasks are completed
+        function checkIfCompleted() {
+            console.log('🔄 Checking if all tasks completed...');
+            // This could make an API call to check status
+            // For now, show completed section as fallback
+            showCompletedSection();
+        }
+
+        // Enhanced task loading function (keeping original name for compatibility)
+        async function loadCurrentTask() {
+            return await loadNextTask();
+        }
+
         function showLoadingSpinner(show) {
-            document.getElementById('loadingSpinner').style.display = show ? 'block' : 'none';
+            const spinner = document.getElementById('loadingSpinner');
+            if (spinner) {
+                spinner.style.display = show ? 'block' : 'none';
+            }
         }
 
         function showTaskSection() {
@@ -1414,11 +1437,20 @@
         async function checkForNewTasks() {
             console.log('🔄 Checking for new tasks...');
             showLoadingSpinner(true);
-            await loadCurrentTask();
-            showLoadingSpinner(false);
             
-            if (currentAgentId && currentTaskId) {
-                showTaskSection();
+            try {
+                await loadNextTask();
+                
+                if (currentAgentId && currentTaskId) {
+                    showTaskSection();
+                } else {
+                    showAlert('No new tasks available', 'info');
+                }
+            } catch (error) {
+                console.error('❌ Error checking for new tasks:', error);
+                showAlert('Error checking for tasks: ' + error.message, 'error');
+            } finally {
+                showLoadingSpinner(false);
             }
         }
 
@@ -1494,7 +1526,7 @@
 
         // Add debug logging for task loading
         console.log('🚀 Agent panel initialized');
-        console.log('🔗 Using relative URLs for API calls');
+        console.log('🔗 API Base URL:', CONFIG.API_BASE_URL);
         console.log('💡 Debug tip: Press Ctrl+Shift+D to see debug info, or type debugSubmit() in console');
     </script>
 </body>
