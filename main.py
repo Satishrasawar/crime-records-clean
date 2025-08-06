@@ -301,31 +301,231 @@ def root():
 
 # ===================== DOMAIN-AWARE STATIC FILE SERVING =====================
 
+# Replace the existing static file serving section with this:
+
+# ===================== STATIC FILE SERVING FIX =====================
+
+# Create directories and mount static files
+try:
+    os.makedirs("static/task_images", exist_ok=True)
+    # Mount static files BEFORE defining routes to avoid conflicts
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    print("✅ Static files configured")
+except Exception as e:
+    print(f"❌ Static files setup failed: {e}")
+
+# ===================== ENHANCED STATIC FILE SERVING =====================
+
+@app.get("/admin")
+async def serve_admin_panel_redirect():
+    """Redirect /admin to /admin.html"""
+    return FileResponse("admin.html") if os.path.exists("admin.html") else JSONResponse({"error": "Admin panel not found"}, status_code=404)
+
 @app.get("/admin.html")
 async def serve_admin_panel():
-    """Serve admin dashboard with domain detection"""
+    """Serve admin dashboard"""
     try:
         if os.path.exists("admin.html"):
             return FileResponse("admin.html", headers={
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Pragma": "no-cache",
-                "Expires": "0"
+                "Expires": "0",
+                "Content-Type": "text/html"
             })
-        return JSONResponse({"error": "Admin panel not found"}, status_code=404)
+        # If admin.html doesn't exist, create a basic one
+        basic_admin_html = """<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Panel - Agent Task System</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .status { background: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #28a745; }
+        .api-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 30px; }
+        .api-link { background: #f8f9fa; padding: 20px; border-radius: 5px; border-left: 4px solid #007bff; }
+        .api-link h3 { margin: 0 0 10px 0; color: #007bff; }
+        .api-link a { color: #007bff; text-decoration: none; font-family: monospace; }
+        .api-link a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Agent Task System - Admin Panel</h1>
+        
+        <div class="status">
+            <strong>✅ System Status:</strong> Online and Ready<br>
+            <strong>🌍 Platform:</strong> Railway<br>
+            <strong>⏰ Last Updated:</strong> <span id="timestamp"></span>
+        </div>
+
+        <div class="api-links">
+            <div class="api-link">
+                <h3>📊 System Health</h3>
+                <a href="/health" target="_blank">/health</a>
+                <p>Check system health and database status</p>
+            </div>
+            
+            <div class="api-link">
+                <h3>👥 Agents Management</h3>
+                <a href="/api/agents" target="_blank">/api/agents</a>
+                <p>View all registered agents and their statistics</p>
+            </div>
+            
+            <div class="api-link">
+                <h3>📈 Statistics</h3>
+                <a href="/api/admin/statistics" target="_blank">/api/admin/statistics</a>
+                <p>Get overall system statistics</p>
+            </div>
+            
+            <div class="api-link">
+                <h3>🔧 Debug Info</h3>
+                <a href="/debug" target="_blank">/debug</a>
+                <p>System debug information</p>
+            </div>
+            
+            <div class="api-link">
+                <h3>📤 Upload Sessions</h3>
+                <a href="/api/admin/upload-sessions" target="_blank">/api/admin/upload-sessions</a>
+                <p>View active file upload sessions</p>
+            </div>
+            
+            <div class="api-link">
+                <h3>📋 Preview Data</h3>
+                <a href="/api/admin/preview-data" target="_blank">/api/admin/preview-data</a>
+                <p>Preview submitted form data</p>
+            </div>
+        </div>
+
+        <div style="margin-top: 40px; padding: 20px; background: #e9ecef; border-radius: 5px;">
+            <h3>🚀 Agent Registration</h3>
+            <p>Register new agents via POST to: <code>/api/agents/register</code></p>
+            <p>Upload tasks via POST to: <code>/api/admin/upload-tasks</code></p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+    </script>
+</body>
+</html>"""
+        
+        # Create admin.html file if it doesn't exist
+        with open("admin.html", "w") as f:
+            f.write(basic_admin_html)
+            
+        return FileResponse("admin.html", headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "Content-Type": "text/html"
+        })
+        
     except Exception as e:
         return JSONResponse({"error": f"Could not serve admin panel: {e}"}, status_code=500)
 
+@app.get("/agent")
+async def serve_agent_panel_redirect():
+    """Redirect /agent to /agent.html"""
+    return FileResponse("agent.html") if os.path.exists("agent.html") else JSONResponse({"error": "Agent panel not found"}, status_code=404)
+
 @app.get("/agent.html") 
 async def serve_agent_panel():
-    """Serve agent interface with domain detection"""
+    """Serve agent interface"""
     try:
         if os.path.exists("agent.html"):
             return FileResponse("agent.html", headers={
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Pragma": "no-cache", 
-                "Expires": "0"
+                "Expires": "0",
+                "Content-Type": "text/html"
             })
-        return JSONResponse({"error": "Agent panel not found"}, status_code=404)
+            
+        # If agent.html doesn't exist, create a basic one
+        basic_agent_html = """<!DOCTYPE html>
+<html>
+<head>
+    <title>Agent Portal - Agent Task System</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 2px solid #28a745; padding-bottom: 10px; }
+        .login-form { background: #f8f9fa; padding: 30px; border-radius: 8px; margin: 20px 0; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        .form-group input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 16px; }
+        .form-group input:focus { border-color: #28a745; outline: none; }
+        .btn { background: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .btn:hover { background: #218838; }
+        .info-box { background: #d1ecf1; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #17a2b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Agent Portal - Task Management System</h1>
+        
+        <div class="info-box">
+            <strong>Welcome to the Agent Portal!</strong><br>
+            Enter your Agent ID and Password to access your assigned tasks.
+        </div>
+
+        <div class="login-form">
+            <h3>Agent Login</h3>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="agentId">Agent ID:</label>
+                    <input type="text" id="agentId" name="agentId" placeholder="Enter your Agent ID (e.g., AG20240101ABCD)" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                </div>
+                
+                <button type="submit" class="btn">🚀 Login & View Tasks</button>
+            </form>
+        </div>
+
+        <div style="margin-top: 30px; padding: 20px; background: #e9ecef; border-radius: 5px;">
+            <h3>📋 Quick Links</h3>
+            <p><strong>Get Current Task:</strong> <code>GET /api/agents/{agent_id}/tasks/current</code></p>
+            <p><strong>Submit Task:</strong> <code>POST /api/agents/{agent_id}/submit</code></p>
+            <p><strong>View Statistics:</strong> <code>GET /api/agents/{agent_id}/statistics</code></p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const agentId = document.getElementById('agentId').value;
+            const password = document.getElementById('password').value;
+            
+            if (agentId && password) {
+                // Redirect to current task API endpoint for now
+                window.location.href = `/api/agents/${agentId}/tasks/current`;
+            } else {
+                alert('Please enter both Agent ID and Password');
+            }
+        });
+    </script>
+</body>
+</html>"""
+        
+        # Create agent.html file if it doesn't exist
+        with open("agent.html", "w") as f:
+            f.write(basic_agent_html)
+            
+        return FileResponse("agent.html", headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "Content-Type": "text/html"
+        })
+        
     except Exception as e:
         return JSONResponse({"error": f"Could not serve agent panel: {e}"}, status_code=500)
 
@@ -1433,3 +1633,4 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
