@@ -833,9 +833,9 @@
         let totalTasks = 0;
         let isSubmitting = false; // Prevent double submissions
 
-        // Global configuration object for international deployment
+        // FIXED Global configuration object - using current domain
         const CONFIG = {
-            API_BASE_URL: '', // ⚠️ UPDATE THIS TO YOUR RAILWAY URL
+            API_BASE_URL: '', // Use current domain (agent-task-system.com)
             LANGUAGE: 'en',
             DATE_FORMAT: 'DD/MM/YYYY',
             TIME_FORMAT: '24h',
@@ -1015,7 +1015,7 @@
             }
         });
 
-        // FIXED Submit and Next function
+        // FIXED Submit and Next function - Main Fix Here
         async function submitAndNext() {
             console.log('🚀 submitAndNext called');
             
@@ -1093,10 +1093,30 @@
                 }
                 console.log(`📊 Total data fields: ${dataCount}`);
                 
-                // Submit the form
-                const success = await submitFormData(formData);
+                // FIXED: Use the correct endpoint from agent_routes.py
+                const submitUrl = `/api/agents/${currentAgentId}/submit`;
+                console.log('📤 Submitting to:', submitUrl);
                 
-                if (success) {
+                const response = await fetch(submitUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                console.log('📡 Response status:', response.status);
+                
+                let result;
+                try {
+                    const responseText = await response.text();
+                    console.log('📥 Raw response:', responseText.substring(0, 200) + '...');
+                    result = JSON.parse(responseText);
+                } catch (parseError) {
+                    console.error('❌ JSON parse error:', parseError);
+                    throw new Error('Invalid response from server');
+                }
+                
+                console.log('📥 Parsed response:', result);
+                
+                if (response.ok && result.success) {
                     console.log('✅ Submission successful!');
                     showAlert(CONFIG.MESSAGES.TASK_SUBMITTED, 'success');
                     
@@ -1115,8 +1135,8 @@
                     }, 1000);
                     
                 } else {
-                    console.log('❌ Submission failed');
-                    showAlert('Submission failed. Please try again.', 'error');
+                    console.log('❌ Submission failed:', result.detail || result.message || 'Unknown error');
+                    showAlert(result.detail || result.message || 'Submission failed. Please try again.', 'error');
                 }
                 
             } catch (error) {
@@ -1132,66 +1152,6 @@
             }
         }
 
-        // Separate function to handle the actual form submission
-        async function submitFormData(formData) {
-            // Try multiple endpoints for better compatibility
-            const endpoints = [
-                `/api/agents/${currentAgentId}/submit`,
-                '/api/submit',
-                `/api/agents/submit`,
-                currentTaskId ? `/api/agents/tasks/${currentTaskId}/submit` : null
-            ].filter(Boolean);
-            
-            let lastError = null;
-            
-            for (let i = 0; i < endpoints.length; i++) {
-                const endpoint = endpoints[i];
-                const submitUrl = getApiUrl(endpoint);
-                
-                try {
-                    console.log(`🔄 Trying endpoint ${i + 1}/${endpoints.length}: ${endpoint}`);
-                    
-                    const response = await fetch(submitUrl, {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    console.log(`📡 Response status: ${response.status} for ${endpoint}`);
-                    
-                    // Try to parse response
-                    const responseText = await response.text();
-                    console.log(`📥 Raw response: ${responseText.substring(0, 200)}...`);
-                    
-                    let data;
-                    try {
-                        data = JSON.parse(responseText);
-                    } catch (parseError) {
-                        console.log('⚠️ JSON parse failed, treating as plain text');
-                        data = { message: responseText, raw: true };
-                    }
-                    
-                    console.log(`📥 Parsed response:`, data);
-                    
-                    // If we got a successful response, return true
-                    if (response.ok) {
-                        console.log(`✅ Success with endpoint: ${endpoint}`);
-                        return true;
-                    } else {
-                        lastError = data.detail || data.message || data.error || `HTTP ${response.status}`;
-                        console.log(`❌ Failed with ${endpoint}: ${lastError}`);
-                    }
-                    
-                } catch (fetchError) {
-                    console.log(`❌ Network error with ${endpoint}:`, fetchError.message);
-                    lastError = fetchError.message;
-                    continue;
-                }
-            }
-            
-            // If we get here, all endpoints failed
-            throw new Error(lastError || 'All submit endpoints failed');
-        }
-
         // Function to clear form but keep task ID
         function clearFormButKeepTaskId() {
             const form = document.getElementById('taskForm');
@@ -1202,7 +1162,7 @@
             }
         }
 
-        // Enhanced function to load next task
+        // FIXED Enhanced function to load next task
         async function loadNextTask() {
             if (!currentAgentId) {
                 console.log('❌ No agent ID for loading task');
@@ -1213,42 +1173,18 @@
                 console.log('📋 Loading next task for agent:', currentAgentId);
                 showLoadingSpinner(true);
                 
-                // Try multiple endpoints to find next task
-                const endpoints = [
-                    `/api/agents/${currentAgentId}/tasks/next`,
-                    `/api/agents/${currentAgentId}/tasks/current`,
-                    `/api/agents/${currentAgentId}/current-task`,
-                    `/api/agents/${currentAgentId}/tasks`,
-                    `/api/tasks/next/${currentAgentId}`,
-                    `/api/tasks/current/${currentAgentId}`
-                ];
+                // FIXED: Use the correct endpoint from agent_routes.py
+                const taskUrl = `/api/agents/${currentAgentId}/current-task`;
+                console.log('📋 Fetching from:', taskUrl);
                 
-                let result = null;
-                let success = false;
+                const response = await fetch(taskUrl);
+                console.log('📡 Task response status:', response.status);
                 
-                for (const endpoint of endpoints) {
-                    try {
-                        console.log(`🔄 Trying task endpoint: ${endpoint}`);
-                        const response = await fetch(getApiUrl(endpoint));
-                        
-                        if (response.ok) {
-                            result = await response.json();
-                            console.log(`✅ Success with ${endpoint}:`, result);
-                            success = true;
-                            break;
-                        } else {
-                            console.log(`❌ Failed ${endpoint}: ${response.status}`);
-                        }
-                    } catch (err) {
-                        console.log(`❌ Network error with ${endpoint}:`, err.message);
-                        continue;
-                    }
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
                 
-                if (!success || !result) {
-                    throw new Error('All task loading endpoints failed');
-                }
-                
+                const result = await response.json();
                 console.log('📊 Task data received:', result);
                 
                 // Process the response and load the task
@@ -1267,97 +1203,64 @@
             }
         }
 
-        // Process task response and load task data
+        // FIXED Process task response and load task data
         async function processTaskResponse(result) {
-            // Handle different response formats
-            if (Array.isArray(result)) {
-                // If we got an array of tasks, find the first pending one
-                const pendingTask = result.find(task => 
-                    task.status === 'pending' || 
-                    task.status === 'in_progress' || 
-                    task.status === 'assigned'
-                );
-                
-                if (pendingTask) {
-                    result = {
-                        task: pendingTask,
-                        image_url: pendingTask.image_path || pendingTask.image_url,
-                        image_name: pendingTask.image_filename || pendingTask.filename,
-                        current_index: result.findIndex(t => t.id === pendingTask.id),
-                        total_images: result.length
-                    };
-                } else {
-                    // All tasks completed
-                    showCompletedSection();
-                    return;
-                }
-            } else if (result.task) {
-                // New format with task object
-                currentTaskId = result.task.id;
-            } else if (result.id) {
-                // Direct task object
-                currentTaskId = result.id;
-                result = {
-                    task: result,
-                    image_url: result.image_path || result.image_url,
-                    image_name: result.image_filename || result.filename
-                };
-            }
+            console.log('🔄 Processing task response:', result);
             
             // Check if all tasks are completed
-            if (result.completed || result.message === 'All tasks completed' || 
-                (result.task && result.task.status === 'completed' && !result.next_available)) {
-                
+            if (result.completed || result.message === 'All tasks completed') {
                 console.log('✅ All tasks completed');
-                document.getElementById('totalCompleted').textContent = result.total_completed || 'All';
+                document.getElementById('totalCompleted').textContent = result.total_completed || result.total_tasks || 'All';
                 showCompletedSection();
                 return;
             }
             
-            // Load the task image and data
-            if (result.image_url || (result.task && (result.task.image_path || result.task.image_url))) {
-                const imageUrl = result.image_url || result.task.image_path || result.task.image_url;
-                const fullImageUrl = imageUrl.startsWith('http') ? imageUrl : `${CONFIG.API_BASE_URL}${imageUrl}`;
+            // Handle task with proper structure
+            if (result.task) {
+                currentTaskId = result.task.id;
+                console.log('📋 Set current task ID to:', currentTaskId);
                 
-                console.log('🖼️ Loading image:', fullImageUrl);
-                
-                const taskImage = document.getElementById('taskImage');
-                taskImage.src = fullImageUrl;
-                
-                // Handle image load errors
-                taskImage.onerror = function() {
-                    console.error('❌ Failed to load image:', fullImageUrl);
-                    this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkltYWdlIG5vdCBmb3VuZDwvdGV4dD48L3N2Zz4=';
-                    showAlert('Image could not be loaded. Please contact admin.', 'error');
-                };
-                
-                taskImage.onload = function() {
-                    console.log('✅ Image loaded successfully');
-                };
-                
-                document.getElementById('imageName').textContent = 
-                    result.image_name || 
-                    result.task?.image_filename || 
-                    result.task?.filename || 
-                    'Task Image';
-                
-                // Update task ID for form submission
-                if (result.task?.id) {
-                    currentTaskId = result.task.id;
+                // Load the task image
+                if (result.image_url || result.task.image_path) {
+                    const imageUrl = result.image_url || result.task.image_path;
+                    const fullImageUrl = imageUrl.startsWith('http') ? imageUrl : imageUrl;
+                    
+                    console.log('🖼️ Loading image:', fullImageUrl);
+                    
+                    const taskImage = document.getElementById('taskImage');
+                    taskImage.src = fullImageUrl;
+                    
+                    // Handle image load errors
+                    taskImage.onerror = function() {
+                        console.error('❌ Failed to load image:', fullImageUrl);
+                        this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkltYWdlIG5vdCBmb3VuZDwvdGV4dD48L3N2Zz4=';
+                        showAlert('Image could not be loaded. Please contact admin.', 'error');
+                    };
+                    
+                    taskImage.onload = function() {
+                        console.log('✅ Image loaded successfully');
+                    };
+                    
+                    document.getElementById('imageName').textContent = 
+                        result.image_name || 
+                        result.task.image_filename || 
+                        'Task Image';
+                    
+                    // Update task ID in form
                     document.getElementById('currentTaskId').value = currentTaskId;
-                    console.log('📋 Set current task ID to:', currentTaskId);
+                    
+                    // Update progress
+                    const progressText = result.progress || `${(result.current_index || 0) + 1}/${result.total_images || 1}`;
+                    document.getElementById('progressInfo').textContent = `Progress: ${progressText}`;
+                    
+                    console.log('✅ Task loaded successfully');
+                } else {
+                    console.log('❌ No image URL found in response');
+                    showAlert('No image found for this task. Please contact admin.', 'error');
                 }
-                
-                // Update progress
-                currentTaskIndex = result.current_index || 0;
-                totalTasks = result.total_images || 1;
-                const progressText = result.progress || `${currentTaskIndex + 1}/${totalTasks}`;
-                document.getElementById('progressInfo').textContent = `Progress: ${progressText}`;
-                
-                console.log('✅ Task loaded successfully');
             } else {
-                console.log('❌ No image URL found in response');
-                showAlert('No image found for this task. Please contact admin.', 'error');
+                console.log('❌ No task found in response');
+                showAlert('No task data found. Please contact admin.', 'error');
             }
         }
 
@@ -1531,4 +1434,3 @@
     </script>
 </body>
 </html>
-
