@@ -98,6 +98,53 @@ os.makedirs(CHUNK_UPLOAD_DIR, exist_ok=True)
 # In-memory storage for upload sessions
 upload_sessions: Dict[str, Dict[str, Any]] = {}
 
+# Global variables to track system state
+database_ready = False
+routes_ready = False
+
+# Mock database classes for when database is not available
+class MockDB:
+    def query(self, *args, **kwargs):
+        return MockQuery()
+    
+    def add(self, *args, **kwargs):
+        pass
+    
+    def commit(self):
+        pass
+    
+    def rollback(self):
+        pass
+    
+    def close(self):
+        pass
+
+class MockQuery:
+    def filter(self, *args, **kwargs):
+        return self
+    
+    def order_by(self, *args, **kwargs):
+        return self
+    
+    def first(self):
+        return None
+    
+    def all(self):
+        return []
+    
+    def count(self):
+        return 0
+    
+    def limit(self, *args):
+        return self
+    
+    def join(self, *args):
+        return self
+
+def get_mock_db():
+    """Mock database dependency when database is not available"""
+    return MockDB()
+
 # Try to import and setup database
 try:
     print("📦 Importing database modules...")
@@ -114,11 +161,14 @@ try:
     logger = logging.getLogger(__name__)
     
     database_ready = True
+    db_dependency = get_db
+    
 except Exception as e:
     print(f"❌ Database setup failed: {e}")
     import traceback
     traceback.print_exc()
     database_ready = False
+    db_dependency = get_mock_db
 
 # Try to import and include agent routes
 try:
@@ -139,7 +189,7 @@ try:
 except Exception as e:
     print(f"❌ Static files setup failed: {e}")
 
-# ===================== ENHANCED HEALTH CHECK - FIXED =====================
+# ===================== ENHANCED HEALTH CHECK =====================
 @app.get("/health")
 def health_check():
     """Enhanced health check with proper database connectivity testing"""
@@ -158,8 +208,12 @@ def health_check():
     # Test database connectivity with proper session handling
     if database_ready:
         try:
-            db_gen = get_db()
-            db = next(db_gen)
+            db_gen = db_dependency()
+            if hasattr(db_gen, '__next__'):
+                db = next(db_gen)
+            else:
+                db = db_gen
+            
             try:
                 # Use proper SQLAlchemy 2.0 syntax with text()
                 result = db.execute(text("SELECT 1")).scalar()
@@ -172,7 +226,8 @@ def health_check():
                 health_status["database"] = f"query_error: {str(query_error)[:50]}"
                 health_status["status"] = "degraded"
             finally:
-                db.close()
+                if hasattr(db, 'close'):
+                    db.close()
         except Exception as conn_error:
             health_status["database"] = f"connection_error: {str(conn_error)[:50]}"
             health_status["status"] = "degraded"
@@ -289,7 +344,7 @@ def system_status():
 
 # ===================== STATISTICS ENDPOINT =====================
 @app.get("/api/admin/statistics")
-async def get_admin_statistics(db: Session = Depends(get_db)):
+async def get_admin_statistics(db: Session = Depends(db_dependency)):
     """Get admin dashboard statistics"""
     try:
         if not database_ready:
@@ -326,7 +381,7 @@ async def get_admin_statistics(db: Session = Depends(get_db)):
 
 # ===================== AGENTS ENDPOINTS =====================
 @app.get("/api/agents")
-async def list_agents(db: Session = Depends(get_db)):
+async def list_agents(db: Session = Depends(db_dependency)):
     """List all agents with their statistics"""
     try:
         if not database_ready:
@@ -367,7 +422,7 @@ async def list_agents(db: Session = Depends(get_db)):
 
 # ===================== TASK ENDPOINTS FOR AGENTS =====================
 @app.get("/api/agents/{agent_id}/tasks/current")
-async def get_current_task(agent_id: str, db: Session = Depends(get_db)):
+async def get_current_task(agent_id: str, db: Session = Depends(db_dependency)):
     """Get current task for an agent"""
     try:
         if not database_ready:
@@ -431,7 +486,7 @@ async def get_current_task(agent_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Error getting current task: {str(e)}")
 
 @app.get("/api/agents/{agent_id}/tasks")
-async def get_agent_tasks(agent_id: str, db: Session = Depends(get_db)):
+async def get_agent_tasks(agent_id: str, db: Session = Depends(db_dependency)):
     """Get all tasks for an agent"""
     try:
         if not database_ready:
@@ -468,7 +523,7 @@ async def get_agent_tasks(agent_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Error getting tasks: {str(e)}")
 
 @app.get("/api/agents/{agent_id}/statistics")
-async def get_agent_statistics(agent_id: str, db: Session = Depends(get_db)):
+async def get_agent_statistics(agent_id: str, db: Session = Depends(db_dependency)):
     """Get statistics for a specific agent"""
     try:
         if not database_ready:
@@ -515,7 +570,7 @@ async def get_agent_statistics(agent_id: str, db: Session = Depends(get_db)):
             "in_progress_tasks": 0
         }
 
-# ===================== AGENT REGISTRATION ENDPOINT - FIXED =====================
+# ===================== AGENT REGISTRATION ENDPOINT =====================
 @app.post("/api/agents/register")
 async def register_agent(
     name: str = Form(...),
@@ -524,7 +579,7 @@ async def register_agent(
     dob: str = Form(...),
     country: str = Form(...),
     gender: str = Form(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(db_dependency)
 ):
     """Register a new agent with proper date handling"""
     try:
@@ -557,7 +612,7 @@ async def register_agent(
             name=name,
             email=email,
             mobile=mobile,
-            dob=dob,  # Store as string for compatibility
+            dob=dob,
             country=country,
             gender=gender,
             password=password,
@@ -582,15 +637,16 @@ async def register_agent(
         raise
     except Exception as e:
         print(f"❌ Error registering agent: {e}")
-        db.rollback()
+        if hasattr(db, 'rollback'):
+            db.rollback()
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
-# ===================== FORM SUBMISSION ENDPOINT - FIXED =====================
+# ===================== FORM SUBMISSION ENDPOINT =====================
 @app.post("/api/agents/{agent_id}/submit")
 async def submit_task_form(
     agent_id: str,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(db_dependency)
 ):
     """Submit completed task form - handles both JSON and form data"""
     try:
@@ -635,7 +691,7 @@ async def submit_task_form(
             agent_id=agent_id,
             task_id=current_task.id,
             image_filename=current_task.image_filename,
-            form_data=data,  # Store as JSON
+            form_data=data,
             submitted_at=datetime.now()
         )
         
@@ -660,7 +716,8 @@ async def submit_task_form(
         raise
     except Exception as e:
         print(f"❌ Error submitting task for {agent_id}: {e}")
-        db.rollback()
+        if hasattr(db, 'rollback'):
+            db.rollback()
         raise HTTPException(status_code=500, detail=f"Error submitting task: {str(e)}")
 
 # ===================== STANDARD UPLOAD ENDPOINT =====================
@@ -668,7 +725,7 @@ async def submit_task_form(
 async def upload_tasks_standard(
     zip_file: UploadFile = File(...),
     agent_id: str = Form(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(db_dependency)
 ):
     """Standard upload endpoint for smaller files"""
     try:
@@ -713,8 +770,12 @@ async def init_chunked_upload(
     try:
         # Validate agent exists (if database is ready)
         if database_ready:
-            db_gen = get_db()
-            db = next(db_gen)
+            db_gen = db_dependency()
+            if hasattr(db_gen, '__next__'):
+                db = next(db_gen)
+            else:
+                db = db_gen
+                
             try:
                 agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
                 if not agent:
@@ -722,7 +783,8 @@ async def init_chunked_upload(
                 if agent.status != "active":
                     raise HTTPException(status_code=400, detail=f"Agent {agent_id} is not active")
             finally:
-                db.close()
+                if hasattr(db, 'close'):
+                    db.close()
         
         # Create unique upload ID
         upload_id = str(uuid.uuid4())
@@ -807,7 +869,7 @@ async def upload_chunk(
         raise HTTPException(status_code=500, detail=f"Failed to upload chunk: {str(e)}")
 
 @app.post("/api/admin/finalize-chunked-upload")
-async def finalize_chunked_upload(upload_id: str = Form(...), db: Session = Depends(get_db)):
+async def finalize_chunked_upload(upload_id: str = Form(...), db: Session = Depends(db_dependency)):
     """Combine all chunks and process the complete file"""
     try:
         if upload_id not in upload_sessions:
@@ -977,12 +1039,14 @@ async def process_uploaded_zip(file_path: str, agent_id: str, db: Session):
                 print(f"✅ Successfully created {len(tasks_to_add)} tasks for agent {agent_id}")
                 temp_files_created.clear()  # Success - don't cleanup files
             except Exception as db_error:
-                db.rollback()
+                if hasattr(db, 'rollback'):
+                    db.rollback()
                 raise Exception(f"Database error while saving tasks: {str(db_error)}")
     
     except Exception as e:
         print(f"❌ Error processing ZIP file: {e}")
-        db.rollback()
+        if hasattr(db, 'rollback'):
+            db.rollback()
         
         # Cleanup any files created before the error
         for temp_file in temp_files_created:
@@ -1068,7 +1132,7 @@ def get_upload_sessions():
 # ===================== ADDITIONAL ADMIN ENDPOINTS =====================
 
 @app.post("/api/admin/reset-password/{agent_id}")
-async def reset_agent_password(agent_id: str, db: Session = Depends(get_db)):
+async def reset_agent_password(agent_id: str, db: Session = Depends(db_dependency)):
     """Reset agent password"""
     try:
         if not database_ready:
@@ -1101,7 +1165,7 @@ async def reset_agent_password(agent_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Password reset failed: {str(e)}")
 
 @app.get("/api/admin/agent-password/{agent_id}")
-async def get_agent_password(agent_id: str, db: Session = Depends(get_db)):
+async def get_agent_password(agent_id: str, db: Session = Depends(db_dependency)):
     """Get agent password information"""
     try:
         if not database_ready:
@@ -1124,7 +1188,7 @@ async def get_agent_password(agent_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Error retrieving password: {str(e)}")
 
 @app.patch("/api/agents/{agent_id}/status")
-async def update_agent_status(agent_id: str, status_data: dict, db: Session = Depends(get_db)):
+async def update_agent_status(agent_id: str, status_data: dict, db: Session = Depends(db_dependency)):
     """Update agent status"""
     try:
         if not database_ready:
@@ -1153,7 +1217,7 @@ async def update_agent_status(agent_id: str, status_data: dict, db: Session = De
         raise HTTPException(status_code=500, detail=f"Status update failed: {str(e)}")
 
 @app.post("/api/admin/force-logout/{agent_id}")
-async def force_logout_agent(agent_id: str, db: Session = Depends(get_db)):
+async def force_logout_agent(agent_id: str, db: Session = Depends(db_dependency)):
     """Force logout an agent"""
     try:
         if not database_ready:
@@ -1187,7 +1251,7 @@ async def preview_data(
     agent_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(db_dependency)
 ):
     """Preview submitted data"""
     try:
@@ -1225,7 +1289,7 @@ async def preview_data(
         raise HTTPException(status_code=500, detail=f"Preview failed: {str(e)}")
 
 @app.get("/api/admin/test-data")
-async def test_data_availability(db: Session = Depends(get_db)):
+async def test_data_availability(db: Session = Depends(db_dependency)):
     """Test data availability"""
     try:
         if not database_ready:
@@ -1257,7 +1321,7 @@ async def get_session_report(
     agent_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(db_dependency)
 ):
     """Get session report"""
     try:
@@ -1305,7 +1369,7 @@ async def export_excel(
     agent_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(db_dependency)
 ):
     """Export submitted data to Excel - ready for implementation"""
     return JSONResponse(
@@ -1321,7 +1385,7 @@ async def export_sessions(
     agent_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(db_dependency)
 ):
     """Export session report to Excel - ready for implementation"""
     return JSONResponse(
@@ -1348,4 +1412,3 @@ if __name__ == "__main__":
     print(f"🏃 Starting server on port {port}")
     print("=" * 60)
     uvicorn.run(app, host="0.0.0.0", port=port)
-            "
