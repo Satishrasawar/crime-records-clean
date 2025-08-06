@@ -22,32 +22,27 @@ from jose import JWTError, jwt
 from fastapi.security import OAuth2PasswordBearer
 import pandas as pd
 import io
+import json
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("app.log"), logging.StreamHandler()]
+    handlers=[logging.StreamHandler()]  # Console only for Railway
 )
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
     title="Client Records Data Entry System",
-    version="2.0.0",
+    version="2.0.1",
     description="Enhanced system for agent-task-system.com with chunked upload support"
 )
 
 # CORS configuration
-ALLOWED_ORIGINS = []
-if os.environ.get("ALLOWED_ORIGINS"):
-    ALLOWED_ORIGINS = [origin.strip() for origin in os.environ.get("ALLOWED_ORIGINS").split(",") if origin.strip()]
-else:
-    ALLOWED_ORIGINS = [
-        "https://agent-task-system.com",
-        "https://www.agent-task-system.com",
-        "https://web-railwaybuilderherokupython.up.railway.app"
-    ]
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "https://agent-task-system.com,https://www.agent-task-system.com").split(",")
+if os.environ.get("DOMAIN") == "web-railwaybuilderherokupython.up.railway.app":
+    ALLOWED_ORIGINS.append("https://web-railwaybuilderherokupython.up.railway.app")
 
 app.add_middleware(
     CORSMiddleware,
@@ -62,15 +57,17 @@ app.add_middleware(
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT configuration
-SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "your-secret-key")
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", secrets.token_hex(32))
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/admin/login")
 
 # File system configuration
 CHUNK_UPLOAD_DIR = "/app/temp_chunks"
-STATIC_DIR = "/app/static/task_images"
+STATIC_DIR = "/app/static"
+STATIC_TASKS_DIR = "/app/static/task_images"
 os.makedirs(CHUNK_UPLOAD_DIR, exist_ok=True)
 os.makedirs(STATIC_DIR, exist_ok=True)
+os.makedirs(STATIC_TASKS_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Global state
@@ -80,6 +77,7 @@ routes_ready = False
 # Mock database for fallback
 class MockDB:
     def query(self, *args, **kwargs):
+        logger.warning("Using MockDB: Database not available")
         return MockQuery()
     
     def add(self, *args, **kwargs):
@@ -150,21 +148,38 @@ except Exception as e:
 def create_access_token(data: dict):
     return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
 
-async def get_current_admin(token: str = Depends(oauth2_scheme)):
+async def get_current_admin(db: Session = Depends(db_dependency), token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if payload.get("role") != "admin":
+        agent_id = payload.get("sub")
+        if not agent_id:
+            raise HTTPException(status_code=401, detail="Invalid token: No agent_id")
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not agent or agent.status != "active":
+            raise HTTPException(status_code=403, detail="Invalid or inactive admin")
+        if not agent.is_admin:  # Assuming Agent model has is_admin
             raise HTTPException(status_code=403, detail="Admin access required")
         return payload
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 @app.post("/api/admin/login")
-async def admin_login(username: str = Form(...), password: str = Form(...)):
-    if username == "admin" and password == "secure_password":  # Replace with database check
-        token = create_access_token({"sub": username, "role": "admin"})
+async def admin_login(email: str = Form(...), password: str = Form(...), db: Session = Depends(db_dependency)):
+    if not database_ready:
+        raise HTTPException(status_code=503, detail="Database not ready")
+    try:
+        agent = db.query(Agent).filter(Agent.email == email).first()
+        if not agent or not pwd_context.verify(password, agent.hashed_password) or not agent.is_admin:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        if agent.status != "active":
+            raise HTTPException(status_code=403, detail="Account is not active")
+        token = create_access_token({"sub": agent.agent_id, "role": "admin"})
         return {"access_token": token, "token_type": "bearer"}
-    raise HTTPException(status_code=401, detail="Invalid credentials")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Admin login failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Login failed")
 
 # Middleware for security headers
 @app.middleware("http")
@@ -177,7 +192,7 @@ async def add_security_headers(request: Request, call_next):
 
 # Health endpoint
 @app.get("/health")
-async def health_check():
+async def health_check(db: Session = Depends(db_dependency)):
     health_status = {
         "status": "healthy",
         "platform": "Railway",
@@ -187,31 +202,26 @@ async def health_check():
         "database": "unknown",
         "imports_loaded": database_ready,
         "chunked_upload": "enabled",
-        "version": "2.0.0"
+        "version": "2.0.1"
     }
     
     if database_ready:
         try:
-            db = next(db_dependency())
-            try:
-                result = db.execute(text("SELECT 1")).scalar()
-                health_status["database"] = "connected" if result == 1 else "query_failed"
-            except Exception as e:
-                health_status["database"] = f"query_error: {str(e)[:50]}"
-                health_status["status"] = "degraded"
-            finally:
-                db.close()
+            result = db.execute(text("SELECT 1")).scalar()
+            health_status["database"] = "connected" if result == 1 else "query_failed"
         except Exception as e:
-            health_status["database"] = f"connection_error: {str(e)[:50]}"
+            health_status["database"] = f"query_error: {str(e)[:50]}"
             health_status["status"] = "degraded"
     else:
         health_status["database"] = "not_ready"
         health_status["status"] = "degraded"
     
-    health_status["static_storage"] = "ready" if os.path.exists(STATIC_DIR) else "missing"
+    health_status["static_storage"] = "ready" if os.path.exists(STATIC_TASKS_DIR) else "missing"
     health_status["upload_storage"] = "ready" if os.path.exists(CHUNK_UPLOAD_DIR) else "missing"
-    if health_status["upload_storage"] == "ready":
-        health_status["active_uploads"] = db.query(UploadSession).count() if database_ready else 0
+    if database_ready:
+        health_status["active_uploads"] = db.query(UploadSession).count()
+    else:
+        health_status["active_uploads"] = 0
     
     return health_status
 
@@ -219,22 +229,23 @@ async def health_check():
 @app.get("/")
 async def root():
     return {
-        "message": "Client Records Data Entry System API v2.0",
+        "message": "Client Records Data Entry System API v2.0.1",
         "status": "running",
         "platform": "Railway",
         "domain": os.environ.get("DOMAIN", "agent-task-system.com"),
         "health_check": "/health",
-        "admin_panel": "/admin.html",
-        "agent_panel": "/agent.html",
+        "admin_panel": "/static/admin.html",
+        "agent_panel": "/static/agent.html",
         "features": ["chunked_upload", "large_file_support", "custom_domain_support", "ssl_enabled"]
     }
 
 # Static file serving
-@app.get("/admin.html")
+@app.get("/static/admin.html")
 async def serve_admin_panel():
     try:
-        if os.path.exists("admin.html"):
-            return FileResponse("admin.html", headers={
+        file_path = os.path.join(STATIC_DIR, "admin.html")
+        if os.path.exists(file_path):
+            return FileResponse(file_path, headers={
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Pragma": "no-cache",
                 "Expires": "0"
@@ -244,11 +255,12 @@ async def serve_admin_panel():
         logger.error(f"❌ Error serving admin panel: {e}", exc_info=True)
         return JSONResponse({"error": f"Could not serve admin panel: {str(e)}"}, status_code=500)
 
-@app.get("/agent.html")
+@app.get("/static/agent.html")
 async def serve_agent_panel():
     try:
-        if os.path.exists("agent.html"):
-            return FileResponse("agent.html", headers={
+        file_path = os.path.join(STATIC_DIR, "agent.html")
+        if os.path.exists(file_path):
+            return FileResponse(file_path, headers={
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Pragma": "no-cache",
                 "Expires": "0"
@@ -260,7 +272,7 @@ async def serve_agent_panel():
 
 # Debug and status endpoints
 @app.get("/debug")
-async def debug_info():
+async def debug_info(db: Session = Depends(db_dependency)):
     return {
         "environment": {
             "domain": os.environ.get("DOMAIN", "agent-task-system.com"),
@@ -269,7 +281,7 @@ async def debug_info():
             "allowed_origins": ALLOWED_ORIGINS
         },
         "system": {
-            "files": os.listdir("."),
+            "files": os.listdir(STATIC_DIR) if os.path.exists(STATIC_DIR) else [],
             "python_version": sys.version,
             "database_ready": database_ready,
             "routes_ready": routes_ready
@@ -277,12 +289,12 @@ async def debug_info():
         "features": {
             "upload_sessions": db.query(UploadSession).count() if database_ready else 0,
             "chunk_upload_dir_exists": os.path.exists(CHUNK_UPLOAD_DIR),
-            "static_dir_exists": os.path.exists(STATIC_DIR)
+            "static_dir_exists": os.path.exists(STATIC_TASKS_DIR)
         }
     }
 
 @app.get("/status")
-async def system_status():
+async def system_status(db: Session = Depends(db_dependency)):
     return {
         "status": "operational",
         "database": "ready" if database_ready else "failed",
@@ -349,6 +361,7 @@ async def list_agents(db: Session = Depends(db_dependency), admin: dict = Depend
                 "name": agent.name,
                 "email": agent.email,
                 "status": agent.status,
+                "is_admin": agent.is_admin,
                 "tasks_completed": completed_tasks,
                 "total_tasks": total_tasks,
                 "last_login": latest_session.login_time.isoformat() if latest_session and latest_session.login_time else None,
@@ -519,6 +532,7 @@ async def register_agent(
     dob: str = Form(...),
     country: str = Form(...),
     gender: str = Form(...),
+    is_admin: bool = Form(False),
     db: Session = Depends(db_dependency)
 ):
     if not database_ready:
@@ -547,6 +561,7 @@ async def register_agent(
             gender=gender,
             hashed_password=pwd_context.hash(password),
             status="active",
+            is_admin=is_admin,
             created_at=datetime.utcnow()
         )
         
@@ -554,7 +569,7 @@ async def register_agent(
         db.commit()
         db.refresh(new_agent)
         
-        logger.info(f"✅ New agent registered: {agent_id}")
+        logger.info(f"✅ New agent registered: {agent_id} (admin: {is_admin})")
         
         return {
             "success": True,
@@ -592,9 +607,7 @@ async def submit_task_form(
             data = await request.json()
         else:
             form_data = await request.form()
-            data = dict(form_data)
-            data.pop('agent_id', None)
-            data.pop('task_id', None)
+            data = {k: v for k, v in form_data.items() if k not in ('agent_id', 'task_id')}
         
         current_task = db.query(TaskProgress).filter(
             TaskProgress.agent_id == agent_id,
@@ -660,9 +673,9 @@ async def upload_tasks_standard(
         
         temp_file_path = os.path.join(CHUNK_UPLOAD_DIR, f"temp_{uuid.uuid4().hex}_{zip_file.filename}")
         
-        with open(temp_file_path, "wb") as buffer:
+        async with aiofiles.open(temp_file_path, 'wb') as buffer:
             content = await zip_file.read()
-            buffer.write(content)
+            await buffer.write(content)
         
         result = await process_uploaded_zip(temp_file_path, agent_id, db)
         
@@ -707,7 +720,7 @@ async def init_chunked_upload(
             total_chunks=total_chunks,
             agent_id=agent_id,
             created_at=datetime.utcnow(),
-            chunks_received=[]
+            chunks_received=[]  # Empty list for JSON column
         )
         db.add(session)
         db.commit()
@@ -743,11 +756,12 @@ async def upload_chunk(
         if chunk_index >= session.total_chunks or chunk_index < 0:
             raise HTTPException(status_code=400, detail=f"Invalid chunk index: {chunk_index}")
         
-        if chunk_index in session.chunks_received:
+        chunks_received = session.chunks_received or []
+        if chunk_index in chunks_received:
             return {
                 "status": "chunk_already_exists",
                 "chunk_index": chunk_index,
-                "received_chunks": len(session.chunks_received),
+                "received_chunks": len(chunks_received),
                 "total_chunks": session.total_chunks
             }
         
@@ -757,7 +771,8 @@ async def upload_chunk(
             content = await chunk.read()
             await f.write(content)
         
-        session.chunks_received.append(chunk_index)
+        chunks_received.append(chunk_index)
+        session.chunks_received = chunks_received
         db.commit()
         
         logger.info(f"📦 Received chunk {chunk_index + 1}/{session.total_chunks} for upload {upload_id}")
@@ -765,9 +780,9 @@ async def upload_chunk(
         return {
             "status": "chunk_uploaded",
             "chunk_index": chunk_index,
-            "received_chunks": len(session.chunks_received),
+            "received_chunks": len(chunks_received),
             "total_chunks": session.total_chunks,
-            "progress_percentage": (len(session.chunks_received) / session.total_chunks) * 100
+            "progress_percentage": (len(chunks_received) / session.total_chunks) * 100
         }
     except HTTPException:
         raise
@@ -785,8 +800,9 @@ async def finalize_chunked_upload(upload_id: str = Form(...), db: Session = Depe
         if not session:
             raise HTTPException(status_code=404, detail="Upload session not found")
         
-        if len(session.chunks_received) != session.total_chunks:
-            missing_chunks = set(range(session.total_chunks)) - set(session.chunks_received)
+        chunks_received = session.chunks_received or []
+        if len(chunks_received) != session.total_chunks:
+            missing_chunks = set(range(session.total_chunks)) - set(chunks_received)
             raise HTTPException(
                 status_code=400,
                 detail=f"Missing chunks: {sorted(list(missing_chunks))[:10]}{'...' if len(missing_chunks) > 10 else ''}"
@@ -873,7 +889,7 @@ async def process_uploaded_zip(file_path: str, agent_id: str, db: Session):
                     original_name = os.path.basename(image_file)
                     file_extension = os.path.splitext(original_name)[1].lower() or '.jpg'
                     unique_filename = f"task_{agent_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{idx:04d}_{uuid.uuid4().hex[:8]}{file_extension}"
-                    image_path = os.path.join(STATIC_DIR, unique_filename)
+                    image_path = os.path.join(STATIC_TASKS_DIR, unique_filename)
                     
                     with open(image_path, 'wb') as f:
                         f.write(image_data)
@@ -959,10 +975,12 @@ async def periodic_cleanup():
                     if expired_sessions:
                         db.commit()
                         logger.info(f"🧹 Cleaned up {len(expired_sessions)} expired upload sessions")
+                except Exception as e:
+                    logger.error(f"❌ Error in periodic cleanup: {e}", exc_info=True)
                 finally:
                     db.close()
         except Exception as e:
-            logger.error(f"❌ Error in periodic cleanup: {e}", exc_info=True)
+            logger.error(f"❌ Error in periodic cleanup setup: {e}", exc_info=True)
         
         await asyncio.sleep(3600)
 
@@ -975,12 +993,13 @@ async def get_upload_sessions(db: Session = Depends(db_dependency), admin: dict 
         sessions = db.query(UploadSession).all()
         sessions_info = {}
         for session in sessions:
+            chunks_received = session.chunks_received or []
             sessions_info[session.id] = {
                 "filename": session.filename,
                 "filesize": session.filesize,
                 "total_chunks": session.total_chunks,
-                "received_chunks": len(session.chunks_received),
-                "progress": (len(session.chunks_received) / session.total_chunks) * 100,
+                "received_chunks": len(chunks_received),
+                "progress": (len(chunks_received) / session.total_chunks) * 100,
                 "created_at": session.created_at.isoformat(),
                 "age_minutes": (datetime.utcnow() - session.created_at).total_seconds() / 60
             }
@@ -1287,7 +1306,9 @@ async def export_excel(
                 "Image_Filename": submission.image_filename,
                 "Submitted_At": submission.submitted_at.isoformat()
             }
-            row.update(submission.form_data)
+            form_data = submission.form_data or {}
+            for key, value in form_data.items():
+                row[f"Form_{key}"] = str(value)  # Flatten complex data
             excel_data.append(row)
         
         df = pd.DataFrame(excel_data)
@@ -1392,7 +1413,7 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     logger.info("=" * 60)
-    logger.info("🚀 CLIENT RECORDS DATA ENTRY SYSTEM v2.0")
+    logger.info("🚀 CLIENT RECORDS DATA ENTRY SYSTEM v2.0.1")
     logger.info("=" * 60)
     logger.info(f"🌍 Domain: {os.environ.get('DOMAIN', 'agent-task-system.com')}")
     logger.info(f"🔗 CORS Origins: {len(ALLOWED_ORIGINS)} configured")
