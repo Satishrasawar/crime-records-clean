@@ -172,13 +172,15 @@ else:
 # Rate limiting setup
 limiter = Limiter(key_func=get_remote_address)
 
-# Lifespan context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown events"""
     print("🚀 Starting periodic cleanup task...")
     print(f"🌍 Domain: {os.environ.get('DOMAIN', 'railway')}")
     print(f"🔗 Allowed Origins: {len(ALLOWED_ORIGINS)} configured")
+    
+    # Create default admin user
+    create_default_admin()
     
     # Start background cleanup task
     cleanup_task = asyncio.create_task(periodic_cleanup())
@@ -1745,4 +1747,5 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
