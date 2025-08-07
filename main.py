@@ -119,106 +119,7 @@ def cleanup_upload_session(upload_id: str):
             # Remove temporary directory and all contents
             if os.path.exists(upload_dir):
                 shutil.rmtree(upload_dir)
-                print(f"❌ Error testing data: {e}")
-        raise HTTPException(status_code=500, detail=f"Data test failed: {str(e)}")
-
-@app.get("/api/admin/session-report")
-async def get_session_report(
-    agent_id: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    db = Depends(db_dependency)
-):
-    """Get session report"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        query = db.query(AgentSession).join(Agent)
-        
-        if agent_id:
-            query = query.filter(AgentSession.agent_id == agent_id)
-        
-        if date_from:
-            query = query.filter(AgentSession.login_time >= datetime.strptime(date_from, '%Y-%m-%d'))
-        
-        if date_to:
-            query = query.filter(AgentSession.login_time <= datetime.strptime(date_to, '%Y-%m-%d'))
-        
-        sessions = query.order_by(AgentSession.login_time.desc()).limit(100).all()
-        
-        result = []
-        for session in sessions:
-            duration_minutes = None
-            if session.logout_time and session.login_time:
-                duration = session.logout_time - session.login_time
-                duration_minutes = int(duration.total_seconds() / 60)
-            
-            result.append({
-                "agent_id": session.agent_id,
-                "agent_name": session.agent.name if session.agent else "Unknown",
-                "login_time": session.login_time.isoformat() if session.login_time else None,
-                "logout_time": session.logout_time.isoformat() if session.logout_time else None,
-                "duration_minutes": duration_minutes
-            })
-        
-        return result
-        
-    except Exception as e:
-        print(f"❌ Error in session report: {e}")
-        raise HTTPException(status_code=500, detail=f"Session report failed: {str(e)}")
-
-# ===================== EXPORT ENDPOINTS (PLACEHOLDERS) =====================
-
-@app.get("/api/admin/export-excel")
-async def export_excel(
-    agent_id: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    db = Depends(db_dependency)
-):
-    """Export submitted data to Excel - ready for implementation"""
-    return JSONResponse(
-        content={
-            "message": "Excel export feature - ready for implementation with pandas/openpyxl",
-            "note": "Add pandas and openpyxl implementation here for full Excel export functionality"
-        },
-        status_code=501
-    )
-
-@app.get("/api/admin/export-sessions")
-async def export_sessions(
-    agent_id: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    db = Depends(db_dependency)
-):
-    """Export session report to Excel - ready for implementation"""
-    return JSONResponse(
-        content={
-            "message": "Session export feature - ready for implementation", 
-            "note": "Add pandas and openpyxl implementation here for full session export functionality"
-        },
-        status_code=501
-    )
-
-# ===================== MAIN ENTRY POINT =====================
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    print("=" * 60)
-    print("🚀 CLIENT RECORDS DATA ENTRY SYSTEM v2.0")
-    print("=" * 60)
-    print(f"🌍 Domain: {os.environ.get('DOMAIN', 'railway')}")
-    print(f"🔗 CORS Origins: {len(ALLOWED_ORIGINS)} configured")
-    print(f"📁 Chunk upload directory: {CHUNK_UPLOAD_DIR}")
-    print(f"💾 Database ready: {database_ready}")
-    print(f"🛣️ Routes ready: {routes_ready}")
-    print(f"🏃 Starting server on port {port}")
-    print("=" * 60)
-    # Railway requires binding to 0.0.0.0 and the PORT environment variable
-    uvicorn.run(app, host="0.0.0.0", port=port)
+                print(f"🧹 Cleaned up upload directory: {upload_dir}")
             
             # Remove session from memory
             del upload_sessions[upload_id]
@@ -757,7 +658,7 @@ async def serve_agent_panel():
 
         <div style="margin-top: 30px; padding: 20px; background: #e9ecef; border-radius: 5px;">
             <h3>📋 Quick Links</h3>
-            <p><strong>Get Current Task:</strong> <code>GET /api/agents/{agent_id}/tasks/current</code></p>
+            <p><strong>Get Current Task:</strong> <code>GET /api/agents/{agent_id}/current-task</code></p>
             <p><strong>Submit Task:</strong> <code>POST /api/agents/{agent_id}/submit</code></p>
             <p><strong>View Statistics:</strong> <code>GET /api/agents/{agent_id}/statistics</code></p>
         </div>
@@ -844,8 +745,8 @@ async def get_admin_statistics(db = Depends(db_dependency)):
             return {
                 "total_agents": 0,
                 "total_tasks": 0,
-                "completed_tasks": 0,
-                "pending_tasks": 0,
+                "completed_tasks": 0
+                  "pending_tasks": 0,
                 "in_progress_tasks": 0
             }
         
@@ -1714,4 +1615,5 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
