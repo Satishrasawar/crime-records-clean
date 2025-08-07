@@ -2,7 +2,17 @@ import os
 import sys
 from datetime import datetime
 from fastapi import FastAPI
+# Add this after imports:
+database_ready = False
 
+try:
+    print("📦 Importing database modules...")
+    from database import Base, engine, get_db
+    from models import Agent, TaskProgress, SubmittedForm, AgentSession
+    database_ready = True
+except Exception as e:
+    print(f"❌ Database setup failed: {e}")
+    database_ready = False
 app = FastAPI(
     title="Client Records Data Entry System", 
     version="2.0.0"
@@ -29,3 +39,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
