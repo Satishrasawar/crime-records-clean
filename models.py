@@ -1,7 +1,7 @@
-from sqlalchemy import Column, String, Integer, Date, DateTime, Text, ForeignKey, Float, JSON
+from sqlalchemy import Column, String, Integer, Date, DateTime, Text, ForeignKey, Float, JSON, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from database import Base
+from .database import Base
 
 class Agent(Base):
     __tablename__ = "agents"
@@ -52,7 +52,6 @@ class SubmittedForm(Base):
 
     agent = relationship("Agent", back_populates="submitted_forms")
 
-# Agent Session Tracking
 class AgentSession(Base):
     __tablename__ = "agent_sessions"
     
@@ -66,7 +65,6 @@ class AgentSession(Base):
     
     agent = relationship("Agent", back_populates="login_sessions")
 
-# Optional: Track individual image assignments (for backwards compatibility)
 class ImageAssignment(Base):
     __tablename__ = "image_assignments"
     
@@ -76,3 +74,11 @@ class ImageAssignment(Base):
     image_path = Column(String, nullable=False)
     assigned_at = Column(DateTime, default=datetime.utcnow)
     is_completed = Column(String, default="pending")  # pending, completed, skipped
+
+class Admin(Base):
+    __tablename__ = "admins"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
