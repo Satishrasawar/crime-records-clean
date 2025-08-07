@@ -18,62 +18,78 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 
 def create_default_admin():
-    """Create default admin user if not exists"""
+    """FIXED: Create default admin user with proper error handling"""
     try:
+        print("🔧 Setting up admin user...")
+        
         if not database_ready:
             print("⚠️ Database not ready, skipping admin creation")
             return
-            
+        
+        # Import after database is ready
         from app.models import Admin
         from app.security import hash_password
         
+        # Get database session
         db_gen = db_dependency()
         if hasattr(db_gen, '__next__'):
             db = next(db_gen)
         else:
             db = db_gen
-            
+        
         try:
-            # Always try to create/update admin for testing
-            admin = db.query(Admin).filter(Admin.username == "admin").first()
+            # Check existing admin
+            existing_admin = db.query(Admin).filter(Admin.username == "admin").first()
             
-            if not admin:
-                print("🔧 Creating admin user...")
+            if existing_admin:
+                print(f"👤 Found existing admin: {existing_admin.username}")
+                # Always reset password for testing
+                existing_admin.hashed_password = hash_password("admin123")
+                existing_admin.is_active = True
+                existing_admin.email = "admin@agent-task-system.com"
+                db.commit()
+                print("🔄 Updated existing admin password")
+            else:
+                print("🔧 Creating new admin user...")
                 hashed_password = hash_password("admin123")
-                admin = Admin(
+                
+                new_admin = Admin(
                     username="admin",
                     hashed_password=hashed_password,
                     email="admin@agent-task-system.com",
                     is_active=True,
                     created_at=datetime.now()
                 )
-                db.add(admin)
-            else:
-                print("🔧 Updating existing admin password...")
-                admin.hashed_password = hash_password("admin123")
-                admin.is_active = True
+                
+                db.add(new_admin)
+                db.commit()
+                db.refresh(new_admin)
+                print("✅ Created new admin user")
             
-            db.commit()
-            
-            print("🎉 Admin user ready!")
             print("=" * 50)
             print("🔐 ADMIN LOGIN CREDENTIALS:")
             print("Username: admin")
-            print("Password: admin123") 
+            print("Password: admin123")
             print("=" * 50)
-            print("🌍 Login at: /admin.html")
-            print("📡 API Login: POST /api/admin/login")
-                
-        except Exception as e:
-            print(f"❌ Error with admin: {e}")
+            print("🌍 Access at:")
+            print("- Admin Panel: /admin.html")
+            print("- Status Check: /api/admin/status")
+            print("- Simple Login: /api/admin/simple-login")
+            print("=" * 50)
+            
+        except Exception as db_error:
+            print(f"❌ Database error: {db_error}")
             if hasattr(db, 'rollback'):
                 db.rollback()
+        
         finally:
             if hasattr(db, 'close'):
                 db.close()
-                
+    
     except Exception as e:
-        print(f"❌ Admin setup failed: {e}")
+        print(f"❌ Admin setup completely failed: {e}")
+        import traceback
+        traceback.print_exc()
 
 # Chunked upload configuration
 CHUNK_UPLOAD_DIR = "temp_chunks"
@@ -1909,3 +1925,4 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
