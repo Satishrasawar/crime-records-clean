@@ -16,6 +16,64 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
+def create_default_admin():
+    """Create default admin user if not exists"""
+    try:
+        if not database_ready:
+            print("⚠️ Database not ready, skipping admin creation")
+            return
+            
+        from app.models import Admin
+        from app.security import hash_password
+        
+        db_gen = db_dependency()
+        if hasattr(db_gen, '__next__'):
+            db = next(db_gen)
+        else:
+            db = db_gen
+            
+        try:
+            # Check if any admin exists
+            admin_count = db.query(Admin).count()
+            
+            if admin_count == 0:
+                print("🔧 Creating default admin user...")
+                
+                hashed_password = hash_password("admin123")
+                
+                new_admin = Admin(
+                    username="admin",
+                    hashed_password=hashed_password,
+                    email="admin@agent-task-system.com",
+                    is_active=True,
+                    created_at=datetime.now()
+                )
+                
+                db.add(new_admin)
+                db.commit()
+                
+                print("🎉 Default admin user created!")
+                print("=" * 50)
+                print("🔐 ADMIN LOGIN CREDENTIALS:")
+                print("Username: admin")
+                print("Password: admin123") 
+                print("=" * 50)
+                print("🌍 Login at: /admin.html")
+                print("📡 API Login: POST /api/admin/login")
+                
+            else:
+                print(f"✅ Admin users exist ({admin_count} found)")
+                
+        except Exception as e:
+            print(f"❌ Error creating admin: {e}")
+            if hasattr(db, 'rollback'):
+                db.rollback()
+        finally:
+            if hasattr(db, 'close'):
+                db.close()
+                
+    except Exception as e:
+        print(f"❌ Admin creation failed: {e}")
 
 # Chunked upload configuration
 CHUNK_UPLOAD_DIR = "temp_chunks"
@@ -1687,3 +1745,4 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
