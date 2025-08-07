@@ -218,7 +218,7 @@ if __name__ == "__main__":
     print(f"🏃 Starting server on port {port}")
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
-    uvicorn.run(app, host="0.0.0.0", port=port)"🧹 Cleaned up upload directory: {upload_dir}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
             
             # Remove session from memory
             del upload_sessions[upload_id]
@@ -1714,3 +1714,4 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
