@@ -106,6 +106,7 @@ else:
         "http://localhost:3000",
         "http://localhost:8000",
         "http://127.0.0.1:8000"
+        "*"
     ]
 
 # Lifespan context manager (replaces deprecated @app.on_event)
@@ -142,26 +143,12 @@ app = FastAPI(
 # Enhanced CORS middleware with custom domain support
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],  # Change this line
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=[
-        "Authorization",
-        "Content-Type", 
-        "X-Session-Token",
-        "X-Requested-With",
-        "Accept",
-        "Origin",
-        "User-Agent",
-        "DNT",
-        "Cache-Control",
-        "X-Mx-ReqToken",
-        "Keep-Alive",
-        "If-Modified-Since"
-    ],
+    allow_headers=["*"],  # Change this line
     expose_headers=["Content-Disposition"]
 )
-
 # Enhanced request middleware for domain detection, logging, and security
 @app.middleware("http")
 async def enhanced_request_middleware(request, call_next):
@@ -920,14 +907,14 @@ async def submit_task_form(
             task_id=current_task.id,
             image_filename=current_task.image_filename,
             form_data=data,
-            submitted_at=datetime.now()
+            submitted_at=datetime.utcnow()
         )
         
         db.add(submitted_form)
         
         # Mark task as completed
         current_task.status = 'completed'
-        current_task.completed_at = datetime.now()
+        current_task.completed_at = datetime.utcnow()
         
         # Commit changes
         db.commit()
@@ -1633,5 +1620,6 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
