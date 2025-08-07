@@ -649,7 +649,7 @@ async def list_agents(db = Depends(db_dependency)):
         return []
 
 # ===================== TASK ENDPOINTS FOR AGENTS =====================
-@app.get("/api/agents/{agent_id}/tasks/current")
+@app.get("/api/agents/{agent_id}/current-task")
 async def get_current_task(agent_id: str, db = Depends(db_dependency)):
     """Get current task for an agent"""
     try:
@@ -681,7 +681,7 @@ async def get_current_task(agent_id: str, db = Depends(db_dependency)):
         
         if next_task.status == 'pending':
             next_task.status = 'in_progress'
-            next_task.started_at = datetime.now()
+           next_task.started_at = datetime.utcnow()  # Match agent_routes.py
             db.commit()
         
         total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).count()
@@ -1633,4 +1633,5 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
