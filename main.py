@@ -745,8 +745,8 @@ async def get_admin_statistics(db = Depends(db_dependency)):
             return {
                 "total_agents": 0,
                 "total_tasks": 0,
-                "completed_tasks": 0
-                  "pending_tasks": 0,
+                "completed_tasks": 0,
+                "pending_tasks": 0,
                 "in_progress_tasks": 0
             }
         
@@ -1615,5 +1615,3 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
-
-
