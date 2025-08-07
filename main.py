@@ -215,6 +215,16 @@ def health_check():
         "chunked_upload": "enabled",
         "version": "2.0.0"
     }
+    # Add right after line 220:
+@app.get("/healthz")
+def railway_health():
+    """Simple health check for Railway"""
+    return {"status": "ok"}
+
+@app.get("/ping")
+def ping():
+    """Minimal ping"""
+    return "pong"
     
     # Test database connectivity with proper session handling
     if database_ready:
@@ -1605,4 +1615,11 @@ if __name__ == "__main__":
     print(f"🏃 Starting server on port {port}")
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(
+    app, 
+    host="0.0.0.0", 
+    port=port,
+    access_log=False,  # Reduce noise
+    log_level="warning"  # Reduce log verbosity
+)
+
