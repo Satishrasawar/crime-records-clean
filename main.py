@@ -1,3 +1,4 @@
+```python
 import os
 import sys
 import uuid
@@ -394,7 +395,7 @@ async def process_uploaded_zip(file_path: str, agent_id: str, db):
 # ===================== ENHANCED HEALTH CHECK =====================
 @app.get("/health")
 @limiter.limit("100/minute")
-async def health_check(request: Request):
+async def health_check(request: Request, db=Depends(db_dependency)):
     """Enhanced health check with proper database connectivity testing"""
     health_status = {
         "status": "healthy",
@@ -756,7 +757,7 @@ async def system_status(request: Request):
 # ===================== STATISTICS ENDPOINT =====================
 @app.get("/api/admin/statistics")
 @limiter.limit("50/minute")
-async def get_admin_statistics(db = Depends(db_dependency), request: Request):
+async def get_admin_statistics(request: Request, db=Depends(db_dependency)):
     """Get admin dashboard statistics"""
     try:
         if not database_ready:
@@ -794,7 +795,7 @@ async def get_admin_statistics(db = Depends(db_dependency), request: Request):
 # ===================== AGENTS ENDPOINTS =====================
 @app.get("/api/agents")
 @limiter.limit("50/minute")
-async def list_agents(db = Depends(db_dependency), request: Request):
+async def list_agents(request: Request, db=Depends(db_dependency)):
     """List all agents with their statistics"""
     try:
         if not database_ready:
@@ -836,7 +837,7 @@ async def list_agents(db = Depends(db_dependency), request: Request):
 # ===================== TASK ENDPOINTS FOR AGENTS =====================
 @app.get("/api/agents/{agent_id}/current-task")
 @limiter.limit("50/minute")
-async def get_current_task(agent_id: str, db = Depends(db_dependency), request: Request):
+async def get_current_task(agent_id: str, request: Request, db=Depends(db_dependency)):
     """Get current task for an agent - FIXED VERSION"""
     try:
         if not database_ready:
@@ -923,11 +924,7 @@ async def get_current_task(agent_id: str, db = Depends(db_dependency), request: 
 
 @app.post("/api/agents/{agent_id}/submit")
 @limiter.limit("50/minute")
-async def submit_task_form(
-    agent_id: str,
-    request: Request,
-    db = Depends(db_dependency)
-):
+async def submit_task_form(agent_id: str, request: Request, db=Depends(db_dependency)):
     """Submit completed task form - FIXED VERSION"""
     try:
         if not database_ready:
@@ -1055,7 +1052,7 @@ async def submit_task_form(
 # ===================== ADDITIONAL HELPER ENDPOINTS =====================
 @app.get("/api/agents/{agent_id}/next-task")
 @limiter.limit("50/minute")
-async def get_next_task(agent_id: str, db = Depends(db_dependency), request: Request):
+async def get_next_task(agent_id: str, request: Request, db=Depends(db_dependency)):
     """Get next available task - Alternative endpoint"""
     try:
         if not database_ready:
@@ -1070,7 +1067,7 @@ async def get_next_task(agent_id: str, db = Depends(db_dependency), request: Req
 
 @app.post("/api/agents/{agent_id}/skip-task")
 @limiter.limit("50/minute")
-async def skip_current_task(agent_id: str, db = Depends(db_dependency), request: Request):
+async def skip_current_task(agent_id: str, request: Request, db=Depends(db_dependency)):
     """Skip current task (mark as skipped) - Optional functionality"""
     try:
         if not database_ready:
@@ -1112,7 +1109,7 @@ async def skip_current_task(agent_id: str, db = Depends(db_dependency), request:
 
 @app.get("/api/agents/{agent_id}/progress")
 @limiter.limit("50/minute")
-async def get_agent_progress(agent_id: str, db = Depends(db_dependency), request: Request):
+async def get_agent_progress(agent_id: str, request: Request, db=Depends(db_dependency)):
     """Get detailed progress information for an agent"""
     try:
         if not database_ready:
@@ -1178,10 +1175,10 @@ async def get_agent_progress(agent_id: str, db = Depends(db_dependency), request
 @app.post("/api/admin/upload-tasks")
 @limiter.limit("10/minute")
 async def upload_tasks_standard(
+    request: Request,
     zip_file: UploadFile = File(...),
     agent_id: str = Form(...),
-    db = Depends(db_dependency),
-    request: Request
+    db=Depends(db_dependency)
 ):
     """Standard upload endpoint for smaller files"""
     try:
@@ -1217,11 +1214,11 @@ async def upload_tasks_standard(
 @app.post("/api/admin/init-chunked-upload")
 @limiter.limit("10/minute")
 async def init_chunked_upload(
+    request: Request,
     filename: str = Form(...),
     filesize: int = Form(...),
     total_chunks: int = Form(...),
-    agent_id: str = Form(...),
-    request: Request
+    agent_id: str = Form(...)
 ):
     """Initialize a chunked upload session for large files"""
     try:
@@ -1276,10 +1273,10 @@ async def init_chunked_upload(
 @app.post("/api/admin/upload-chunk")
 @limiter.limit("50/minute")
 async def upload_chunk(
+    request: Request,
     upload_id: str = Form(...),
     chunk_index: int = Form(...),
-    chunk: UploadFile = File(...),
-    request: Request
+    chunk: UploadFile = File(...)
 ):
     """Upload a single chunk of a large file"""
     try:
@@ -1329,7 +1326,7 @@ async def upload_chunk(
 
 @app.post("/api/admin/finalize-chunked-upload")
 @limiter.limit("10/minute")
-async def finalize_chunked_upload(upload_id: str = Form(...), db = Depends(db_dependency), request: Request):
+async def finalize_chunked_upload(request: Request, upload_id: str = Form(...), db=Depends(db_dependency)):
     """Combine all chunks and process the complete file"""
     try:
         if upload_id not in upload_sessions:
@@ -1400,7 +1397,7 @@ async def get_upload_sessions(request: Request):
 # ===================== ADDITIONAL ADMIN ENDPOINTS =====================
 @app.post("/api/admin/reset-password/{agent_id}")
 @limiter.limit("10/minute")
-async def reset_agent_password(agent_id: str, db = Depends(db_dependency), request: Request):
+async def reset_agent_password(agent_id: str, request: Request, db=Depends(db_dependency)):
     """Reset agent password"""
     try:
         if not database_ready:
@@ -1434,7 +1431,7 @@ async def reset_agent_password(agent_id: str, db = Depends(db_dependency), reque
 
 @app.get("/api/admin/agent-password/{agent_id}")
 @limiter.limit("50/minute")
-async def get_agent_password(agent_id: str, db = Depends(db_dependency), request: Request):
+async def get_agent_password(agent_id: str, request: Request, db=Depends(db_dependency)):
     """Get agent password information"""
     try:
         if not database_ready:
@@ -1458,7 +1455,7 @@ async def get_agent_password(agent_id: str, db = Depends(db_dependency), request
 
 @app.patch("/api/agents/{agent_id}/status")
 @limiter.limit("10/minute")
-async def update_agent_status(agent_id: str, status_data: dict, db = Depends(db_dependency), request: Request):
+async def update_agent_status(agent_id: str, status_data: dict, request: Request, db=Depends(db_dependency)):
     """Update agent status"""
     try:
         if not database_ready:
@@ -1488,7 +1485,7 @@ async def update_agent_status(agent_id: str, status_data: dict, db = Depends(db_
 
 @app.post("/api/admin/force-logout/{agent_id}")
 @limiter.limit("10/minute")
-async def force_logout_agent(agent_id: str, db = Depends(db_dependency), request: Request):
+async def force_logout_agent(agent_id: str, request: Request, db=Depends(db_dependency)):
     """Force logout an agent"""
     try:
         if not database_ready:
@@ -1520,11 +1517,11 @@ async def force_logout_agent(agent_id: str, db = Depends(db_dependency), request
 @app.get("/api/admin/preview-data")
 @limiter.limit("50/minute")
 async def preview_data(
+    request: Request,
     agent_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    db = Depends(db_dependency),
-    request: Request
+    db=Depends(db_dependency)
 ):
     """Preview submitted data"""
     try:
@@ -1563,7 +1560,7 @@ async def preview_data(
 
 @app.get("/api/admin/test-data")
 @limiter.limit("50/minute")
-async def test_data_availability(db = Depends(db_dependency), request: Request):
+async def test_data_availability(request: Request, db=Depends(db_dependency)):
     """Test data availability"""
     try:
         if not database_ready:
@@ -1593,11 +1590,11 @@ async def test_data_availability(db = Depends(db_dependency), request: Request):
 @app.get("/api/admin/session-report")
 @limiter.limit("50/minute")
 async def get_session_report(
+    request: Request,
     agent_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    db = Depends(db_dependency),
-    request: Request
+    db=Depends(db_dependency)
 ):
     """Get session report"""
     try:
@@ -1642,11 +1639,11 @@ async def get_session_report(
 @app.get("/api/admin/export-excel")
 @limiter.limit("10/minute")
 async def export_excel(
+    request: Request,
     agent_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    db = Depends(db_dependency),
-    request: Request
+    db=Depends(db_dependency)
 ):
     """Export submitted data to Excel - ready for implementation"""
     return JSONResponse(
@@ -1660,11 +1657,11 @@ async def export_excel(
 @app.get("/api/admin/export-sessions")
 @limiter.limit("10/minute")
 async def export_sessions(
+    request: Request,
     agent_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    db = Depends(db_dependency),
-    request: Request
+    db=Depends(db_dependency)
 ):
     """Export session report to Excel - ready for implementation"""
     return JSONResponse(
@@ -1691,3 +1688,4 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+```
