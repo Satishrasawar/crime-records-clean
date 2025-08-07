@@ -3,6 +3,9 @@ import sys
 from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+import asyncio
+
 
 # ADD DATABASE SECTION:
 database_ready = False
@@ -24,6 +27,18 @@ except Exception as e:
     traceback.print_exc()
     database_ready = False
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("🚀 Starting up...")
+    yield
+    print("🛑 Shutting down...")
+
+# Modify app creation:
+app = FastAPI(
+    title="Client Records Data Entry System", 
+    version="2.0.0",
+    lifespan=lifespan  # ADD THIS
+)
 app = FastAPI(
     title="Client Records Data Entry System", 
     version="2.0.0"
@@ -58,4 +73,5 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
