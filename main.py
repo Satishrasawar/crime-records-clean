@@ -815,23 +815,42 @@ async def list_agents(db = Depends(db_dependency)):
         return []
 
 # ===================== TASK ENDPOINTS FOR AGENTS =====================
+# ===================== FIXED TASK ENDPOINTS FOR AGENTS =====================
+
 @app.get("/api/agents/{agent_id}/current-task")
 async def get_current_task(agent_id: str, db = Depends(db_dependency)):
-    """Get current task for an agent"""
+    """Get current task for an agent - FIXED VERSION"""
     try:
         if not database_ready:
             raise HTTPException(status_code=503, detail="Database not ready")
         
+        # Validate agent exists
         agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
         if not agent:
             raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
         
-        next_task = db.query(TaskProgress).filter(
+        # First try to get any existing in_progress task
+        current_task = db.query(TaskProgress).filter(
             TaskProgress.agent_id == agent_id,
-            TaskProgress.status.in_(['pending', 'in_progress'])
+            TaskProgress.status == 'in_progress'
         ).order_by(TaskProgress.assigned_at).first()
         
-        if not next_task:
+        # If no in_progress task, get the next pending task
+        if not current_task:
+            current_task = db.query(TaskProgress).filter(
+                TaskProgress.agent_id == agent_id,
+                TaskProgress.status == 'pending'
+            ).order_by(TaskProgress.assigned_at).first()
+            
+            # If we found a pending task, mark it as in_progress
+            if current_task:
+                current_task.status = 'in_progress'
+                current_task.started_at = datetime.utcnow()
+                db.commit()
+                db.refresh(current_task)
+        
+        # If no tasks available, return completion status
+        if not current_task:
             total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).count()
             completed_tasks = db.query(TaskProgress).filter(
                 TaskProgress.agent_id == agent_id,
@@ -840,48 +859,199 @@ async def get_current_task(agent_id: str, db = Depends(db_dependency)):
             
             return {
                 "completed": True,
-                "message": "All tasks completed",
+                "message": "All tasks completed! Great job!",
                 "total_completed": completed_tasks,
-                "total_tasks": total_tasks
+                "total_tasks": total_tasks,
+                "task": None,
+                "image_url": None,
+                "image_name": None,
+                "current_index": completed_tasks,
+                "progress": f"{completed_tasks}/{total_tasks}"
             }
         
-        if next_task.status == 'pending':
-            next_task.status = 'in_progress'
-            next_task.started_at = datetime.utcnow()
-            db.commit()
-        
+        # Calculate progress statistics
         total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).count()
         completed_tasks = db.query(TaskProgress).filter(
             TaskProgress.agent_id == agent_id,
             TaskProgress.status == 'completed'
         ).count()
-        current_index = completed_tasks
         
         return {
+            "completed": False,
             "task": {
-                "id": next_task.id,
-                "agent_id": next_task.agent_id,
-                "image_path": next_task.image_path,
-                "image_filename": next_task.image_filename,
-                "status": next_task.status,
-                "assigned_at": next_task.assigned_at.isoformat()
+                "id": current_task.id,
+                "agent_id": current_task.agent_id,
+                "image_path": current_task.image_path,
+                "image_filename": current_task.image_filename,
+                "status": current_task.status,
+                "assigned_at": current_task.assigned_at.isoformat() if current_task.assigned_at else None,
+                "started_at": current_task.started_at.isoformat() if current_task.started_at else None
             },
-            "image_url": next_task.image_path,
-            "image_name": next_task.image_filename,
-            "current_index": current_index,
+            "image_url": current_task.image_path,
+            "image_name": current_task.image_filename,
+            "current_index": completed_tasks + 1,  # Current task index (1-based)
             "total_images": total_tasks,
-            "progress": f"{current_index + 1}/{total_tasks}"
+            "progress": f"{completed_tasks + 1}/{total_tasks}",
+            "completion_percentage": round(((completed_tasks + 1) / total_tasks) * 100, 1) if total_tasks > 0 else 0
         }
         
     except HTTPException:
         raise
     except Exception as e:
         print(f"❌ Error getting current task for {agent_id}: {e}")
+        if hasattr(db, 'rollback'):
+            db.rollback()
         raise HTTPException(status_code=500, detail=f"Error getting current task: {str(e)}")
 
-@app.get("/api/agents/{agent_id}/tasks")
-async def get_agent_tasks(agent_id: str, db = Depends(db_dependency)):
-    """Get all tasks for an agent"""
+@app.post("/api/agents/{agent_id}/submit")
+async def submit_task_form(
+    agent_id: str,
+    request: Request,
+    db = Depends(db_dependency)
+):
+    """Submit completed task form - FIXED VERSION"""
+    try:
+        if not database_ready:
+            raise HTTPException(status_code=503, detail="Database not ready")
+        
+        # Validate agent exists
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not agent:
+            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
+        
+        # Parse form data - handle both JSON and form submissions
+        try:
+            content_type = request.headers.get("content-type", "")
+            
+            if content_type.startswith("application/json"):
+                form_data = await request.json()
+            else:
+                # Handle multipart form data
+                form = await request.form()
+                form_data = {}
+                for key, value in form.items():
+                    if key not in ['agent_id', 'task_id']:  # Skip metadata fields
+                        form_data[key] = value
+            
+            print(f"📝 Received form data for {agent_id}: {list(form_data.keys())}")
+            
+        except Exception as parse_error:
+            print(f"❌ Error parsing form data: {parse_error}")
+            raise HTTPException(status_code=400, detail="Invalid form data format")
+        
+        # Find the current in-progress task
+        current_task = db.query(TaskProgress).filter(
+            TaskProgress.agent_id == agent_id,
+            TaskProgress.status == 'in_progress'
+        ).order_by(TaskProgress.assigned_at).first()
+        
+        if not current_task:
+            # Fallback: try to find pending task and mark as in_progress
+            current_task = db.query(TaskProgress).filter(
+                TaskProgress.agent_id == agent_id,
+                TaskProgress.status == 'pending'
+            ).order_by(TaskProgress.assigned_at).first()
+            
+            if current_task:
+                current_task.status = 'in_progress'
+                current_task.started_at = datetime.utcnow()
+        
+        if not current_task:
+            raise HTTPException(
+                status_code=404, 
+                detail="No active task found for submission. Please refresh and try again."
+            )
+        
+        # Create submission record
+        try:
+            submitted_form = SubmittedForm(
+                agent_id=agent_id,
+                task_id=current_task.id,
+                image_filename=current_task.image_filename,
+                form_data=form_data,
+                submitted_at=datetime.utcnow()
+            )
+            
+            db.add(submitted_form)
+            
+            # Mark current task as completed
+            current_task.status = 'completed'
+            current_task.completed_at = datetime.utcnow()
+            
+            # Commit both changes
+            db.commit()
+            db.refresh(submitted_form)
+            db.refresh(current_task)
+            
+            print(f"✅ Task {current_task.id} completed by agent {agent_id}")
+            
+        except Exception as db_error:
+            print(f"❌ Database error during submission: {db_error}")
+            if hasattr(db, 'rollback'):
+                db.rollback()
+            raise HTTPException(status_code=500, detail="Failed to save submission to database")
+        
+        # Check if there are more tasks
+        next_task = db.query(TaskProgress).filter(
+            TaskProgress.agent_id == agent_id,
+            TaskProgress.status == 'pending'
+        ).order_by(TaskProgress.assigned_at).first()
+        
+        # Calculate final statistics
+        total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).count()
+        completed_tasks = db.query(TaskProgress).filter(
+            TaskProgress.agent_id == agent_id,
+            TaskProgress.status == 'completed'
+        ).count()
+        
+        response_data = {
+            "success": True,
+            "message": "Task submitted successfully!",
+            "task_id": current_task.id,
+            "completed_tasks": completed_tasks,
+            "total_tasks": total_tasks,
+            "has_next_task": next_task is not None,
+            "progress": f"{completed_tasks}/{total_tasks}",
+            "completion_percentage": round((completed_tasks / total_tasks) * 100, 1) if total_tasks > 0 else 0
+        }
+        
+        if next_task:
+            response_data["next_task_available"] = True
+            response_data["message"] = f"Task submitted! {total_tasks - completed_tasks} tasks remaining."
+        else:
+            response_data["next_task_available"] = False
+            response_data["message"] = "Congratulations! All tasks completed successfully!"
+            response_data["all_completed"] = True
+        
+        return response_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error submitting task for {agent_id}: {e}")
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error submitting task: {str(e)}")
+
+# ===================== ADDITIONAL HELPER ENDPOINTS =====================
+
+@app.get("/api/agents/{agent_id}/next-task")
+async def get_next_task(agent_id: str, db = Depends(db_dependency)):
+    """Get next available task - Alternative endpoint"""
+    try:
+        if not database_ready:
+            raise HTTPException(status_code=503, detail="Database not ready")
+        
+        # This endpoint just redirects to current-task for consistency
+        return await get_current_task(agent_id, db)
+        
+    except Exception as e:
+        print(f"❌ Error getting next task for {agent_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting next task: {str(e)}")
+
+@app.post("/api/agents/{agent_id}/skip-task")
+async def skip_current_task(agent_id: str, db = Depends(db_dependency)):
+    """Skip current task (mark as skipped) - Optional functionality"""
     try:
         if not database_ready:
             raise HTTPException(status_code=503, detail="Database not ready")
@@ -890,42 +1060,48 @@ async def get_agent_tasks(agent_id: str, db = Depends(db_dependency)):
         if not agent:
             raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
         
-        tasks = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id
-        ).order_by(TaskProgress.assigned_at).all()
+        # Find current in-progress task
+        current_task = db.query(TaskProgress).filter(
+            TaskProgress.agent_id == agent_id,
+            TaskProgress.status == 'in_progress'
+        ).order_by(TaskProgress.assigned_at).first()
         
-        task_list = []
-        for task in tasks:
-            task_data = {
-                "id": task.id,
-                "agent_id": task.agent_id,
-                "image_path": task.image_path,
-                "image_filename": task.image_filename,
-                "status": task.status,
-                "assigned_at": task.assigned_at.isoformat(),
-                "started_at": task.started_at.isoformat() if task.started_at else None,
-                "completed_at": task.completed_at.isoformat() if task.completed_at else None
-            }
-            task_list.append(task_data)
+        if not current_task:
+            raise HTTPException(status_code=404, detail="No active task to skip")
         
-        return task_list
+        # Mark as skipped
+        current_task.status = 'skipped'
+        current_task.completed_at = datetime.utcnow()
+        db.commit()
+        
+        print(f"⏭️ Task {current_task.id} skipped by agent {agent_id}")
+        
+        return {
+            "success": True,
+            "message": "Task skipped successfully",
+            "task_id": current_task.id
+        }
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Error getting tasks for {agent_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting tasks: {str(e)}")
+        print(f"❌ Error skipping task for {agent_id}: {e}")
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error skipping task: {str(e)}")
 
-@app.get("/api/agents/{agent_id}/statistics")
-async def get_agent_statistics(agent_id: str, db = Depends(db_dependency)):
-    """Get statistics for a specific agent"""
+@app.get("/api/agents/{agent_id}/progress")
+async def get_agent_progress(agent_id: str, db = Depends(db_dependency)):
+    """Get detailed progress information for an agent"""
     try:
         if not database_ready:
             return {
                 "total_tasks": 0,
                 "completed_tasks": 0,
                 "pending_tasks": 0,
-                "in_progress_tasks": 0
+                "in_progress_tasks": 0,
+                "skipped_tasks": 0,
+                "completion_percentage": 0
             }
         
         agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
@@ -945,174 +1121,37 @@ async def get_agent_statistics(agent_id: str, db = Depends(db_dependency)):
             TaskProgress.agent_id == agent_id,
             TaskProgress.status == 'in_progress'
         ).count()
+        skipped_tasks = db.query(TaskProgress).filter(
+            TaskProgress.agent_id == agent_id,
+            TaskProgress.status == 'skipped'
+        ).count()
+        
+        completion_percentage = round((completed_tasks / total_tasks) * 100, 1) if total_tasks > 0 else 0
         
         return {
+            "agent_id": agent_id,
             "total_tasks": total_tasks,
             "completed_tasks": completed_tasks,
             "pending_tasks": pending_tasks,
-            "in_progress_tasks": in_progress_tasks
+            "in_progress_tasks": in_progress_tasks,
+            "skipped_tasks": skipped_tasks,
+            "completion_percentage": completion_percentage,
+            "progress_text": f"{completed_tasks}/{total_tasks}",
+            "is_completed": pending_tasks == 0 and in_progress_tasks == 0
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Error getting statistics for {agent_id}: {e}")
+        print(f"❌ Error getting progress for {agent_id}: {e}")
         return {
             "total_tasks": 0,
             "completed_tasks": 0,
             "pending_tasks": 0,
-            "in_progress_tasks": 0
+            "in_progress_tasks": 0,
+            "skipped_tasks": 0,
+            "completion_percentage": 0
         }
-
-# ===================== AGENT REGISTRATION ENDPOINT =====================
-@app.post("/api/agents/register")
-async def register_agent(
-    name: str = Form(...),
-    email: str = Form(...),
-    mobile: str = Form(...),
-    dob: str = Form(...),
-    country: str = Form(...),
-    gender: str = Form(...),
-    db = Depends(db_dependency)
-):
-    """Register a new agent with proper date handling"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        # Validate date format
-        try:
-            datetime.strptime(dob, '%Y-%m-%d')
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-        
-        # Check if email already exists
-        existing_agent = db.query(Agent).filter(Agent.email == email).first()
-        if existing_agent:
-            raise HTTPException(status_code=400, detail="Email already registered")
-        
-        # Generate unique agent ID
-        agent_id = f"AG{datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:4].upper()}"
-        
-        # Generate secure password
-        import secrets
-        import string
-        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-        password = ''.join(secrets.choice(alphabet) for _ in range(12))
-        
-        # Create agent record
-        new_agent = Agent(
-            agent_id=agent_id,
-            name=name,
-            email=email,
-            mobile=mobile,
-            dob=dob,
-            country=country,
-            gender=gender,
-            password=password,
-            status="active",
-            created_at=datetime.now()
-        )
-        
-        db.add(new_agent)
-        db.commit()
-        db.refresh(new_agent)
-        
-        print(f"✅ New agent registered: {agent_id}")
-        
-        return {
-            "success": True,
-            "agent_id": agent_id,
-            "password": password,
-            "message": "Agent registered successfully"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error registering agent: {e}")
-        if hasattr(db, 'rollback'):
-            db.rollback()
-        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
-
-# ===================== FORM SUBMISSION ENDPOINT =====================
-@app.post("/api/agents/{agent_id}/submit")
-async def submit_task_form(
-    agent_id: str,
-    request: Request,
-    db = Depends(db_dependency)
-):
-    """Submit completed task form - handles both JSON and form data"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        # Handle both JSON and form data from frontend
-        content_type = request.headers.get("content-type", "")
-        
-        if content_type.startswith("application/json"):
-            data = await request.json()
-        else:
-            # Handle form data from frontend
-            form_data = await request.form()
-            data = dict(form_data)
-            # Remove metadata fields
-            data.pop('agent_id', None)
-            data.pop('task_id', None)
-        
-        # Get the current in-progress task for this agent
-        current_task = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id,
-            TaskProgress.status == 'in_progress'
-        ).order_by(TaskProgress.assigned_at).first()
-        
-        if not current_task:
-            # If no in-progress task, try to find a pending one
-            current_task = db.query(TaskProgress).filter(
-                TaskProgress.agent_id == agent_id,
-                TaskProgress.status == 'pending'
-            ).order_by(TaskProgress.assigned_at).first()
-        
-        if not current_task:
-            raise HTTPException(status_code=404, detail="No active task found for submission")
-        
-        # Create submitted form record
-        submitted_form = SubmittedForm(
-            agent_id=agent_id,
-            task_id=current_task.id,
-            image_filename=current_task.image_filename,
-            form_data=data,
-            submitted_at=datetime.utcnow()
-        )
-        
-        db.add(submitted_form)
-        
-        # Mark task as completed
-        current_task.status = 'completed'
-        current_task.completed_at = datetime.utcnow()
-        
-        # Commit changes
-        db.commit()
-        
-        print(f"✅ Task {current_task.id} completed by agent {agent_id}")
-        
-        return {
-            "success": True,
-            "message": "Task submitted successfully",
-            "task_id": current_task.id
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error submitting task for {agent_id}: {e}")
-        if hasattr(db, 'rollback'):
-            db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error submitting task: {str(e)}")
 
 # ===================== STANDARD UPLOAD ENDPOINT =====================
 @app.post("/api/admin/upload-tasks")
@@ -1615,3 +1654,4 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
