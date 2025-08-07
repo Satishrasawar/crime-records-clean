@@ -38,40 +38,329 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
 @router.post("/api/admin/login")
 @limiter.limit("5/minute")
 async def admin_login(request: Request, db: Session = Depends(get_db)):
-    """Secure admin login with JWT token and hashed password"""
+    """Secure admin login with JWT token and hashed password - ENHANCED DEBUG VERSION"""
     try:
-        data = await request.json()
+        print("🔐 Admin login attempt received")
+        
+        # Parse request data with enhanced error handling
+        try:
+            data = await request.json()
+            print(f"📨 Login data received: {list(data.keys()) if data else 'No data'}")
+        except Exception as parse_error:
+            print(f"❌ Failed to parse login data: {parse_error}")
+            raise HTTPException(status_code=400, detail="Invalid JSON data")
+        
         username = data.get("username")
         password = data.get("password")
+        
+        print(f"🔍 Login attempt - Username: '{username}', Password length: {len(password) if password else 0}")
 
         if not username or not password:
+            print("❌ Missing username or password")
             raise HTTPException(status_code=400, detail="Username and password are required")
-        if len(username) < 4 or len(password) < 8:
-            raise HTTPException(status_code=400, detail="Username must be at least 4 characters and password at least 8 characters")
+            
+        # Remove the length restriction for debugging
+        # if len(username) < 4 or len(password) < 8:
+        #     raise HTTPException(status_code=400, detail="Username must be at least 4 characters and password at least 8 characters")
 
+        print(f"🔍 Querying database for admin: {username}")
         admin = db.query(Admin).filter(Admin.username == username).first()
-        if not admin or not verify_password(password, admin.hashed_password):
-            print(f"❌ Invalid admin login attempt for {username}")
+        
+        if not admin:
+            print(f"❌ Admin user '{username}' not found in database")
+            # Check if any admins exist
+            admin_count = db.query(Admin).count()
+            print(f"📊 Total admins in database: {admin_count}")
+            if admin_count == 0:
+                print("⚠️ No admin users exist in database!")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        print(f"✅ Admin user found: {admin.username}, Active: {admin.is_active}")
+        print(f"🔐 Stored hash: {admin.hashed_password[:20]}...")
+        
+        # Test password verification with debug info
+        try:
+            password_valid = verify_password(password, admin.hashed_password)
+            print(f"🔐 Password verification result: {password_valid}")
+        except Exception as verify_error:
+            print(f"❌ Password verification error: {verify_error}")
+            raise HTTPException(status_code=500, detail="Password verification failed")
+        
+        if not password_valid:
+            print(f"❌ Invalid password for admin {username}")
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
         if not admin.is_active:
-            print(f"❌ Admin {username} is not active")
+            print(f"❌ Admin {username} is not active: {admin.is_active}")
             raise HTTPException(status_code=403, detail="Account is not active")
 
-        access_token = create_access_token(data={"sub": username})
-        print(f"✅ Admin login successful for {username}")
+        # Create access token
+        try:
+            access_token = create_access_token(data={"sub": username})
+            print(f"✅ JWT token created successfully for {username}")
+        except Exception as token_error:
+            print(f"❌ Token creation error: {token_error}")
+            raise HTTPException(status_code=500, detail="Token creation failed")
+        
+        print(f"🎉 Admin login successful for {username}")
 
         return {
             "success": True,
             "access_token": access_token,
             "token_type": "bearer",
-            "message": "Login successful"
+            "message": "Login successful",
+            "admin_info": {
+                "username": admin.username,
+                "email": admin.email,
+                "is_active": admin.is_active
+            }
         }
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Admin login error: {e}")
-        raise HTTPException(status_code=500, detail="Login failed")
+        print(f"❌ Unexpected admin login error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
+
+# ===================== ADMIN DEBUG ENDPOINTS =====================
+@router.post("/api/admin/debug-create")
+@limiter.limit("1/minute")
+async def debug_create_admin(request: Request, db: Session = Depends(get_db)):
+    """Debug endpoint to create admin user"""
+    try:
+        print("🔧 Debug: Creating admin user")
+        
+        # Check if admin already exists
+        existing_admin = db.query(Admin).filter(Admin.username == "admin").first()
+        if existing_admin:
+            print(f"⚠️ Admin already exists: {existing_admin.username}, Active: {existing_admin.is_active}")
+            return {
+                "message": "Admin already exists",
+                "username": existing_admin.username,
+                "email": existing_admin.email,
+                "is_active": existing_admin.is_active,
+                "created_at": existing_admin.created_at.isoformat() if existing_admin.created_at else None
+            }
+        
+        # Create new admin
+        print("🔧 Creating new admin user")
+        hashed_password = hash_password("admin123")
+        print(f"🔐 Generated hash: {hashed_password[:20]}...")
+        
+        new_admin = Admin(
+            username="admin",
+            hashed_password=hashed_password,
+            email="admin@agent-task-system.com",
+            is_active=True,
+            created_at=datetime.utcnow()
+        )
+        
+        db.add(new_admin)
+        db.commit()
+        db.refresh(new_admin)
+        
+        print(f"✅ Admin created successfully: ID {new_admin.id}")
+        
+        return {
+            "success": True,
+            "message": "Admin user created successfully!",
+            "credentials": {
+                "username": "admin",
+                "password": "admin123"
+            },
+            "admin_info": {
+                "id": new_admin.id,
+                "username": new_admin.username,
+                "email": new_admin.email,
+                "is_active": new_admin.is_active
+            }
+        }
+        
+    except Exception as e:
+        print(f"❌ Error creating admin: {e}")
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create admin: {str(e)}")
+
+@router.get("/api/admin/debug-check")
+@limiter.limit("10/minute")
+async def debug_check_admin(request: Request, db: Session = Depends(get_db)):
+    """Debug endpoint to check admin status"""
+    try:
+        print("🔍 Debug: Checking admin status")
+        
+        # Get all admins
+        admins = db.query(Admin).all()
+        admin_count = len(admins)
+        
+        print(f"📊 Found {admin_count} admin users")
+        
+        if admin_count == 0:
+            return {
+                "admin_exists": False,
+                "admin_count": 0,
+                "message": "No admin users found. Use /api/admin/debug-create to create one."
+            }
+        
+        admin_list = []
+        for admin in admins:
+            admin_info = {
+                "id": admin.id,
+                "username": admin.username,
+                "email": admin.email,
+                "is_active": admin.is_active,
+                "created_at": admin.created_at.isoformat() if admin.created_at else None,
+                "hash_preview": admin.hashed_password[:20] + "..." if admin.hashed_password else "No hash"
+            }
+            admin_list.append(admin_info)
+            print(f"👤 Admin: {admin.username}, Active: {admin.is_active}")
+        
+        return {
+            "admin_exists": True,
+            "admin_count": admin_count,
+            "admins": admin_list,
+            "message": f"Found {admin_count} admin user(s). Use credentials: admin / admin123"
+        }
+        
+    except Exception as e:
+        print(f"❌ Error checking admin: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
+
+@router.post("/api/admin/debug-test-login")
+@limiter.limit("10/minute")
+async def debug_test_login(request: Request, db: Session = Depends(get_db)):
+    """Debug endpoint to test login components"""
+    try:
+        print("🧪 Debug: Testing login components")
+        
+        data = await request.json()
+        username = data.get("username", "admin")
+        password = data.get("password", "admin123")
+        
+        print(f"🧪 Testing with username: {username}, password: {password}")
+        
+        # Step 1: Check if admin exists
+        admin = db.query(Admin).filter(Admin.username == username).first()
+        if not admin:
+            return {
+                "success": False,
+                "step": "user_lookup",
+                "message": f"Admin user '{username}' not found"
+            }
+        
+        print(f"✅ Step 1: User found - {admin.username}")
+        
+        # Step 2: Test password verification
+        try:
+            password_valid = verify_password(password, admin.hashed_password)
+            print(f"✅ Step 2: Password verification - {password_valid}")
+        except Exception as verify_error:
+            return {
+                "success": False,
+                "step": "password_verification",
+                "message": f"Password verification failed: {str(verify_error)}"
+            }
+        
+        if not password_valid:
+            return {
+                "success": False,
+                "step": "password_verification", 
+                "message": "Invalid password"
+            }
+        
+        # Step 3: Check if active
+        if not admin.is_active:
+            return {
+                "success": False,
+                "step": "active_check",
+                "message": "Admin user is not active"
+            }
+        
+        print(f"✅ Step 3: Admin is active")
+        
+        # Step 4: Test JWT creation
+        try:
+            access_token = create_access_token(data={"sub": username})
+            print(f"✅ Step 4: JWT token created")
+        except Exception as token_error:
+            return {
+                "success": False,
+                "step": "token_creation",
+                "message": f"Token creation failed: {str(token_error)}"
+            }
+        
+        return {
+            "success": True,
+            "message": "All login components working!",
+            "test_results": {
+                "user_found": True,
+                "password_valid": True,
+                "user_active": True,
+                "token_created": True
+            },
+            "admin_info": {
+                "username": admin.username,
+                "email": admin.email,
+                "is_active": admin.is_active
+            },
+            "token_preview": access_token[:50] + "..." if access_token else None
+        }
+        
+    except Exception as e:
+        print(f"❌ Debug test error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "error": str(e)}
+
+@router.post("/api/admin/debug-reset")
+@limiter.limit("1/minute")
+async def debug_reset_admin(request: Request, db: Session = Depends(get_db)):
+    """Debug endpoint to reset admin password"""
+    try:
+        print("🔄 Debug: Resetting admin password")
+        
+        admin = db.query(Admin).filter(Admin.username == "admin").first()
+        if not admin:
+            print("❌ Admin user not found for reset")
+            raise HTTPException(status_code=404, detail="Admin user not found")
+        
+        # Reset password
+        new_password = "admin123"
+        new_hash = hash_password(new_password)
+        
+        print(f"🔐 Old hash: {admin.hashed_password[:20]}...")
+        print(f"🔐 New hash: {new_hash[:20]}...")
+        
+        admin.hashed_password = new_hash
+        admin.is_active = True  # Make sure admin is active
+        db.commit()
+        
+        print("✅ Admin password reset successfully")
+        
+        return {
+            "success": True,
+            "message": "Admin password reset successfully!",
+            "credentials": {
+                "username": "admin",
+                "password": "admin123"
+            },
+            "admin_info": {
+                "username": admin.username,
+                "email": admin.email,
+                "is_active": admin.is_active
+            }
+        }
+        
+    except Exception as e:
+        print(f"❌ Error resetting admin: {e}")
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to reset password: {str(e)}")
 
 def generate_agent_credentials():
     agent_id = "AGT" + "".join(secrets.choice(string.digits) for _ in range(6))
@@ -89,8 +378,7 @@ def get_agent_image_files(agent_id: str):
         return []
     
     return sorted([f for f in os.listdir(agent_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
-
-@router.post("/api/agents/register")
+    @router.post("/api/agents/register")
 async def register_agent(
     name: str = Form(...),
     email: str = Form(...),
@@ -423,7 +711,6 @@ async def get_session_report(
     except Exception as e:
         print(f"❌ Error in session report: {e}")
         raise HTTPException(status_code=500, detail=f"Session report failed: {str(e)}")
-
 @router.get("/api/agents/{agent_id}/current-task")
 def get_current_task(agent_id: str, db: Session = Depends(get_db)):
     print(f"📋 Getting current task for agent: {agent_id}")
