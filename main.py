@@ -14,6 +14,8 @@ from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Req
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
 
 # Chunked upload configuration
 CHUNK_UPLOAD_DIR = "temp_chunks"
@@ -72,8 +74,8 @@ def get_mock_db():
 # Try to import and setup database
 try:
     print("📦 Importing database modules...")
-    from database import Base, engine, get_db
-    from models import Agent, TaskProgress, SubmittedForm, AgentSession
+    from app.database import Base, engine, get_db
+    from app.models import Agent, TaskProgress, SubmittedForm, AgentSession, Admin, ImageAssignment
     
     print("🔧 Creating database tables...")
     Base.metadata.create_all(bind=engine)
@@ -105,8 +107,106 @@ else:
         "https://web-railwaybuilderherokupython.up.railway.app",
         "http://localhost:3000",
         "http://localhost:8000",
-        "http://127.0.0.1:8000"
+        "http://127.0.0.1:8000",
+        "https://web-production-b3ef2.up.railway.app"
     ]
+
+# Rate limiting setup
+limiter = Limiter(key_func=get_remote_address)
+
+# Lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan - startup and shutdown events"""
+    print("🚀 Starting periodic cleanup task...")
+    print(f"🌍 Domain: {os.environ.get('DOMAIN', 'railway')}")
+    print(f"🔗 Allowed Origins: {len(ALLOWED_ORIGINS)} configured")
+    
+    # Start background cleanup task
+    cleanup_task = asyncio.create_task(periodic_cleanup())
+    
+    yield
+    
+    # Shutdown
+    print("🛑 Shutting down application...")
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+    print("✅ Application shutdown complete")
+
+# Initialize FastAPI app with lifespan
+app = FastAPI(
+    title="Client Records Data Entry System", 
+    version="2.0.0",
+    description="Enhanced system for agent-task-system.com with chunked upload support and custom domain",
+    lifespan=lifespan
+)
+
+# Add rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(429, _rate_limit_exceeded_handler)
+
+# Enhanced CORS middleware with custom domain support
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["Content-Disposition"]
+)
+
+# Enhanced request middleware for domain detection, logging, and security
+@app.middleware("http")
+async def enhanced_request_middleware(request, call_next):
+    """Enhanced middleware for domain detection, logging, and security"""
+    host = request.headers.get("host", "unknown")
+    origin = request.headers.get("origin", "unknown")
+    
+    # Log domain information for debugging (exclude health checks to reduce noise)
+    if not request.url.path.startswith("/health") and not host.startswith(("127.0.0.1", "localhost")):
+        print(f"🌍 Request - Host: {host}, Origin: {origin}, Path: {request.url.path}")
+    
+    response = await call_next(request)
+    
+    # Add security headers
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    
+    # Add domain-specific headers
+    if "agent-task-system.com" in host:
+        response.headers["X-Domain-Status"] = "production"
+        response.headers["X-Environment"] = "production"
+    elif "railway.app" in host:
+        response.headers["X-Domain-Status"] = "railway"
+        response.headers["X-Environment"] = "staging"
+    else:
+        response.headers["X-Domain-Status"] = "development"
+        response.headers["X-Environment"] = "development"
+    
+    return response
+
+# Try to import and include agent routes
+try:
+    print("📦 Importing agent routes...")
+    from agent_routes import router as agent_router
+    app.include_router(agent_router)
+    print("✅ Agent routes included successfully!")
+    routes_ready = True
+except Exception as e:
+    print(f"❌ Agent routes failed: {e}")
+    routes_ready = False
+
+# Create directories and mount static files
+try:
+    os.makedirs("static/task_images", exist_ok=True)
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    print("✅ Static files configured")
+except Exception as e:
+    print(f"❌ Static files setup failed: {e}")
 
 # ===================== CLEANUP FUNCTIONS =====================
 def cleanup_upload_session(upload_id: str):
@@ -291,100 +391,10 @@ async def process_uploaded_zip(file_path: str, agent_id: str, db):
         "timestamp": datetime.now().isoformat()
     }
 
-# Lifespan context manager (replaces deprecated @app.on_event)
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan - startup and shutdown events"""
-    # Startup
-    print("🚀 Starting periodic cleanup task...")
-    print(f"🌍 Domain: {os.environ.get('DOMAIN', 'railway')}")
-    print(f"🔗 Allowed Origins: {len(ALLOWED_ORIGINS)} configured")
-    
-    # Start background cleanup task
-    cleanup_task = asyncio.create_task(periodic_cleanup())
-    
-    yield
-    
-    # Shutdown
-    print("🛑 Shutting down application...")
-    cleanup_task.cancel()
-    try:
-        await cleanup_task
-    except asyncio.CancelledError:
-        pass
-    print("✅ Application shutdown complete")
-
-# Initialize FastAPI app with lifespan
-app = FastAPI(
-    title="Client Records Data Entry System", 
-    version="2.0.0",
-    description="Enhanced system for agent-task-system.com with chunked upload support and custom domain",
-    lifespan=lifespan
-)
-
-# Enhanced CORS middleware with custom domain support
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["Content-Disposition"]
-)
-
-# Enhanced request middleware for domain detection, logging, and security
-@app.middleware("http")
-async def enhanced_request_middleware(request, call_next):
-    """Enhanced middleware for domain detection, logging, and security"""
-    host = request.headers.get("host", "unknown")
-    origin = request.headers.get("origin", "unknown")
-    
-    # Log domain information for debugging (exclude health checks to reduce noise)
-    if not request.url.path.startswith("/health") and not host.startswith(("127.0.0.1", "localhost")):
-        print(f"🌍 Request - Host: {host}, Origin: {origin}, Path: {request.url.path}")
-    
-    response = await call_next(request)
-    
-    # Add security headers
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    
-    # Add domain-specific headers
-    if "agent-task-system.com" in host:
-        response.headers["X-Domain-Status"] = "production"
-        response.headers["X-Environment"] = "production"
-    elif "railway.app" in host:
-        response.headers["X-Domain-Status"] = "railway"
-        response.headers["X-Environment"] = "staging"
-    else:
-        response.headers["X-Domain-Status"] = "development"
-        response.headers["X-Environment"] = "development"
-    
-    return response
-
-# Try to import and include agent routes
-try:
-    print("📦 Importing agent routes...")
-    from agent_routes import router as agent_router
-    app.include_router(agent_router)
-    print("✅ Agent routes included successfully!")
-    routes_ready = True
-except Exception as e:
-    print(f"❌ Agent routes failed: {e}")
-    routes_ready = False
-
-# Create directories and mount static files
-try:
-    os.makedirs("static/task_images", exist_ok=True)
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-    print("✅ Static files configured")
-except Exception as e:
-    print(f"❌ Static files setup failed: {e}")
-
 # ===================== ENHANCED HEALTH CHECK =====================
 @app.get("/health")
-def health_check():
+@limiter.limit("100/minute")
+async def health_check(request: Request):
     """Enhanced health check with proper database connectivity testing"""
     health_status = {
         "status": "healthy",
@@ -450,18 +460,21 @@ def health_check():
 
 # Add simple health endpoints for Railway
 @app.get("/healthz")
-def railway_health():
+@limiter.limit("100/minute")
+async def railway_health(request: Request):
     """Simple health check for Railway"""
     return {"status": "ok"}
 
 @app.get("/ping")
-def ping():
+@limiter.limit("100/minute")
+async def ping(request: Request):
     """Minimal ping"""
     return "pong"
 
 # Enhanced root endpoint
 @app.get("/")
-def root():
+@limiter.limit("100/minute")
+async def root(request: Request):
     """Root endpoint with domain information"""
     return {
         "message": "Client Records Data Entry System API v2.0",
@@ -481,14 +494,15 @@ def root():
     }
 
 # ===================== ENHANCED STATIC FILE SERVING =====================
-
 @app.get("/admin")
-async def serve_admin_panel_redirect():
+@limiter.limit("50/minute")
+async def serve_admin_panel_redirect(request: Request):
     """Redirect /admin to /admin.html"""
     return FileResponse("admin.html") if os.path.exists("admin.html") else JSONResponse({"error": "Admin panel not found"}, status_code=404)
 
 @app.get("/admin.html")
-async def serve_admin_panel():
+@limiter.limit("50/minute")
+async def serve_admin_panel(request: Request):
     """Serve admin dashboard"""
     try:
         if os.path.exists("admin.html"):
@@ -593,12 +607,14 @@ async def serve_admin_panel():
         return JSONResponse({"error": f"Could not serve admin panel: {e}"}, status_code=500)
 
 @app.get("/agent")
-async def serve_agent_panel_redirect():
+@limiter.limit("50/minute")
+async def serve_agent_panel_redirect(request: Request):
     """Redirect /agent to /agent.html"""
     return FileResponse("agent.html") if os.path.exists("agent.html") else JSONResponse({"error": "Agent panel not found"}, status_code=404)
 
 @app.get("/agent.html") 
-async def serve_agent_panel():
+@limiter.limit("50/minute")
+async def serve_agent_panel(request: Request):
     """Serve agent interface"""
     try:
         if os.path.exists("agent.html"):
@@ -696,9 +712,9 @@ async def serve_agent_panel():
         return JSONResponse({"error": f"Could not serve agent panel: {e}"}, status_code=500)
 
 # ===================== ENHANCED DEBUG ENDPOINTS =====================
-
 @app.get("/debug")
-def debug_info():
+@limiter.limit("50/minute")
+async def debug_info(request: Request):
     """Enhanced debug endpoint with domain information"""
     return {
         "environment": {
@@ -723,7 +739,8 @@ def debug_info():
     }
 
 @app.get("/status")
-def system_status():
+@limiter.limit("50/minute")
+async def system_status(request: Request):
     """Enhanced system status endpoint"""
     return {
         "status": "operational",
@@ -738,7 +755,8 @@ def system_status():
 
 # ===================== STATISTICS ENDPOINT =====================
 @app.get("/api/admin/statistics")
-async def get_admin_statistics(db = Depends(db_dependency)):
+@limiter.limit("50/minute")
+async def get_admin_statistics(db = Depends(db_dependency), request: Request):
     """Get admin dashboard statistics"""
     try:
         if not database_ready:
@@ -775,7 +793,8 @@ async def get_admin_statistics(db = Depends(db_dependency)):
 
 # ===================== AGENTS ENDPOINTS =====================
 @app.get("/api/agents")
-async def list_agents(db = Depends(db_dependency)):
+@limiter.limit("50/minute")
+async def list_agents(db = Depends(db_dependency), request: Request):
     """List all agents with their statistics"""
     try:
         if not database_ready:
@@ -815,10 +834,9 @@ async def list_agents(db = Depends(db_dependency)):
         return []
 
 # ===================== TASK ENDPOINTS FOR AGENTS =====================
-# ===================== FIXED TASK ENDPOINTS FOR AGENTS =====================
-
 @app.get("/api/agents/{agent_id}/current-task")
-async def get_current_task(agent_id: str, db = Depends(db_dependency)):
+@limiter.limit("50/minute")
+async def get_current_task(agent_id: str, db = Depends(db_dependency), request: Request):
     """Get current task for an agent - FIXED VERSION"""
     try:
         if not database_ready:
@@ -904,6 +922,7 @@ async def get_current_task(agent_id: str, db = Depends(db_dependency)):
         raise HTTPException(status_code=500, detail=f"Error getting current task: {str(e)}")
 
 @app.post("/api/agents/{agent_id}/submit")
+@limiter.limit("50/minute")
 async def submit_task_form(
     agent_id: str,
     request: Request,
@@ -1034,9 +1053,9 @@ async def submit_task_form(
         raise HTTPException(status_code=500, detail=f"Error submitting task: {str(e)}")
 
 # ===================== ADDITIONAL HELPER ENDPOINTS =====================
-
 @app.get("/api/agents/{agent_id}/next-task")
-async def get_next_task(agent_id: str, db = Depends(db_dependency)):
+@limiter.limit("50/minute")
+async def get_next_task(agent_id: str, db = Depends(db_dependency), request: Request):
     """Get next available task - Alternative endpoint"""
     try:
         if not database_ready:
@@ -1050,7 +1069,8 @@ async def get_next_task(agent_id: str, db = Depends(db_dependency)):
         raise HTTPException(status_code=500, detail=f"Error getting next task: {str(e)}")
 
 @app.post("/api/agents/{agent_id}/skip-task")
-async def skip_current_task(agent_id: str, db = Depends(db_dependency)):
+@limiter.limit("50/minute")
+async def skip_current_task(agent_id: str, db = Depends(db_dependency), request: Request):
     """Skip current task (mark as skipped) - Optional functionality"""
     try:
         if not database_ready:
@@ -1091,7 +1111,8 @@ async def skip_current_task(agent_id: str, db = Depends(db_dependency)):
         raise HTTPException(status_code=500, detail=f"Error skipping task: {str(e)}")
 
 @app.get("/api/agents/{agent_id}/progress")
-async def get_agent_progress(agent_id: str, db = Depends(db_dependency)):
+@limiter.limit("50/minute")
+async def get_agent_progress(agent_id: str, db = Depends(db_dependency), request: Request):
     """Get detailed progress information for an agent"""
     try:
         if not database_ready:
@@ -1155,10 +1176,12 @@ async def get_agent_progress(agent_id: str, db = Depends(db_dependency)):
 
 # ===================== STANDARD UPLOAD ENDPOINT =====================
 @app.post("/api/admin/upload-tasks")
+@limiter.limit("10/minute")
 async def upload_tasks_standard(
     zip_file: UploadFile = File(...),
     agent_id: str = Form(...),
-    db = Depends(db_dependency)
+    db = Depends(db_dependency),
+    request: Request
 ):
     """Standard upload endpoint for smaller files"""
     try:
@@ -1191,13 +1214,14 @@ async def upload_tasks_standard(
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 # ===================== CHUNKED UPLOAD ENDPOINTS =====================
-
 @app.post("/api/admin/init-chunked-upload")
+@limiter.limit("10/minute")
 async def init_chunked_upload(
     filename: str = Form(...),
     filesize: int = Form(...),
     total_chunks: int = Form(...),
-    agent_id: str = Form(...)
+    agent_id: str = Form(...),
+    request: Request
 ):
     """Initialize a chunked upload session for large files"""
     try:
@@ -1250,10 +1274,12 @@ async def init_chunked_upload(
         raise HTTPException(status_code=500, detail=f"Failed to initialize upload: {str(e)}")
 
 @app.post("/api/admin/upload-chunk")
+@limiter.limit("50/minute")
 async def upload_chunk(
     upload_id: str = Form(...),
     chunk_index: int = Form(...),
-    chunk: UploadFile = File(...)
+    chunk: UploadFile = File(...),
+    request: Request
 ):
     """Upload a single chunk of a large file"""
     try:
@@ -1302,7 +1328,8 @@ async def upload_chunk(
         raise HTTPException(status_code=500, detail=f"Failed to upload chunk: {str(e)}")
 
 @app.post("/api/admin/finalize-chunked-upload")
-async def finalize_chunked_upload(upload_id: str = Form(...), db = Depends(db_dependency)):
+@limiter.limit("10/minute")
+async def finalize_chunked_upload(upload_id: str = Form(...), db = Depends(db_dependency), request: Request):
     """Combine all chunks and process the complete file"""
     try:
         if upload_id not in upload_sessions:
@@ -1353,9 +1380,9 @@ async def finalize_chunked_upload(upload_id: str = Form(...), db = Depends(db_de
         raise HTTPException(status_code=500, detail=f"Failed to finalize upload: {str(e)}")
 
 # ===================== UPLOAD SESSIONS MANAGEMENT =====================
-
 @app.get("/api/admin/upload-sessions")
-def get_upload_sessions():
+@limiter.limit("50/minute")
+async def get_upload_sessions(request: Request):
     """Get current upload sessions (admin only)"""
     sessions_info = {}
     for upload_id, session in upload_sessions.items():
@@ -1371,9 +1398,9 @@ def get_upload_sessions():
     return {"upload_sessions": sessions_info}
 
 # ===================== ADDITIONAL ADMIN ENDPOINTS =====================
-
 @app.post("/api/admin/reset-password/{agent_id}")
-async def reset_agent_password(agent_id: str, db = Depends(db_dependency)):
+@limiter.limit("10/minute")
+async def reset_agent_password(agent_id: str, db = Depends(db_dependency), request: Request):
     """Reset agent password"""
     try:
         if not database_ready:
@@ -1406,7 +1433,8 @@ async def reset_agent_password(agent_id: str, db = Depends(db_dependency)):
         raise HTTPException(status_code=500, detail=f"Password reset failed: {str(e)}")
 
 @app.get("/api/admin/agent-password/{agent_id}")
-async def get_agent_password(agent_id: str, db = Depends(db_dependency)):
+@limiter.limit("50/minute")
+async def get_agent_password(agent_id: str, db = Depends(db_dependency), request: Request):
     """Get agent password information"""
     try:
         if not database_ready:
@@ -1429,7 +1457,8 @@ async def get_agent_password(agent_id: str, db = Depends(db_dependency)):
         raise HTTPException(status_code=500, detail=f"Error retrieving password: {str(e)}")
 
 @app.patch("/api/agents/{agent_id}/status")
-async def update_agent_status(agent_id: str, status_data: dict, db = Depends(db_dependency)):
+@limiter.limit("10/minute")
+async def update_agent_status(agent_id: str, status_data: dict, db = Depends(db_dependency), request: Request):
     """Update agent status"""
     try:
         if not database_ready:
@@ -1458,7 +1487,8 @@ async def update_agent_status(agent_id: str, status_data: dict, db = Depends(db_
         raise HTTPException(status_code=500, detail=f"Status update failed: {str(e)}")
 
 @app.post("/api/admin/force-logout/{agent_id}")
-async def force_logout_agent(agent_id: str, db = Depends(db_dependency)):
+@limiter.limit("10/minute")
+async def force_logout_agent(agent_id: str, db = Depends(db_dependency), request: Request):
     """Force logout an agent"""
     try:
         if not database_ready:
@@ -1488,11 +1518,13 @@ async def force_logout_agent(agent_id: str, db = Depends(db_dependency)):
         raise HTTPException(status_code=500, detail=f"Force logout failed: {str(e)}")
 
 @app.get("/api/admin/preview-data")
+@limiter.limit("50/minute")
 async def preview_data(
     agent_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    db = Depends(db_dependency)
+    db = Depends(db_dependency),
+    request: Request
 ):
     """Preview submitted data"""
     try:
@@ -1530,7 +1562,8 @@ async def preview_data(
         raise HTTPException(status_code=500, detail=f"Preview failed: {str(e)}")
 
 @app.get("/api/admin/test-data")
-async def test_data_availability(db = Depends(db_dependency)):
+@limiter.limit("50/minute")
+async def test_data_availability(db = Depends(db_dependency), request: Request):
     """Test data availability"""
     try:
         if not database_ready:
@@ -1558,11 +1591,13 @@ async def test_data_availability(db = Depends(db_dependency)):
         raise HTTPException(status_code=500, detail=f"Data test failed: {str(e)}")
 
 @app.get("/api/admin/session-report")
+@limiter.limit("50/minute")
 async def get_session_report(
     agent_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    db = Depends(db_dependency)
+    db = Depends(db_dependency),
+    request: Request
 ):
     """Get session report"""
     try:
@@ -1604,13 +1639,14 @@ async def get_session_report(
         raise HTTPException(status_code=500, detail=f"Session report failed: {str(e)}")
 
 # ===================== EXPORT ENDPOINTS (PLACEHOLDERS) =====================
-
 @app.get("/api/admin/export-excel")
+@limiter.limit("10/minute")
 async def export_excel(
     agent_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    db = Depends(db_dependency)
+    db = Depends(db_dependency),
+    request: Request
 ):
     """Export submitted data to Excel - ready for implementation"""
     return JSONResponse(
@@ -1622,11 +1658,13 @@ async def export_excel(
     )
 
 @app.get("/api/admin/export-sessions")
+@limiter.limit("10/minute")
 async def export_sessions(
     agent_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    db = Depends(db_dependency)
+    db = Depends(db_dependency),
+    request: Request
 ):
     """Export session report to Excel - ready for implementation"""
     return JSONResponse(
@@ -1638,7 +1676,6 @@ async def export_sessions(
     )
 
 # ===================== MAIN ENTRY POINT =====================
-
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
@@ -1654,6 +1691,3 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
-
-
-
