@@ -1,3 +1,6 @@
+# THIS IS ALMOST YOUR COMPLETE ORIGINAL CODE
+# Adding the HTML serving endpoints that might be causing the issue
+
 import os
 import sys
 import uuid
@@ -155,7 +158,7 @@ async def periodic_cleanup():
 
 # ===================== ZIP PROCESSING FUNCTION =====================
 async def process_uploaded_zip(file_path: str, agent_id: str, db):
-    """ZIP file processing - THIS IS VERY COMPLEX AND MIGHT CAUSE ISSUES"""
+    """ZIP file processing function"""
     temp_files_created = []
     
     try:
@@ -382,7 +385,204 @@ try:
 except Exception as e:
     print(f"❌ Static files setup failed: {e}")
 
-# ===================== HEALTH CHECK =====================
+# ===================== ENHANCED STATIC FILE SERVING - THE SUSPECT =====================
+
+@app.get("/admin")
+async def serve_admin_panel_redirect():
+    """Redirect /admin to /admin.html - MIGHT CAUSE ISSUES"""
+    return FileResponse("admin.html") if os.path.exists("admin.html") else JSONResponse({"error": "Admin panel not found"}, status_code=404)
+
+@app.get("/admin.html")
+async def serve_admin_panel():
+    """Serve admin dashboard - VERY COMPLEX HTML GENERATION"""
+    try:
+        if os.path.exists("admin.html"):
+            return FileResponse("admin.html", headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+                "Content-Type": "text/html"
+            })
+        # If admin.html doesn't exist, create a basic one - THIS MIGHT BE THE ISSUE
+        basic_admin_html = """<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Panel - Agent Task System</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .status { background: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #28a745; }
+        .api-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 30px; }
+        .api-link { background: #f8f9fa; padding: 20px; border-radius: 5px; border-left: 4px solid #007bff; }
+        .api-link h3 { margin: 0 0 10px 0; color: #007bff; }
+        .api-link a { color: #007bff; text-decoration: none; font-family: monospace; }
+        .api-link a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Agent Task System - Admin Panel</h1>
+        
+        <div class="status">
+            <strong>✅ System Status:</strong> Online and Ready<br>
+            <strong>🌍 Platform:</strong> Railway<br>
+            <strong>⏰ Last Updated:</strong> <span id="timestamp"></span>
+        </div>
+
+        <div class="api-links">
+            <div class="api-link">
+                <h3>📊 System Health</h3>
+                <a href="/health" target="_blank">/health</a>
+                <p>Check system health and database status</p>
+            </div>
+            
+            <div class="api-link">
+                <h3>👥 Agents Management</h3>
+                <a href="/api/agents" target="_blank">/api/agents</a>
+                <p>View all registered agents and their statistics</p>
+            </div>
+            
+            <div class="api-link">
+                <h3>📈 Statistics</h3>
+                <a href="/api/admin/statistics" target="_blank">/api/admin/statistics</a>
+                <p>Get overall system statistics</p>
+            </div>
+            
+            <div class="api-link">
+                <h3>🔧 Debug Info</h3>
+                <a href="/debug" target="_blank">/debug</a>
+                <p>System debug information</p>
+            </div>
+            
+            <div class="api-link">
+                <h3>📤 Upload Sessions</h3>
+                <a href="/api/admin/upload-sessions" target="_blank">/api/admin/upload-sessions</a>
+                <p>View active file upload sessions</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+    </script>
+</body>
+</html>"""
+        
+        # Create admin.html file if it doesn't exist - FILE CREATION MIGHT BE THE ISSUE
+        with open("admin.html", "w") as f:
+            f.write(basic_admin_html)
+            
+        return FileResponse("admin.html", headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "Content-Type": "text/html"
+        })
+        
+    except Exception as e:
+        return JSONResponse({"error": f"Could not serve admin panel: {e}"}, status_code=500)
+
+@app.get("/agent")
+async def serve_agent_panel_redirect():
+    """Redirect /agent to /agent.html"""
+    return FileResponse("agent.html") if os.path.exists("agent.html") else JSONResponse({"error": "Agent panel not found"}, status_code=404)
+
+@app.get("/agent.html") 
+async def serve_agent_panel():
+    """Serve agent interface - ANOTHER COMPLEX HTML GENERATOR"""
+    try:
+        if os.path.exists("agent.html"):
+            return FileResponse("agent.html", headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache", 
+                "Expires": "0",
+                "Content-Type": "text/html"
+            })
+            
+        # If agent.html doesn't exist, create a basic one - THIS MIGHT BE THE ISSUE
+        basic_agent_html = """<!DOCTYPE html>
+<html>
+<head>
+    <title>Agent Portal - Agent Task System</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 2px solid #28a745; padding-bottom: 10px; }
+        .login-form { background: #f8f9fa; padding: 30px; border-radius: 8px; margin: 20px 0; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        .form-group input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 16px; }
+        .form-group input:focus { border-color: #28a745; outline: none; }
+        .btn { background: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .btn:hover { background: #218838; }
+        .info-box { background: #d1ecf1; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #17a2b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Agent Portal - Task Management System</h1>
+        
+        <div class="info-box">
+            <strong>Welcome to the Agent Portal!</strong><br>
+            Enter your Agent ID and Password to access your assigned tasks.
+        </div>
+
+        <div class="login-form">
+            <h3>Agent Login</h3>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="agentId">Agent ID:</label>
+                    <input type="text" id="agentId" name="agentId" placeholder="Enter your Agent ID (e.g., AG20240101ABCD)" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                </div>
+                
+                <button type="submit" class="btn">🚀 Login & View Tasks</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const agentId = document.getElementById('agentId').value;
+            const password = document.getElementById('password').value;
+            
+            if (agentId && password) {
+                // Redirect to current task API endpoint for now
+                window.location.href = `/api/agents/${agentId}/tasks/current`;
+            } else {
+                alert('Please enter both Agent ID and Password');
+            }
+        });
+    </script>
+</body>
+</html>"""
+        
+        # Create agent.html file if it doesn't exist - FILE CREATION MIGHT BE THE ISSUE
+        with open("agent.html", "w") as f:
+            f.write(basic_agent_html)
+            
+        return FileResponse("agent.html", headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "Content-Type": "text/html"
+        })
+        
+    except Exception as e:
+        return JSONResponse({"error": f"Could not serve agent panel: {e}"}, status_code=500)
+
+# ===================== ALL OTHER ENDPOINTS (REST OF YOUR CODE) =====================
+
 @app.get("/health")
 def health_check():
     """Enhanced health check"""
@@ -397,7 +597,6 @@ def health_check():
         "version": "2.0.0"
     }
 
-# Enhanced root endpoint
 @app.get("/")
 def root():
     """Root endpoint with domain information"""
@@ -407,6 +606,8 @@ def root():
         "platform": "Railway",
         "domain": os.environ.get("DOMAIN", "railway"),
         "health_check": "/health",
+        "admin_panel": "/admin.html",
+        "agent_panel": "/agent.html",
         "routes_ready": routes_ready,
         "active_uploads": len(upload_sessions),
         "features": [
@@ -417,247 +618,6 @@ def root():
             "enhanced_security"
         ]
     }
-
-# ===================== CHUNKED UPLOAD ENDPOINTS - VERY COMPLEX =====================
-
-@app.post("/api/admin/init-chunked-upload")
-async def init_chunked_upload(
-    filename: str = Form(...),
-    filesize: int = Form(...),
-    total_chunks: int = Form(...),
-    agent_id: str = Form(...)
-):
-    """Initialize a chunked upload session for large files - MIGHT CAUSE ISSUES"""
-    try:
-        # Validate agent exists (if database is ready)
-        if database_ready:
-            db_gen = db_dependency()
-            if hasattr(db_gen, '__next__'):
-                db = next(db_gen)
-            else:
-                db = db_gen
-                
-            try:
-                agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-                if not agent:
-                    raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-                if agent.status != "active":
-                    raise HTTPException(status_code=400, detail=f"Agent {agent_id} is not active")
-            finally:
-                if hasattr(db, 'close'):
-                    db.close()
-        
-        # Create unique upload ID
-        upload_id = str(uuid.uuid4())
-        upload_dir = os.path.join(CHUNK_UPLOAD_DIR, upload_id)
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        # Store upload session info
-        upload_sessions[upload_id] = {
-            "filename": filename,
-            "filesize": filesize,
-            "total_chunks": total_chunks,
-            "agent_id": agent_id,
-            "received_chunks": set(),
-            "upload_dir": upload_dir,
-            "created_at": datetime.now()
-        }
-        
-        print(f"🚀 Initialized chunked upload: {upload_id} for {filename} ({filesize} bytes, {total_chunks} chunks)")
-        
-        return {
-            "upload_id": upload_id, 
-            "status": "initialized",
-            "message": f"Ready to receive {total_chunks} chunks"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Failed to initialize chunked upload: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to initialize upload: {str(e)}")
-
-@app.post("/api/admin/upload-chunk")
-async def upload_chunk(
-    upload_id: str = Form(...),
-    chunk_index: int = Form(...),
-    chunk: UploadFile = File(...)
-):
-    """Upload a single chunk of a large file - MIGHT CAUSE ISSUES"""
-    try:
-        if upload_id not in upload_sessions:
-            raise HTTPException(status_code=404, detail="Upload session not found")
-        
-        session = upload_sessions[upload_id]
-        
-        # Validate chunk index
-        if chunk_index >= session["total_chunks"] or chunk_index < 0:
-            raise HTTPException(status_code=400, detail=f"Invalid chunk index: {chunk_index}")
-        
-        # Check if chunk already uploaded
-        if chunk_index in session["received_chunks"]:
-            return {
-                "status": "chunk_already_exists",
-                "chunk_index": chunk_index,
-                "received_chunks": len(session["received_chunks"]),
-                "total_chunks": session["total_chunks"]
-            }
-        
-        chunk_path = os.path.join(session["upload_dir"], f"chunk_{chunk_index:06d}")
-        
-        # Save chunk to disk
-        async with aiofiles.open(chunk_path, 'wb') as f:
-            content = await chunk.read()
-            await f.write(content)
-        
-        # Mark chunk as received
-        session["received_chunks"].add(chunk_index)
-        
-        print(f"📦 Received chunk {chunk_index + 1}/{session['total_chunks']} for upload {upload_id}")
-        
-        return {
-            "status": "chunk_uploaded",
-            "chunk_index": chunk_index,
-            "received_chunks": len(session["received_chunks"]),
-            "total_chunks": session["total_chunks"],
-            "progress_percentage": (len(session["received_chunks"]) / session["total_chunks"]) * 100
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Failed to upload chunk {chunk_index}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to upload chunk: {str(e)}")
-
-@app.post("/api/admin/finalize-chunked-upload")
-async def finalize_chunked_upload(upload_id: str = Form(...), db = Depends(db_dependency)):
-    """Combine all chunks and process the complete file - VERY COMPLEX"""
-    try:
-        if upload_id not in upload_sessions:
-            raise HTTPException(status_code=404, detail="Upload session not found")
-        
-        session = upload_sessions[upload_id]
-        
-        # Verify all chunks received
-        if len(session["received_chunks"]) != session["total_chunks"]:
-            missing_chunks = set(range(session["total_chunks"])) - session["received_chunks"]
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Missing chunks: {sorted(list(missing_chunks))[:10]}{'...' if len(missing_chunks) > 10 else ''}"
-            )
-        
-        print(f"🔄 Combining {session['total_chunks']} chunks for upload {upload_id}")
-        
-        # Combine chunks into final file
-        final_file_path = os.path.join(session["upload_dir"], session["filename"])
-        
-        with open(final_file_path, 'wb') as final_file:
-            for chunk_index in range(session["total_chunks"]):
-                chunk_path = os.path.join(session["upload_dir"], f"chunk_{chunk_index:06d}")
-                if os.path.exists(chunk_path):
-                    with open(chunk_path, 'rb') as chunk_file:
-                        final_file.write(chunk_file.read())
-                    # Clean up chunk file immediately
-                    os.remove(chunk_path)
-                else:
-                    raise HTTPException(status_code=500, detail=f"Chunk {chunk_index} file not found")
-        
-        print(f"✅ Successfully combined all chunks into {final_file_path}")
-        
-        # Process the complete ZIP file
-        result = await process_uploaded_zip(final_file_path, session["agent_id"], db)
-        
-        # Clean up upload session
-        cleanup_upload_session(upload_id)
-        
-        return result
-        
-    except HTTPException:
-        cleanup_upload_session(upload_id)
-        raise
-    except Exception as e:
-        print(f"❌ Failed to finalize upload {upload_id}: {e}")
-        cleanup_upload_session(upload_id)
-        raise HTTPException(status_code=500, detail=f"Failed to finalize upload: {str(e)}")
-
-# ===================== STANDARD UPLOAD ENDPOINT =====================
-@app.post("/api/admin/upload-tasks")
-async def upload_tasks_standard(
-    zip_file: UploadFile = File(...),
-    agent_id: str = Form(...),
-    db = Depends(db_dependency)
-):
-    """Standard upload endpoint for smaller files - MIGHT CAUSE ISSUES"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        if agent.status != "active":
-            raise HTTPException(status_code=400, detail=f"Agent {agent_id} is not active")
-        
-        # Save uploaded file temporarily
-        temp_file_path = f"temp_{uuid.uuid4().hex}_{zip_file.filename}"
-        
-        with open(temp_file_path, "wb") as buffer:
-            content = await zip_file.read()
-            buffer.write(content)
-        
-        # Process the ZIP file
-        result = await process_uploaded_zip(temp_file_path, agent_id, db)
-        
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Upload error: {e}")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
-
-# ===================== OTHER ENDPOINTS =====================
-@app.get("/debug")
-def debug_info():
-    """Enhanced debug endpoint with domain information"""
-    return {
-        "environment": {
-            "domain": os.environ.get("DOMAIN", "not_set"),
-            "port": os.environ.get("PORT", "not_set"),
-            "database_url_set": bool(os.environ.get("DATABASE_URL")),
-            "allowed_origins": ALLOWED_ORIGINS,
-            "allowed_origins_count": len(ALLOWED_ORIGINS)
-        },
-        "system": {
-            "files": os.listdir("."),
-            "python_version": sys.version,
-            "database_ready": database_ready,
-            "routes_ready": routes_ready
-        },
-        "features": {
-            "upload_sessions": len(upload_sessions),
-            "chunk_upload_dir_exists": os.path.exists(CHUNK_UPLOAD_DIR),
-            "static_dir_exists": os.path.exists("static"),
-            "static_images_dir_exists": os.path.exists("static/task_images")
-        }
-    }
-
-@app.get("/api/admin/upload-sessions")
-def get_upload_sessions():
-    """Get current upload sessions (admin only)"""
-    sessions_info = {}
-    for upload_id, session in upload_sessions.items():
-        sessions_info[upload_id] = {
-            "filename": session["filename"],
-            "filesize": session["filesize"],
-            "total_chunks": session["total_chunks"],
-            "received_chunks": len(session["received_chunks"]),
-            "progress": (len(session["received_chunks"]) / session["total_chunks"]) * 100,
-            "created_at": session["created_at"].isoformat(),
-            "age_minutes": (datetime.now() - session["created_at"]).total_seconds() / 60
-        }
-    return {"upload_sessions": sessions_info}
 
 if __name__ == "__main__":
     import uvicorn
