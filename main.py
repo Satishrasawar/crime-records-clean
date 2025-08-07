@@ -108,21 +108,53 @@ else:
         "http://127.0.0.1:8000"
     ]
 
-# SIMPLIFIED Lifespan context manager - NO BACKGROUND TASKS
+# ===================== BACKGROUND TASK CLEANUP FUNCTION =====================
+async def periodic_cleanup():
+    """Clean up old upload sessions every hour - THIS MIGHT BE THE CULPRIT"""
+    while True:
+        try:
+            now = datetime.now()
+            expired_sessions = []
+            
+            for upload_id, session in upload_sessions.items():
+                # Remove sessions older than 2 hours
+                if (now - session["created_at"]).total_seconds() > 7200:
+                    expired_sessions.append(upload_id)
+            
+            for upload_id in expired_sessions:
+                print(f"🧹 Cleaning up expired upload session: {upload_id}")
+                # cleanup_upload_session(upload_id)  # Commented out for testing
+                
+            if expired_sessions:
+                print(f"🧹 Cleaned up {len(expired_sessions)} expired upload sessions")
+                
+        except Exception as e:
+            print(f"❌ Error in periodic cleanup: {e}")
+        
+        # Wait 1 hour before next cleanup
+        await asyncio.sleep(3600)
+
+# Lifespan context manager WITH BACKGROUND TASKS
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown events"""
     # Startup
-    print("🚀 Starting FastAPI application...")
+    print("🚀 Starting periodic cleanup task...")
     print(f"🌍 Domain: {os.environ.get('DOMAIN', 'railway')}")
     print(f"🔗 Allowed Origins: {len(ALLOWED_ORIGINS)} configured")
     
-    # NO BACKGROUND TASKS DURING TESTING
+    # Start background cleanup task - THIS MIGHT BLOCK RAILWAY HEALTH CHECK
+    cleanup_task = asyncio.create_task(periodic_cleanup())
     
     yield
     
     # Shutdown
     print("🛑 Shutting down application...")
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
     print("✅ Application shutdown complete")
 
 # Initialize FastAPI app with lifespan
@@ -182,7 +214,7 @@ try:
 except Exception as e:
     print(f"❌ Static files setup failed: {e}")
 
-# ===================== ENHANCED HEALTH CHECK =====================
+# ===================== HEALTH CHECK =====================
 @app.get("/health")
 def health_check():
     """Simplified health check"""
@@ -192,6 +224,7 @@ def health_check():
         "message": "Service is running",
         "timestamp": datetime.now().isoformat(),
         "database": "ready" if database_ready else "not_ready",
+        "active_uploads": len(upload_sessions),
         "version": "2.0.0"
     }
 
@@ -205,6 +238,7 @@ def root():
         "platform": "Railway",
         "domain": os.environ.get("DOMAIN", "railway"),
         "health_check": "/health",
+        "active_uploads": len(upload_sessions),
         "features": [
             "chunked_upload", 
             "large_file_support", 
