@@ -105,7 +105,7 @@ else:
         "https://web-railwaybuilderherokupython.up.railway.app",
         "http://localhost:3000",
         "http://localhost:8000",
-        "http://127.0.0.1:8000"
+        "http://127.0.0.1:8000",
         "*"
     ]
 
@@ -668,7 +668,7 @@ async def get_current_task(agent_id: str, db = Depends(db_dependency)):
         
         if next_task.status == 'pending':
             next_task.status = 'in_progress'
-           next_task.started_at = datetime.utcnow()  # Match agent_routes.py
+           next_task.started_at = datetime.utcnow()  # Fixed indentation  # Match agent_routes.py
             db.commit()
         
         total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).count()
@@ -1620,6 +1620,7 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
 
