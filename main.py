@@ -152,6 +152,10 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Content-Disposition"]
 )
+@app.get("/railway-health")
+def railway_health_check():
+    """Extremely simple endpoint for Railway healthcheck"""
+    return {"status": "ok"}
 # Enhanced request middleware for domain detection, logging, and security
 @app.middleware("http")
 async def enhanced_request_middleware(request, call_next):
@@ -205,19 +209,14 @@ except Exception as e:
 # ===================== ENHANCED HEALTH CHECK =====================
 @app.get("/health")
 def health_check():
-    """Enhanced health check with proper error handling"""
-    health_status = {
+    """Simplified health check for Railway"""
+    return {
         "status": "healthy",
         "platform": "Railway",
         "message": "Service is running",
         "timestamp": datetime.utcnow().isoformat(),
-        "domain": os.environ.get("DOMAIN", "not_set"),
-        "database": "unknown",
-        "imports_loaded": "database" in sys.modules,
-        "chunked_upload": "enabled",
         "version": "2.0.0"
     }
-    
     # Simple database test without complex session handling
     if database_ready:
         try:
@@ -1590,6 +1589,7 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
 
