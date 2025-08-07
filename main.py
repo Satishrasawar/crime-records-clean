@@ -105,8 +105,8 @@ else:
         "https://web-railwaybuilderherokupython.up.railway.app",
         "http://localhost:3000",
         "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "*"
+        "http://127.0.0.1:8000"
+        
     ]
 
 # Lifespan context manager (replaces deprecated @app.on_event)
@@ -1620,6 +1620,7 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
 
