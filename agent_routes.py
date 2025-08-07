@@ -440,8 +440,7 @@ def get_current_task(agent_id: str, db: Session = Depends(get_db)):
         "task_number": progress.current_index + 1,
         "completed": False
     }
-
-# FIXED SUBMIT ENDPOINT - MATCHES OLD WORKING SYSTEM
+    # FIXED SUBMIT ENDPOINT - MATCHES OLD WORKING SYSTEM
 @router.post("/api/agents/{agent_id}/submit")
 async def submit_task_data(
     agent_id: str,
@@ -862,3 +861,165 @@ async def test_data_availability(db: Session = Depends(get_db)):
     except Exception as e:
         print(f"❌ Error testing data: {e}")
         raise HTTPException(status_code=500, detail=f"Data test failed: {str(e)}")
+
+@router.get("/api/admin/agent-details/{agent_id}")
+async def get_agent_details(agent_id: str, db: Session = Depends(get_db)):
+    """Get detailed information about a specific agent"""
+    try:
+        # Get agent
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        
+        # Get task progress
+        progress = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).first()
+        
+        # Get total assigned images
+        assigned_images = get_agent_image_files(agent_id)
+        
+        # Get completed tasks count
+        completed_count = db.query(SubmittedForm).filter(SubmittedForm.agent_id == agent_id).count()
+        
+        # Get recent submissions (last 10)
+        recent_submissions = db.query(SubmittedForm).filter(
+            SubmittedForm.agent_id == agent_id
+        ).order_by(SubmittedForm.submitted_at.desc()).limit(10).all()
+        
+        # Get session information
+        sessions = db.query(AgentSession).filter(
+            AgentSession.agent_id == agent_id
+        ).order_by(AgentSession.login_time.desc()).limit(10).all()
+        
+        # Calculate progress percentage
+        total_images = len(assigned_images)
+        progress_percentage = (completed_count / total_images * 100) if total_images > 0 else 0
+        
+        return {
+            "agent_id": agent.agent_id,
+            "name": agent.name,
+            "email": agent.email,
+            "mobile": agent.mobile,
+            "status": agent.status,
+            "created_at": agent.created_at.isoformat() if agent.created_at else None,
+            "progress": {
+                "current_index": progress.current_index if progress else 0,
+                "total_images": total_images,
+                "completed_count": completed_count,
+                "progress_percentage": round(progress_percentage, 2),
+                "remaining_tasks": max(0, total_images - completed_count)
+            },
+            "recent_submissions": [
+                {
+                    "id": sub.id,
+                    "submitted_at": sub.submitted_at.isoformat(),
+                    "image_name": json.loads(sub.form_data).get('image_name', 'Unknown')
+                } for sub in recent_submissions
+            ],
+            "recent_sessions": [
+                {
+                    "login_time": sess.login_time.isoformat() if sess.login_time else None,
+                    "logout_time": sess.logout_time.isoformat() if sess.logout_time else None,
+                    "duration_minutes": sess.duration_minutes,
+                    "is_active": sess.logout_time is None
+                } for sess in sessions
+            ]
+        }
+        
+    except Exception as e:
+        print(f"❌ Error getting agent details: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get agent details: {str(e)}")
+
+@router.post("/api/admin/reset-progress/{agent_id}")
+async def reset_agent_progress(agent_id: str, db: Session = Depends(get_db)):
+    """Reset agent's task progress to beginning"""
+    try:
+        # Verify agent exists
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        
+        # Reset progress
+        progress = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).first()
+        if progress:
+            progress.current_index = 0
+            progress.updated_at = datetime.utcnow()
+        else:
+            progress = TaskProgress(agent_id=agent_id, current_index=0)
+            db.add(progress)
+        
+        db.commit()
+        
+        return {
+            "message": f"Progress reset successfully for agent {agent_id}",
+            "agent_id": agent_id,
+            "new_progress_index": 0
+        }
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error resetting progress: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to reset progress: {str(e)}")
+
+@router.delete("/api/admin/clear-submissions/{agent_id}")
+async def clear_agent_submissions(agent_id: str, db: Session = Depends(get_db)):
+    """Clear all submissions for a specific agent (admin only)"""
+    try:
+        # Verify agent exists
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        
+        # Count current submissions
+        submission_count = db.query(SubmittedForm).filter(SubmittedForm.agent_id == agent_id).count()
+        
+        # Delete all submissions for this agent
+        db.query(SubmittedForm).filter(SubmittedForm.agent_id == agent_id).delete()
+        
+        # Reset progress
+        progress = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).first()
+        if progress:
+            progress.current_index = 0
+            progress.updated_at = datetime.utcnow()
+        
+        db.commit()
+        
+        return {
+            "message": f"Cleared {submission_count} submissions for agent {agent_id}",
+            "agent_id": agent_id,
+            "submissions_cleared": submission_count
+        }
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error clearing submissions: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear submissions: {str(e)}")
+
+@router.get("/api/admin/system-health")
+async def check_system_health(db: Session = Depends(get_db)):
+    """Check system health and database connectivity"""
+    try:
+        # Test database connection
+        agent_count = db.query(Agent).count()
+        
+        # Check static directory
+        static_exists = os.path.exists("static/task_images")
+        
+        # Check for any active sessions
+        active_sessions = db.query(AgentSession).filter(AgentSession.logout_time.is_(None)).count()
+        
+        return {
+            "status": "healthy",
+            "database_connected": True,
+            "static_directory_exists": static_exists,
+            "total_agents": agent_count,
+            "active_sessions": active_sessions,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "database_connected": False,
+            "timestamp": datetime.utcnow().isoformat()
+        }
