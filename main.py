@@ -7,7 +7,6 @@ from contextlib import asynccontextmanager
 import asyncio
 from fastapi.staticfiles import StaticFiles
 
-
 # ADD DATABASE SECTION:
 database_ready = False
 
@@ -34,16 +33,14 @@ async def lifespan(app: FastAPI):
     yield
     print("🛑 Shutting down...")
 
-# Modify app creation:
+# Create app with lifespan
 app = FastAPI(
     title="Client Records Data Entry System", 
     version="2.0.0",
-    lifespan=lifespan  # ADD THIS
+    lifespan=lifespan
 )
-app = FastAPI(
-    title="Client Records Data Entry System", 
-    version="2.0.0"
-)
+
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -51,6 +48,15 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Add static files
+try:
+    os.makedirs("static/task_images", exist_ok=True)
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    print("✅ Static files configured")
+except Exception as e:
+    print(f"❌ Static files setup failed: {e}")
+
 @app.get("/")
 def root():
     return {
@@ -69,17 +75,8 @@ def health_check():
         "timestamp": datetime.utcnow().isoformat(),
         "version": "2.0.0"
     }
-    try:
-    os.makedirs("static/task_images", exist_ok=True)
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-    print("✅ Static files configured")
-except Exception as e:
-    print(f"❌ Static files setup failed: {e}")
 
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
-
-
-
