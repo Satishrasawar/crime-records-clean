@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
+
 def create_default_admin():
     """Create default admin user if not exists"""
     try:
@@ -33,39 +34,38 @@ def create_default_admin():
             db = db_gen
             
         try:
-            # Check if any admin exists
-            admin_count = db.query(Admin).count()
+            # Always try to create/update admin for testing
+            admin = db.query(Admin).filter(Admin.username == "admin").first()
             
-            if admin_count == 0:
-                print("🔧 Creating default admin user...")
-                
+            if not admin:
+                print("🔧 Creating admin user...")
                 hashed_password = hash_password("admin123")
-                
-                new_admin = Admin(
+                admin = Admin(
                     username="admin",
                     hashed_password=hashed_password,
                     email="admin@agent-task-system.com",
                     is_active=True,
                     created_at=datetime.now()
                 )
-                
-                db.add(new_admin)
-                db.commit()
-                
-                print("🎉 Default admin user created!")
-                print("=" * 50)
-                print("🔐 ADMIN LOGIN CREDENTIALS:")
-                print("Username: admin")
-                print("Password: admin123") 
-                print("=" * 50)
-                print("🌍 Login at: /admin.html")
-                print("📡 API Login: POST /api/admin/login")
-                
+                db.add(admin)
             else:
-                print(f"✅ Admin users exist ({admin_count} found)")
+                print("🔧 Updating existing admin password...")
+                admin.hashed_password = hash_password("admin123")
+                admin.is_active = True
+            
+            db.commit()
+            
+            print("🎉 Admin user ready!")
+            print("=" * 50)
+            print("🔐 ADMIN LOGIN CREDENTIALS:")
+            print("Username: admin")
+            print("Password: admin123") 
+            print("=" * 50)
+            print("🌍 Login at: /admin.html")
+            print("📡 API Login: POST /api/admin/login")
                 
         except Exception as e:
-            print(f"❌ Error creating admin: {e}")
+            print(f"❌ Error with admin: {e}")
             if hasattr(db, 'rollback'):
                 db.rollback()
         finally:
@@ -73,7 +73,7 @@ def create_default_admin():
                 db.close()
                 
     except Exception as e:
-        print(f"❌ Admin creation failed: {e}")
+        print(f"❌ Admin setup failed: {e}")
 
 # Chunked upload configuration
 CHUNK_UPLOAD_DIR = "temp_chunks"
@@ -267,8 +267,7 @@ try:
     print("✅ Static files configured")
 except Exception as e:
     print(f"❌ Static files setup failed: {e}")
-
-# ===================== CLEANUP FUNCTIONS =====================
+    # ===================== CLEANUP FUNCTIONS =====================
 def cleanup_upload_session(upload_id: str):
     """Clean up upload session and temporary files"""
     try:
@@ -451,6 +450,162 @@ async def process_uploaded_zip(file_path: str, agent_id: str, db):
         "timestamp": datetime.now().isoformat()
     }
 
+# ===================== ADMIN DEBUG ENDPOINTS (NEW) =====================
+@app.post("/api/admin/create-admin")
+@limiter.limit("1/minute")
+async def create_admin_user_endpoint(request: Request, db=Depends(db_dependency)):
+    """Create admin user - for testing only"""
+    try:
+        if not database_ready:
+            raise HTTPException(status_code=503, detail="Database not ready")
+        
+        from app.models import Admin
+        from app.security import hash_password
+        
+        # Check if admin already exists
+        existing_admin = db.query(Admin).filter(Admin.username == "admin").first()
+        if existing_admin:
+            return {
+                "message": "Admin already exists",
+                "username": "admin",
+                "status": "active" if existing_admin.is_active else "inactive"
+            }
+        
+        # Create new admin
+        hashed_password = hash_password("admin123")
+        new_admin = Admin(
+            username="admin",
+            hashed_password=hashed_password,
+            email="admin@agent-task-system.com",
+            is_active=True,
+            created_at=datetime.now()
+        )
+        
+        db.add(new_admin)
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Admin user created successfully!",
+            "credentials": {
+                "username": "admin",
+                "password": "admin123"
+            },
+            "login_url": "/admin.html"
+        }
+        
+    except Exception as e:
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        print(f"❌ Error creating admin: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create admin: {str(e)}")
+
+@app.get("/api/admin/check-admin")
+@limiter.limit("10/minute")
+async def check_admin_status(request: Request, db=Depends(db_dependency)):
+    """Check admin user status"""
+    try:
+        if not database_ready:
+            return {"database": "not_ready"}
+        
+        from app.models import Admin
+        
+        admin = db.query(Admin).filter(Admin.username == "admin").first()
+        if not admin:
+            return {
+                "admin_exists": False,
+                "message": "No admin user found. Use /api/admin/create-admin to create one."
+            }
+        
+        return {
+            "admin_exists": True,
+            "username": admin.username,
+            "email": admin.email,
+            "is_active": admin.is_active,
+            "created_at": admin.created_at.isoformat() if admin.created_at else None,
+            "message": "Admin user found. Use credentials: admin / admin123"
+        }
+        
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/api/admin/test-login")
+@limiter.limit("5/minute")
+async def test_admin_login(request: Request, db=Depends(db_dependency)):
+    """Test admin login without JWT - for debugging"""
+    try:
+        if not database_ready:
+            raise HTTPException(status_code=503, detail="Database not ready")
+        
+        data = await request.json()
+        username = data.get("username")
+        password = data.get("password")
+        
+        if not username or not password:
+            raise HTTPException(status_code=400, detail="Username and password required")
+        
+        from app.models import Admin
+        from app.security import verify_password
+        
+        admin = db.query(Admin).filter(Admin.username == username).first()
+        if not admin:
+            return {"success": False, "message": "Admin user not found"}
+        
+        if not admin.is_active:
+            return {"success": False, "message": "Admin user is not active"}
+        
+        password_valid = verify_password(password, admin.hashed_password)
+        if not password_valid:
+            return {"success": False, "message": "Invalid password"}
+        
+        return {
+            "success": True,
+            "message": "Login test successful!",
+            "admin_info": {
+                "username": admin.username,
+                "email": admin.email,
+                "is_active": admin.is_active
+            }
+        }
+        
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/api/admin/reset-admin-password")
+@limiter.limit("1/minute")
+async def reset_admin_password_endpoint(request: Request, db=Depends(db_dependency)):
+    """Reset admin password - for testing only"""
+    try:
+        if not database_ready:
+            raise HTTPException(status_code=503, detail="Database not ready")
+        
+        from app.models import Admin
+        from app.security import hash_password
+        
+        admin = db.query(Admin).filter(Admin.username == "admin").first()
+        if not admin:
+            raise HTTPException(status_code=404, detail="Admin user not found")
+        
+        # Reset password
+        new_password = "admin123"
+        admin.hashed_password = hash_password(new_password)
+        admin.is_active = True  # Make sure admin is active
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Admin password reset successfully!",
+            "credentials": {
+                "username": "admin",
+                "password": new_password
+            }
+        }
+        
+    except Exception as e:
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to reset password: {str(e)}")
+
 # ===================== ENHANCED HEALTH CHECK =====================
 @app.get("/health")
 @limiter.limit("100/minute")
@@ -552,8 +707,7 @@ async def root(request: Request):
             "enhanced_security"
         ]
     }
-
-# ===================== ENHANCED STATIC FILE SERVING =====================
+    # ===================== ENHANCED STATIC FILE SERVING =====================
 @app.get("/admin")
 @limiter.limit("50/minute")
 async def serve_admin_panel_redirect(request: Request):
@@ -589,6 +743,7 @@ async def serve_admin_panel(request: Request):
         .api-link h3 { margin: 0 0 10px 0; color: #007bff; }
         .api-link a { color: #007bff; text-decoration: none; font-family: monospace; }
         .api-link a:hover { text-decoration: underline; }
+        .debug-section { background: #fff3cd; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107; }
     </style>
 </head>
 <body>
@@ -599,6 +754,14 @@ async def serve_admin_panel(request: Request):
             <strong>✅ System Status:</strong> Online and Ready<br>
             <strong>🌍 Platform:</strong> Railway<br>
             <strong>⏰ Last Updated:</strong> <span id="timestamp"></span>
+        </div>
+
+        <div class="debug-section">
+            <h3>🔧 Admin Debug Tools</h3>
+            <p><strong>Check Admin Status:</strong> <a href="/api/admin/check-admin" target="_blank">/api/admin/check-admin</a></p>
+            <p><strong>Create Admin:</strong> <code>POST /api/admin/create-admin</code></p>
+            <p><strong>Test Login:</strong> <code>POST /api/admin/test-login</code> with {"username": "admin", "password": "admin123"}
+            <p><strong>Reset Password:</strong> <code>POST /api/admin/reset-admin-password</code></p>
         </div>
 
         <div class="api-links">
@@ -720,7 +883,7 @@ async def serve_agent_panel(request: Request):
             <form id="loginForm">
                 <div class="form-group">
                     <label for="agentId">Agent ID:</label>
-                    <input type="text" id="agentId" name="agentId" placeholder="Enter your Agent ID (e.g., AG20240101ABCD)" required>
+                    <input type="text" id="agentId" name="agentId" placeholder="Enter your Agent ID (e.g., AGT123456)" required>
                 </div>
                 
                 <div class="form-group">
@@ -736,7 +899,7 @@ async def serve_agent_panel(request: Request):
             <h3>📋 Quick Links</h3>
             <p><strong>Get Current Task:</strong> <code>GET /api/agents/{agent_id}/current-task</code></p>
             <p><strong>Submit Task:</strong> <code>POST /api/agents/{agent_id}/submit</code></p>
-            <p><strong>View Statistics:</strong> <code>GET /api/agents/{agent_id}/statistics</code></p>
+            <p><strong>View Progress:</strong> <code>GET /api/agents/{agent_id}/progress</code></p>
         </div>
     </div>
 
@@ -850,7 +1013,6 @@ async def get_admin_statistics(request: Request, db=Depends(db_dependency)):
             "pending_tasks": 0,
             "in_progress_tasks": 0
         }
-
 # ===================== AGENTS ENDPOINTS =====================
 @app.get("/api/agents")
 @limiter.limit("50/minute")
@@ -1118,7 +1280,7 @@ async def get_next_task(agent_id: str, request: Request, db=Depends(db_dependenc
             raise HTTPException(status_code=503, detail="Database not ready")
         
         # This endpoint just redirects to current-task for consistency
-        return await get_current_task(agent_id, db)
+        return await get_current_task(agent_id, request, db)
         
     except Exception as e:
         print(f"❌ Error getting next task for {agent_id}: {e}")
@@ -1731,7 +1893,6 @@ async def export_sessions(
         status_code=501
     )
 
-# ===================== MAIN ENTRY POINT =====================
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
@@ -1747,5 +1908,3 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
-
-
