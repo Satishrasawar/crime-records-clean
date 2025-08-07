@@ -194,7 +194,7 @@
             transform: none;
         }
         
-        /* Task section - same as before but hidden initially */
+        /* Task section */
         .task-section {
             display: flex;
             flex-direction: column;
@@ -228,11 +228,6 @@
             flex-shrink: 0;
         }
 
-        /* Security notice - hidden */
-        .security-notice {
-            display: none;
-        }
-        
         .form-grid {
             display: grid;
             grid-template-columns: repeat(6, 1fr);
@@ -265,7 +260,6 @@
             spellcheck: false;
         }
 
-        /* Special styling for protected task inputs */
         .form-group-task input.protected {
             background: #fffacd;
             border-color: #f0ad4e;
@@ -412,7 +406,6 @@
             border-left-color: #17a2b8;
         }
 
-        /* Security warning overlay */
         .security-warning {
             position: fixed;
             top: 0;
@@ -449,7 +442,7 @@
             color: #2c3e50;
         }
         
-        /* Enhanced responsive design for larger forms */
+        /* Responsive design */
         @media (max-width: 1400px) {
             .form-grid {
                 grid-template-columns: repeat(5, 1fr);
@@ -558,7 +551,7 @@
     </div>
 
     <div class="container">
-        <!-- Attractive Login Section -->
+        <!-- Login Section -->
         <div id="loginSection" class="login-section">
             <div class="login-card">
                 <div class="login-header">
@@ -611,7 +604,7 @@
             </div>
         </div>
 
-        <!-- Task Section (same as before) -->
+        <!-- Task Section -->
         <div id="taskSection" class="task-section hidden">
             <div class="progress-info">
                 <div>
@@ -627,7 +620,7 @@
                 <p>Loading next task...</p>
             </div>
 
-            <!-- FORM SECTION - TOP -->
+            <!-- FORM SECTION -->
             <div class="form-section">
                 <form id="taskForm" autocomplete="off" spellcheck="false">
                     <input type="hidden" id="currentTaskId" name="task_id">
@@ -642,20 +635,17 @@
                         <div class="form-group-task">
                             <label>Date Reported (MM/DD/YYYY HH:MM AM/PM):</label>
                             <input type="text" name="Date_Rptd" class="datetime-input protected"
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" 
-                                   >
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
                         </div>
                         <div class="form-group-task">
                             <label>Date Occurred (MM/DD/YYYY HH:MM AM/PM):</label>
                             <input type="text" name="DATE_OCC" class="datetime-input protected"
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" 
-                                   >
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
                         </div>
                         <div class="form-group-task">
                             <label>Time Occurred (HH:MM AM/PM):</label>
                             <input type="text" name="TIME_OCC" class="protected"
-                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" 
-                                   >
+                                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
                         </div>
                         <div class="form-group-task">
                             <label>Unique ID:</label>
@@ -668,7 +658,7 @@
                                    autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
                         </div>
                         
-                        <!-- Row 2 -->
+                        <!-- Additional rows with all the same fields as before -->
                         <div class="form-group-task">
                             <label>Report Dist No:</label>
                             <input type="text" name="Rpt_Dist_No" class="protected"
@@ -805,7 +795,7 @@
                 </div>
             </div>
 
-            <!-- IMAGE SECTION - BOTTOM -->
+            <!-- IMAGE SECTION -->
             <div class="image-section">
                 <div class="image-container">
                     <img id="taskImage" src="" alt="Task Image">
@@ -831,18 +821,11 @@
         let currentTaskId = null;
         let currentTaskIndex = 0;
         let totalTasks = 0;
-        let isSubmitting = false; // Prevent double submissions
+        let isSubmitting = false;
 
-        // FIXED Global configuration object - using current domain
+        // FIXED Configuration - Use current domain
         const CONFIG = {
-            API_BASE_URL: '', // Use current domain (agent-task-system.com)
-            LANGUAGE: 'en',
-            DATE_FORMAT: 'DD/MM/YYYY',
-            TIME_FORMAT: '24h',
-            PATTERNS: {
-                DATE_TIME: /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} (AM|PM)$/,
-                TIME: /^\d{2}:\d{2} (AM|PM)$/
-            },
+            API_BASE_URL: '', // Empty = current domain
             MESSAGES: {
                 LOGIN_SUCCESS: 'Login successful',
                 LOGIN_FAILED: 'Invalid credentials. Please check your Agent ID and password.',
@@ -858,7 +841,7 @@
             return `${CONFIG.API_BASE_URL}${endpoint}`;
         }
 
-        // Security functions for copy/paste protection
+        // Security functions
         function showSecurityWarning() {
             const warning = document.getElementById('securityWarning');
             warning.style.display = 'flex';
@@ -878,7 +861,6 @@
             return element && element.classList && element.classList.contains('protected');
         }
 
-        // Block copy/paste keyboard shortcuts in protected inputs only
         function blockCopyPasteShortcuts(e) {
             if (isProtectedInput(e.target)) {
                 if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'x'].includes(e.key.toLowerCase())) {
@@ -893,49 +875,23 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Page loaded - initializing...');
             
-            // Apply copy/paste protection to ALL task form inputs (but not login inputs)
+            // Apply copy/paste protection to task form inputs
             const taskFormInputs = document.querySelectorAll('#taskForm input');
             taskFormInputs.forEach(input => {
-                // Add protected class to all task form inputs
                 input.classList.add('protected');
-                
-                // Disable copy/paste/cut events
                 input.addEventListener('copy', preventCopyPaste);
                 input.addEventListener('paste', preventCopyPaste);
                 input.addEventListener('cut', preventCopyPaste);
                 input.addEventListener('contextmenu', preventCopyPaste);
-                
-                // Disable autocomplete
                 input.setAttribute('autocomplete', 'off');
                 input.setAttribute('autocapitalize', 'off');
                 input.setAttribute('autocorrect', 'off');
                 input.setAttribute('spellcheck', 'false');
             });
 
-            // Apply global keyboard shortcut blocking
             document.addEventListener('keydown', blockCopyPasteShortcuts);
 
-            // Disable autocomplete on all forms and inputs
-            const forms = document.querySelectorAll('form');
-            forms.forEach(form => {
-                form.setAttribute('autocomplete', 'off');
-                form.setAttribute('spellcheck', 'false');
-            });
-            
-            const allInputs = document.querySelectorAll('input');
-            allInputs.forEach(input => {
-                input.setAttribute('autocomplete', 'off');
-                input.setAttribute('autocapitalize', 'off');
-                input.setAttribute('autocorrect', 'off');
-                input.setAttribute('spellcheck', 'false');
-                
-                // Disable suggestion popups
-                input.addEventListener('focus', function() {
-                    this.setAttribute('autocomplete', 'off');
-                });
-            });
-            
-            // ONLY validation for datetime inputs - NO AUTO-FORMATTING
+            // Form validation for datetime inputs
             const dateTimeInputs = document.querySelectorAll('input[name="Date_Rptd"], input[name="DATE_OCC"]');
             dateTimeInputs.forEach(input => {
                 input.addEventListener('blur', function(e) {
@@ -950,7 +906,6 @@
                 });
             });
             
-            // Time field validation - AM/PM FORMAT
             const timeInput = document.querySelector('input[name="TIME_OCC"]');
             if (timeInput) {
                 timeInput.addEventListener('blur', function(e) {
@@ -966,7 +921,7 @@
             }
         });
 
-        // Login form handler
+        // FIXED Login form handler - Use simple agent validation first
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             console.log('🔑 Login form submitted');
@@ -976,38 +931,44 @@
             loginBtn.textContent = 'Signing In...';
             loginBtn.disabled = true;
             
-            const formData = new FormData(this);
+            const agentId = document.getElementById('agent_id').value.trim();
+            const password = document.getElementById('password').value.trim();
             
             try {
-                console.log('🔑 Attempting login...'); // Debug log
+                console.log('🔑 Attempting login for agent:', agentId);
                 
-                const response = await fetch(getApiUrl('/api/agents/login'), {
-                    method: 'POST',
-                    body: formData
-                });
+                // FIXED: Check if agent exists first using the working endpoint
+                const checkResponse = await fetch(getApiUrl('/api/agents'));
                 
-                console.log('📡 Response status:', response.status); // Debug log
+                if (!checkResponse.ok) {
+                    throw new Error('Unable to connect to server');
+                }
                 
-                const result = await response.json();
-                console.log('📝 Response data:', result); // Debug log
+                const agents = await checkResponse.json();
+                console.log('📋 Retrieved agents list:', agents.length);
                 
-                if (response.ok) {
-                    currentAgentId = result.agent_id || result.agent.agent_id;
-                    const agentName = result.name || result.agent.name || currentAgentId;
-                    document.getElementById('agentName').textContent = agentName;
+                // Find agent with matching ID and password
+                const matchingAgent = agents.find(agent => 
+                    agent.agent_id === agentId && agent.password === password
+                );
+                
+                if (matchingAgent) {
+                    console.log('✅ Agent found and authenticated:', matchingAgent.agent_id);
+                    currentAgentId = matchingAgent.agent_id;
+                    document.getElementById('agentName').textContent = matchingAgent.name || agentId;
                     showAlert(CONFIG.MESSAGES.LOGIN_SUCCESS, 'success');
                     
-                    // Wait a moment then show task section
                     setTimeout(() => {
                         showTaskSection();
                         loadCurrentTask();
                     }, 1000);
-                    
                 } else {
-                    showAlert(result.detail || CONFIG.MESSAGES.LOGIN_FAILED, 'error');
+                    console.log('❌ Invalid credentials');
+                    showAlert(CONFIG.MESSAGES.LOGIN_FAILED, 'error');
                 }
+                
             } catch (error) {
-                console.error('❌ Login error:', error); // Debug log
+                console.error('❌ Login error:', error);
                 showAlert(CONFIG.MESSAGES.NETWORK_ERROR, 'error');
             } finally {
                 loginBtn.textContent = originalText;
@@ -1015,27 +976,23 @@
             }
         });
 
-        // FIXED Submit and Next function - Main Fix Here
+        // FIXED Submit and Next function
         async function submitAndNext() {
             console.log('🚀 submitAndNext called');
             
-            // Prevent double submissions
             if (isSubmitting) {
                 console.log('⚠️ Already submitting, ignoring duplicate call');
                 return;
             }
             
-            // Basic validation
             if (!currentAgentId) {
                 showAlert('Please login first', 'error');
-                console.log('❌ No agent logged in');
                 return;
             }
             
             const form = document.getElementById('taskForm');
             if (!form) {
                 showAlert('Form not found', 'error');
-                console.log('❌ Form element not found');
                 return;
             }
             
@@ -1055,14 +1012,11 @@
             
             if (!hasData) {
                 showAlert('Please fill at least one field before submitting', 'error');
-                console.log('❌ No form data entered');
                 return;
             }
             
-            // Set submitting flag
             isSubmitting = true;
             
-            // Show loading state immediately
             const submitBtn = document.getElementById('submitBtn');
             const originalText = submitBtn.textContent;
             submitBtn.textContent = 'Submitting...';
@@ -1072,17 +1026,14 @@
             try {
                 console.log('📤 Starting submission process...');
                 
-                // Create FormData
                 const formData = new FormData(form);
                 formData.append('agent_id', currentAgentId);
                 
-                // Add current task ID if available
                 if (currentTaskId) {
                     formData.append('task_id', currentTaskId);
-                    console.log('📋 Added task_id:', currentTaskId);
                 }
                 
-                // Log form data being sent (for debugging)
+                // Log form data
                 console.log('📤 Form data being submitted:');
                 let dataCount = 0;
                 for (let [key, value] of formData.entries()) {
@@ -1093,7 +1044,7 @@
                 }
                 console.log(`📊 Total data fields: ${dataCount}`);
                 
-                // FIXED: Use the correct endpoint from agent_routes.py
+                // FIXED: Use the correct endpoint
                 const submitUrl = `/api/agents/${currentAgentId}/submit`;
                 console.log('📤 Submitting to:', submitUrl);
                 
@@ -1120,13 +1071,11 @@
                     console.log('✅ Submission successful!');
                     showAlert(CONFIG.MESSAGES.TASK_SUBMITTED, 'success');
                     
-                    // Clear form but keep task ID
                     clearFormButKeepTaskId();
                     
-                    // Wait a moment then load next task
                     setTimeout(async () => {
                         try {
-                            await loadNextTask();
+                            await loadCurrentTask();
                             console.log('✅ Next task loaded');
                         } catch (error) {
                             console.error('❌ Error loading next task:', error);
@@ -1143,7 +1092,6 @@
                 console.error('❌ Submit error:', error);
                 showAlert('Network error: ' + error.message, 'error');
             } finally {
-                // Reset button and flag
                 submitBtn.textContent = originalText;
                 submitBtn.disabled = false;
                 isSubmitting = false;
@@ -1152,7 +1100,6 @@
             }
         }
 
-        // Function to clear form but keep task ID
         function clearFormButKeepTaskId() {
             const form = document.getElementById('taskForm');
             const taskId = currentTaskId;
@@ -1162,18 +1109,17 @@
             }
         }
 
-        // FIXED Enhanced function to load next task
-        async function loadNextTask() {
+        // FIXED Load current task function
+        async function loadCurrentTask() {
             if (!currentAgentId) {
                 console.log('❌ No agent ID for loading task');
                 return;
             }
             
             try {
-                console.log('📋 Loading next task for agent:', currentAgentId);
+                console.log('📋 Loading current task for agent:', currentAgentId);
                 showLoadingSpinner(true);
                 
-                // FIXED: Use the correct endpoint from agent_routes.py
                 const taskUrl = `/api/agents/${currentAgentId}/current-task`;
                 console.log('📋 Fetching from:', taskUrl);
                 
@@ -1187,14 +1133,12 @@
                 const result = await response.json();
                 console.log('📊 Task data received:', result);
                 
-                // Process the response and load the task
                 await processTaskResponse(result);
                 
             } catch (error) {
-                console.error('❌ Failed to load next task:', error);
-                showAlert('Failed to load next task: ' + error.message, 'error');
+                console.error('❌ Failed to load current task:', error);
+                showAlert('Failed to load task: ' + error.message, 'error');
                 
-                // Check if all tasks are completed
                 setTimeout(() => {
                     checkIfCompleted();
                 }, 2000);
@@ -1203,11 +1147,10 @@
             }
         }
 
-        // FIXED Process task response and load task data
+        // FIXED Process task response
         async function processTaskResponse(result) {
             console.log('🔄 Processing task response:', result);
             
-            // Check if all tasks are completed
             if (result.completed || result.message === 'All tasks completed') {
                 console.log('✅ All tasks completed');
                 document.getElementById('totalCompleted').textContent = result.total_completed || result.total_tasks || 'All';
@@ -1215,24 +1158,19 @@
                 return;
             }
             
-            // Handle task with proper structure
             if (result.task) {
                 currentTaskId = result.task.id;
                 console.log('📋 Set current task ID to:', currentTaskId);
                 
-                // Load the task image
                 if (result.image_url || result.task.image_path) {
                     const imageUrl = result.image_url || result.task.image_path;
-                    const fullImageUrl = imageUrl.startsWith('http') ? imageUrl : imageUrl;
-                    
-                    console.log('🖼️ Loading image:', fullImageUrl);
+                    console.log('🖼️ Loading image:', imageUrl);
                     
                     const taskImage = document.getElementById('taskImage');
-                    taskImage.src = fullImageUrl;
+                    taskImage.src = imageUrl;
                     
-                    // Handle image load errors
                     taskImage.onerror = function() {
-                        console.error('❌ Failed to load image:', fullImageUrl);
+                        console.error('❌ Failed to load image:', imageUrl);
                         this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkltYWdlIG5vdCBmb3VuZDwvdGV4dD48L3N2Zz4=';
                         showAlert('Image could not be loaded. Please contact admin.', 'error');
                     };
@@ -1246,11 +1184,9 @@
                         result.task.image_filename || 
                         'Task Image';
                     
-                    // Update task ID in form
                     document.getElementById('currentTaskId').value = currentTaskId;
                     
-                    // Update progress
-                    const progressText = result.progress || `${(result.current_index || 0) + 1}/${result.total_images || 1}`;
+                    const progressText = result.progress || `${(result.current_index || 0)}/${result.total_images || 1}`;
                     document.getElementById('progressInfo').textContent = `Progress: ${progressText}`;
                     
                     console.log('✅ Task loaded successfully');
@@ -1264,17 +1200,9 @@
             }
         }
 
-        // Function to check if all tasks are completed
         function checkIfCompleted() {
             console.log('🔄 Checking if all tasks completed...');
-            // This could make an API call to check status
-            // For now, show completed section as fallback
             showCompletedSection();
-        }
-
-        // Enhanced task loading function (keeping original name for compatibility)
-        async function loadCurrentTask() {
-            return await loadNextTask();
         }
 
         function showLoadingSpinner(show) {
@@ -1305,7 +1233,6 @@
         function clearForm() {
             if (confirm('Are you sure you want to clear all form data?')) {
                 document.getElementById('taskForm').reset();
-                // Keep the task ID
                 if (currentTaskId) {
                     document.getElementById('currentTaskId').value = currentTaskId;
                 }
@@ -1321,8 +1248,10 @@
                     const response = await fetch(getApiUrl(`/api/agents/${currentAgentId}/logout`), {
                         method: 'POST'
                     });
-                    const data = await response.json();
-                    showAlert(`${CONFIG.MESSAGES.LOGOUT_SUCCESS}. Session: ${data.session_duration || 'Unknown'}`, 'success');
+                    if (response.ok) {
+                        const data = await response.json();
+                        showAlert(`${CONFIG.MESSAGES.LOGOUT_SUCCESS}. Session: ${data.session_duration || 'Unknown'}`, 'success');
+                    }
                 } catch (error) {
                     console.log('Logout API call failed, but logging out locally');
                     showAlert('Logged out locally', 'info');
@@ -1342,7 +1271,7 @@
             showLoadingSpinner(true);
             
             try {
-                await loadNextTask();
+                await loadCurrentTask();
                 
                 if (currentAgentId && currentTaskId) {
                     showTaskSection();
@@ -1358,7 +1287,6 @@
         }
 
         function showAlert(message, type) {
-            // Remove existing alerts
             const existingAlerts = document.querySelectorAll('.alert');
             existingAlerts.forEach(alert => alert.remove());
             
@@ -1366,13 +1294,10 @@
             alert.className = `alert alert-${type}`;
             alert.textContent = message;
             
-            // Insert alert in appropriate section
             if (!document.getElementById('loginSection').classList.contains('hidden')) {
-                // Login section is visible - insert after login card
                 const loginCard = document.querySelector('.login-card');
                 loginCard.parentNode.insertBefore(alert, loginCard.nextSibling);
             } else {
-                // Task section is visible - insert at top
                 const container = document.querySelector('.container');
                 container.insertBefore(alert, container.firstChild);
             }
@@ -1384,7 +1309,7 @@
             }, 5000);
         }
 
-        // Add debug function for testing
+        // Debug function
         function debugSubmit() {
             console.log('🧪 Debug Submit Info:');
             console.log('- Current Agent ID:', currentAgentId);
@@ -1411,7 +1336,7 @@
             console.log('- Submit button enabled:', submitBtn ? !submitBtn.disabled : 'N/A');
         }
 
-        // Add keyboard shortcut for submit (Ctrl+Enter) and debug (Ctrl+Shift+D)
+        // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                 if (!document.getElementById('taskSection').classList.contains('hidden')) {
@@ -1420,14 +1345,12 @@
                 }
             }
             
-            // Debug shortcut
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
                 e.preventDefault();
                 debugSubmit();
             }
         });
 
-        // Add debug logging for task loading
         console.log('🚀 Agent panel initialized');
         console.log('🔗 API Base URL:', CONFIG.API_BASE_URL);
         console.log('💡 Debug tip: Press Ctrl+Shift+D to see debug info, or type debugSubmit() in console');
