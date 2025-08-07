@@ -5,13 +5,12 @@ import shutil
 import zipfile
 import asyncio
 import aiofiles
-import logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 from contextlib import asynccontextmanager
+import time
+from sqlalchemy.exc import OperationalError
 
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,7 +19,11 @@ from fastapi.responses import FileResponse, JSONResponse
 
 # Chunked upload configuration
 CHUNK_UPLOAD_DIR = "temp_chunks"
-os.makedirs(CHUNK_UPLOAD_DIR, exist_ok=True)
+try:
+    os.makedirs(CHUNK_UPLOAD_DIR, exist_ok=True)
+    print(f"✅ Created {CHUNK_UPLOAD_DIR} directory")
+except Exception as e:
+    print(f"❌ Failed to create {CHUNK_UPLOAD_DIR}: {e}")
 
 # In-memory storage for upload sessions
 upload_sessions: Dict[str, Dict[str, Any]] = {}
@@ -72,24 +75,26 @@ def get_mock_db():
     """Mock database dependency when database is not available"""
     return MockDB()
 
-# Try to import and setup database
+# Try to import and setup database with retry logic
 try:
     print("📦 Importing database modules...")
     from database import Base, engine, get_db
     from models import Agent, TaskProgress, SubmittedForm, AgentSession
     
-    print("🔧 Creating database tables...")
-    Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created successfully!")
-    
-    # Enhanced logging for domain-aware debugging
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
-    
-    database_ready = True
-    db_dependency = get_db
-    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            print(f"🔧 Creating database tables (attempt {attempt + 1}/{max_retries})...")
+            Base.metadata.create_all(bind=engine)
+            print("✅ Database tables created successfully!")
+            database_ready = True
+            db_dependency = get_db
+            break
+        except OperationalError as e:
+            print(f"❌ Database connection attempt {attempt + 1} failed: {e}")
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(2)  # Wait before retrying
 except Exception as e:
     print(f"❌ Database setup failed: {e}")
     import traceback
@@ -104,29 +109,25 @@ if os.environ.get("ALLOWED_ORIGINS"):
 else:
     ALLOWED_ORIGINS = [
         "https://agent-task-system.com",
-        "https://www.agent-task-system.com", 
+        "https://www.agent-task-system.com",
         "https://web-railwaybuilderherokupython.up.railway.app",
         "http://localhost:3000",
         "http://localhost:8000",
         "http://127.0.0.1:8000"
-        
     ]
 
-# Lifespan context manager (replaces deprecated @app.on_event)
+# Lifespan context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown events"""
-    # Startup
     print("🚀 Starting periodic cleanup task...")
     print(f"🌍 Domain: {os.environ.get('DOMAIN', 'railway')}")
     print(f"🔗 Allowed Origins: {len(ALLOWED_ORIGINS)} configured")
     
-    # Start background cleanup task
     cleanup_task = asyncio.create_task(periodic_cleanup())
     
     yield
     
-    # Shutdown
     print("🛑 Shutting down application...")
     cleanup_task.cancel()
     try:
@@ -135,46 +136,40 @@ async def lifespan(app: FastAPI):
         pass
     print("✅ Application shutdown complete")
 
-# Initialize FastAPI app with lifespan
+# Initialize FastAPI app
 app = FastAPI(
-    title="Client Records Data Entry System", 
+    title="Client Records Data Entry System",
     version="2.0.0",
     description="Enhanced system for agent-task-system.com with chunked upload support and custom domain",
     lifespan=lifespan
 )
 
-# Enhanced CORS middleware with custom domain support
+# Enhanced CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,  # Use defined origins instead of "*"
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["Content-Disposition"]
 )
-@app.get("/railway-health")
-def railway_health_check():
-    """Extremely simple endpoint for Railway healthcheck"""
-    return {"status": "ok"}
-# Enhanced request middleware for domain detection, logging, and security
+
+# Enhanced request middleware
 @app.middleware("http")
 async def enhanced_request_middleware(request, call_next):
     """Enhanced middleware for domain detection, logging, and security"""
     host = request.headers.get("host", "unknown")
     origin = request.headers.get("origin", "unknown")
     
-    # Log domain information for debugging (exclude health checks to reduce noise)
     if not request.url.path.startswith("/health") and not host.startswith(("127.0.0.1", "localhost")):
         print(f"🌍 Request - Host: {host}, Origin: {origin}, Path: {request.url.path}")
     
     response = await call_next(request)
     
-    # Add security headers
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     
-    # Add domain-specific headers
     if "agent-task-system.com" in host:
         response.headers["X-Domain-Status"] = "production"
         response.headers["X-Environment"] = "production"
@@ -205,36 +200,57 @@ try:
     print("✅ Static files configured")
 except Exception as e:
     print(f"❌ Static files setup failed: {e}")
+    import traceback
+    traceback.print_exc()
 
-# ===================== ENHANCED HEALTH CHECK =====================
+# Enhanced health check
 @app.get("/health")
 def health_check():
-    """Simplified health check for Railway"""
-    return {
+    """Enhanced health check with proper database connectivity testing"""
+    health_status = {
         "status": "healthy",
         "platform": "Railway",
         "message": "Service is running",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": "2.0.0"
+        "timestamp": datetime.now().isoformat(),
+        "domain": os.environ.get("DOMAIN", "not_set"),
+        "database": "unknown",
+        "imports_loaded": "database" in sys.modules,
+        "chunked_upload": "enabled",
+        "version": "2.0.0",
+        "network": {
+            "host": os.environ.get("HOST", "0.0.0.0"),
+            "port": os.environ.get("PORT", "8000")
+        }
     }
-    # Simple database test without complex session handling
+    
     if database_ready:
         try:
-            health_status["database"] = "ready"
-        except Exception as e:
-            health_status["database"] = f"error: {str(e)[:50]}"
+            db_gen = db_dependency()
+            db = next(db_gen) if hasattr(db_gen, '__next__') else db_gen
+            try:
+                from sqlalchemy import text
+                result = db.execute(text("SELECT 1")).scalar()
+                health_status["database"] = "connected" if result == 1 else "query_failed"
+            except Exception as query_error:
+                health_status["database"] = f"query_error: {str(query_error)[:50]}"
+                health_status["status"] = "degraded"
+            finally:
+                if hasattr(db, 'close'):
+                    db.close()
+        except Exception as conn_error:
+            health_status["database"] = f"connection_error: {str(conn_error)[:50]}"
             health_status["status"] = "degraded"
     else:
         health_status["database"] = "not_ready"
         health_status["status"] = "degraded"
     
-    # Check directories
     health_status["static_storage"] = "ready" if os.path.exists("static/task_images") else "missing"
     health_status["upload_storage"] = "ready" if os.path.exists(CHUNK_UPLOAD_DIR) else "missing"
+    health_status["active_uploads"] = len(upload_sessions)
     
     return health_status
 
-# Enhanced root endpoint
+# Root endpoint
 @app.get("/")
 def root():
     """Root endpoint with domain information"""
@@ -247,31 +263,15 @@ def root():
         "admin_panel": "/admin.html",
         "agent_panel": "/agent.html",
         "features": [
-            "chunked_upload", 
-            "large_file_support", 
+            "chunked_upload",
+            "large_file_support",
             "custom_domain_support",
             "ssl_enabled",
             "enhanced_security"
         ]
     }
 
-# ===================== DOMAIN-AWARE STATIC FILE SERVING =====================
-
-# Replace the existing static file serving section with this:
-
-# ===================== STATIC FILE SERVING FIX =====================
-
-# Create directories and mount static files
-try:
-    os.makedirs("static/task_images", exist_ok=True)
-    # Mount static files BEFORE defining routes to avoid conflicts
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-    print("✅ Static files configured")
-except Exception as e:
-    print(f"❌ Static files setup failed: {e}")
-
-# ===================== ENHANCED STATIC FILE SERVING =====================
-
+# Static file serving
 @app.get("/admin")
 async def serve_admin_panel_redirect():
     """Redirect /admin to /admin.html"""
@@ -288,7 +288,6 @@ async def serve_admin_panel():
                 "Expires": "0",
                 "Content-Type": "text/html"
             })
-        # If admin.html doesn't exist, create a basic one
         basic_admin_html = """<!DOCTYPE html>
 <html>
 <head>
@@ -368,7 +367,6 @@ async def serve_admin_panel():
 </body>
 </html>"""
         
-        # Create admin.html file if it doesn't exist
         with open("admin.html", "w") as f:
             f.write(basic_admin_html)
             
@@ -387,19 +385,18 @@ async def serve_agent_panel_redirect():
     """Redirect /agent to /agent.html"""
     return FileResponse("agent.html") if os.path.exists("agent.html") else JSONResponse({"error": "Agent panel not found"}, status_code=404)
 
-@app.get("/agent.html") 
+@app.get("/agent.html")
 async def serve_agent_panel():
     """Serve agent interface"""
     try:
         if os.path.exists("agent.html"):
             return FileResponse("agent.html", headers={
                 "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache", 
+                "Pragma": "no-cache",
                 "Expires": "0",
                 "Content-Type": "text/html"
             })
             
-        # If agent.html doesn't exist, create a basic one
         basic_agent_html = """<!DOCTYPE html>
 <html>
 <head>
@@ -461,7 +458,6 @@ async def serve_agent_panel():
             const password = document.getElementById('password').value;
             
             if (agentId && password) {
-                // Redirect to current task API endpoint for now
                 window.location.href = `/api/agents/${agentId}/tasks/current`;
             } else {
                 alert('Please enter both Agent ID and Password');
@@ -471,7 +467,6 @@ async def serve_agent_panel():
 </body>
 </html>"""
         
-        # Create agent.html file if it doesn't exist
         with open("agent.html", "w") as f:
             f.write(basic_agent_html)
             
@@ -485,8 +480,7 @@ async def serve_agent_panel():
     except Exception as e:
         return JSONResponse({"error": f"Could not serve agent panel: {e}"}, status_code=500)
 
-# ===================== ENHANCED DEBUG ENDPOINTS =====================
-
+# Debug endpoint
 @app.get("/debug")
 def debug_info():
     """Enhanced debug endpoint with domain information"""
@@ -512,13 +506,14 @@ def debug_info():
         }
     }
 
+# System status endpoint
 @app.get("/status")
 def system_status():
     """Enhanced system status endpoint"""
     return {
         "status": "operational",
         "database": "ready" if database_ready else "failed",
-        "routes": "ready" if routes_ready else "failed", 
+        "routes": "ready" if routes_ready else "failed",
         "domain": os.environ.get("DOMAIN", "railway"),
         "health": "ok",
         "chunked_upload": "enabled",
@@ -526,7 +521,7 @@ def system_status():
         "cors_origins": len(ALLOWED_ORIGINS)
     }
 
-# ===================== STATISTICS ENDPOINT =====================
+# Admin statistics endpoint
 @app.get("/api/admin/statistics")
 async def get_admin_statistics(db = Depends(db_dependency)):
     """Get admin dashboard statistics"""
@@ -563,7 +558,7 @@ async def get_admin_statistics(db = Depends(db_dependency)):
             "in_progress_tasks": 0
         }
 
-# ===================== AGENTS ENDPOINTS =====================
+# List agents endpoint
 @app.get("/api/agents")
 async def list_agents(db = Depends(db_dependency)):
     """List all agents with their statistics"""
@@ -604,7 +599,7 @@ async def list_agents(db = Depends(db_dependency)):
         print(f"❌ Error listing agents: {e}")
         return []
 
-# ===================== TASK ENDPOINTS FOR AGENTS =====================
+# Current task endpoint
 @app.get("/api/agents/{agent_id}/current-task")
 async def get_current_task(agent_id: str, db = Depends(db_dependency)):
     """Get current task for an agent"""
@@ -637,7 +632,7 @@ async def get_current_task(agent_id: str, db = Depends(db_dependency)):
         
         if next_task.status == 'pending':
             next_task.status = 'in_progress'
-           next_task.started_at = datetime.utcnow()  # Fixed indentation  # Match agent_routes.py
+            next_task.started_at = datetime.utcnow()
             db.commit()
         
         total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).count()
@@ -669,6 +664,7 @@ async def get_current_task(agent_id: str, db = Depends(db_dependency)):
         print(f"❌ Error getting current task for {agent_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting current task: {str(e)}")
 
+# Agent tasks endpoint
 @app.get("/api/agents/{agent_id}/tasks")
 async def get_agent_tasks(agent_id: str, db = Depends(db_dependency)):
     """Get all tasks for an agent"""
@@ -706,6 +702,7 @@ async def get_agent_tasks(agent_id: str, db = Depends(db_dependency)):
         print(f"❌ Error getting tasks for {agent_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting tasks: {str(e)}")
 
+# Agent statistics endpoint
 @app.get("/api/agents/{agent_id}/statistics")
 async def get_agent_statistics(agent_id: str, db = Depends(db_dependency)):
     """Get statistics for a specific agent"""
@@ -754,7 +751,7 @@ async def get_agent_statistics(agent_id: str, db = Depends(db_dependency)):
             "in_progress_tasks": 0
         }
 
-# ===================== AGENT REGISTRATION ENDPOINT =====================
+# Agent registration endpoint
 @app.post("/api/agents/register")
 async def register_agent(
     name: str = Form(...),
@@ -770,27 +767,22 @@ async def register_agent(
         if not database_ready:
             raise HTTPException(status_code=503, detail="Database not ready")
         
-        # Validate date format
         try:
             datetime.strptime(dob, '%Y-%m-%d')
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
         
-        # Check if email already exists
         existing_agent = db.query(Agent).filter(Agent.email == email).first()
         if existing_agent:
             raise HTTPException(status_code=400, detail="Email already registered")
         
-        # Generate unique agent ID
         agent_id = f"AG{datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:4].upper()}"
         
-        # Generate secure password
         import secrets
         import string
         alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
         password = ''.join(secrets.choice(alphabet) for _ in range(12))
         
-        # Create agent record
         new_agent = Agent(
             agent_id=agent_id,
             name=name,
@@ -825,7 +817,7 @@ async def register_agent(
             db.rollback()
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
-# ===================== FORM SUBMISSION ENDPOINT =====================
+# Task submission endpoint
 @app.post("/api/agents/{agent_id}/submit")
 async def submit_task_form(
     agent_id: str,
@@ -841,27 +833,22 @@ async def submit_task_form(
         if not agent:
             raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
         
-        # Handle both JSON and form data from frontend
         content_type = request.headers.get("content-type", "")
         
         if content_type.startswith("application/json"):
             data = await request.json()
         else:
-            # Handle form data from frontend
             form_data = await request.form()
             data = dict(form_data)
-            # Remove metadata fields
             data.pop('agent_id', None)
             data.pop('task_id', None)
         
-        # Get the current in-progress task for this agent
         current_task = db.query(TaskProgress).filter(
             TaskProgress.agent_id == agent_id,
             TaskProgress.status == 'in_progress'
         ).order_by(TaskProgress.assigned_at).first()
         
         if not current_task:
-            # If no in-progress task, try to find a pending one
             current_task = db.query(TaskProgress).filter(
                 TaskProgress.agent_id == agent_id,
                 TaskProgress.status == 'pending'
@@ -870,7 +857,6 @@ async def submit_task_form(
         if not current_task:
             raise HTTPException(status_code=404, detail="No active task found for submission")
         
-        # Create submitted form record
         submitted_form = SubmittedForm(
             agent_id=agent_id,
             task_id=current_task.id,
@@ -881,11 +867,9 @@ async def submit_task_form(
         
         db.add(submitted_form)
         
-        # Mark task as completed
         current_task.status = 'completed'
         current_task.completed_at = datetime.utcnow()
         
-        # Commit changes
         db.commit()
         
         print(f"✅ Task {current_task.id} completed by agent {agent_id}")
@@ -904,7 +888,7 @@ async def submit_task_form(
             db.rollback()
         raise HTTPException(status_code=500, detail=f"Error submitting task: {str(e)}")
 
-# ===================== STANDARD UPLOAD ENDPOINT =====================
+# Standard upload endpoint
 @app.post("/api/admin/upload-tasks")
 async def upload_tasks_standard(
     zip_file: UploadFile = File(...),
@@ -923,14 +907,12 @@ async def upload_tasks_standard(
         if agent.status != "active":
             raise HTTPException(status_code=400, detail=f"Agent {agent_id} is not active")
         
-        # Save uploaded file temporarily
         temp_file_path = f"temp_{uuid.uuid4().hex}_{zip_file.filename}"
         
         with open(temp_file_path, "wb") as buffer:
             content = await zip_file.read()
             buffer.write(content)
         
-        # Process the ZIP file
         result = await process_uploaded_zip(temp_file_path, agent_id, db)
         
         return result
@@ -941,8 +923,7 @@ async def upload_tasks_standard(
         print(f"❌ Upload error: {e}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-# ===================== CHUNKED UPLOAD ENDPOINTS =====================
-
+# Chunked upload initialization
 @app.post("/api/admin/init-chunked-upload")
 async def init_chunked_upload(
     filename: str = Form(...),
@@ -952,14 +933,9 @@ async def init_chunked_upload(
 ):
     """Initialize a chunked upload session for large files"""
     try:
-        # Validate agent exists (if database is ready)
         if database_ready:
             db_gen = db_dependency()
-            if hasattr(db_gen, '__next__'):
-                db = next(db_gen)
-            else:
-                db = db_gen
-                
+            db = next(db_gen) if hasattr(db_gen, '__next__') else db_gen
             try:
                 agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
                 if not agent:
@@ -970,12 +946,10 @@ async def init_chunked_upload(
                 if hasattr(db, 'close'):
                     db.close()
         
-        # Create unique upload ID
         upload_id = str(uuid.uuid4())
         upload_dir = os.path.join(CHUNK_UPLOAD_DIR, upload_id)
         os.makedirs(upload_dir, exist_ok=True)
         
-        # Store upload session info
         upload_sessions[upload_id] = {
             "filename": filename,
             "filesize": filesize,
@@ -989,7 +963,7 @@ async def init_chunked_upload(
         print(f"🚀 Initialized chunked upload: {upload_id} for {filename} ({filesize} bytes, {total_chunks} chunks)")
         
         return {
-            "upload_id": upload_id, 
+            "upload_id": upload_id,
             "status": "initialized",
             "message": f"Ready to receive {total_chunks} chunks"
         }
@@ -1000,6 +974,7 @@ async def init_chunked_upload(
         print(f"❌ Failed to initialize chunked upload: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to initialize upload: {str(e)}")
 
+# Chunk upload endpoint
 @app.post("/api/admin/upload-chunk")
 async def upload_chunk(
     upload_id: str = Form(...),
@@ -1013,11 +988,9 @@ async def upload_chunk(
         
         session = upload_sessions[upload_id]
         
-        # Validate chunk index
         if chunk_index >= session["total_chunks"] or chunk_index < 0:
             raise HTTPException(status_code=400, detail=f"Invalid chunk index: {chunk_index}")
         
-        # Check if chunk already uploaded
         if chunk_index in session["received_chunks"]:
             return {
                 "status": "chunk_already_exists",
@@ -1028,12 +1001,10 @@ async def upload_chunk(
         
         chunk_path = os.path.join(session["upload_dir"], f"chunk_{chunk_index:06d}")
         
-        # Save chunk to disk
         async with aiofiles.open(chunk_path, 'wb') as f:
             content = await chunk.read()
             await f.write(content)
         
-        # Mark chunk as received
         session["received_chunks"].add(chunk_index)
         
         print(f"📦 Received chunk {chunk_index + 1}/{session['total_chunks']} for upload {upload_id}")
@@ -1052,6 +1023,7 @@ async def upload_chunk(
         print(f"❌ Failed to upload chunk {chunk_index}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to upload chunk: {str(e)}")
 
+# Finalize chunked upload
 @app.post("/api/admin/finalize-chunked-upload")
 async def finalize_chunked_upload(upload_id: str = Form(...), db = Depends(db_dependency)):
     """Combine all chunks and process the complete file"""
@@ -1061,17 +1033,15 @@ async def finalize_chunked_upload(upload_id: str = Form(...), db = Depends(db_de
         
         session = upload_sessions[upload_id]
         
-        # Verify all chunks received
         if len(session["received_chunks"]) != session["total_chunks"]:
             missing_chunks = set(range(session["total_chunks"])) - session["received_chunks"]
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail=f"Missing chunks: {sorted(list(missing_chunks))[:10]}{'...' if len(missing_chunks) > 10 else ''}"
             )
         
         print(f"🔄 Combining {session['total_chunks']} chunks for upload {upload_id}")
         
-        # Combine chunks into final file
         final_file_path = os.path.join(session["upload_dir"], session["filename"])
         
         with open(final_file_path, 'wb') as final_file:
@@ -1080,17 +1050,14 @@ async def finalize_chunked_upload(upload_id: str = Form(...), db = Depends(db_de
                 if os.path.exists(chunk_path):
                     with open(chunk_path, 'rb') as chunk_file:
                         final_file.write(chunk_file.read())
-                    # Clean up chunk file immediately
                     os.remove(chunk_path)
                 else:
                     raise HTTPException(status_code=500, detail=f"Chunk {chunk_index} file not found")
         
         print(f"✅ Successfully combined all chunks into {final_file_path}")
         
-        # Process the complete ZIP file
         result = await process_uploaded_zip(final_file_path, session["agent_id"], db)
         
-        # Clean up upload session
         cleanup_upload_session(upload_id)
         
         return result
@@ -1103,6 +1070,7 @@ async def finalize_chunked_upload(upload_id: str = Form(...), db = Depends(db_de
         cleanup_upload_session(upload_id)
         raise HTTPException(status_code=500, detail=f"Failed to finalize upload: {str(e)}")
 
+# Cleanup upload session
 def cleanup_upload_session(upload_id: str):
     """Clean up upload session and temporary files"""
     try:
@@ -1110,19 +1078,17 @@ def cleanup_upload_session(upload_id: str):
             session = upload_sessions[upload_id]
             upload_dir = session["upload_dir"]
             
-            # Remove temporary directory and all contents
             if os.path.exists(upload_dir):
                 shutil.rmtree(upload_dir)
                 print(f"🧹 Cleaned up upload directory: {upload_dir}")
             
-            # Remove session from memory
             del upload_sessions[upload_id]
             print(f"🧹 Cleaned up upload session: {upload_id}")
             
     except Exception as e:
         print(f"❌ Error cleaning up upload session {upload_id}: {e}")
 
-# ===================== ENHANCED ZIP PROCESSING FUNCTION =====================
+# ZIP processing function
 async def process_uploaded_zip(file_path: str, agent_id: str, db):
     """Enhanced ZIP file processing with comprehensive error handling and cleanup"""
     temp_files_created = []
@@ -1135,7 +1101,6 @@ async def process_uploaded_zip(file_path: str, agent_id: str, db):
         
         images_processed = 0
         
-        # Verify ZIP file exists and is readable
         if not os.path.exists(file_path):
             raise Exception(f"ZIP file not found: {file_path}")
             
@@ -1143,17 +1108,15 @@ async def process_uploaded_zip(file_path: str, agent_id: str, db):
             raise Exception("Uploaded file is not a valid ZIP archive")
         
         with zipfile.ZipFile(file_path, 'r') as zip_ref:
-            # Get image files from ZIP with better filtering
             image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp')
             image_files = []
             
             for file_info in zip_ref.filelist:
                 filename = file_info.filename
-                # Skip directories, hidden files, and system files
-                if (not file_info.is_dir() and 
+                if (not file_info.is_dir() and
                     filename.lower().endswith(image_extensions) and
                     not filename.startswith(('__MACOSX/', '.', 'thumbs.db')) and
-                    '/' not in filename.split('/')[-1]):  # Only files in root or simple subdirs
+                    '/' not in filename.split('/')[-1]):
                     image_files.append(filename)
             
             if not image_files:
@@ -1161,41 +1124,35 @@ async def process_uploaded_zip(file_path: str, agent_id: str, db):
             
             print(f"📸 Found {len(image_files)} valid images in ZIP file")
             
-            # Create static directory with proper permissions
             static_dir = "static/task_images"
             os.makedirs(static_dir, exist_ok=True)
             
-            # Process images with transaction safety
             tasks_to_add = []
             
             for idx, image_file in enumerate(image_files):
                 try:
-                    # Extract image data
                     image_data = zip_ref.read(image_file)
                     
                     if len(image_data) == 0:
                         print(f"⚠️ Skipping empty image: {image_file}")
                         continue
                     
-                    # Create unique filename with timestamp and random component
                     original_name = os.path.basename(image_file)
                     file_extension = os.path.splitext(original_name)[1].lower()
                     if not file_extension:
-                        file_extension = '.jpg'  # Default extension
+                        file_extension = '.jpg'
                     
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                     unique_id = str(uuid.uuid4())[:8]
                     unique_filename = f"task_{agent_id}_{timestamp}_{idx:04d}_{unique_id}{file_extension}"
                     
-                    # Save to static directory
                     image_path = os.path.join(static_dir, unique_filename)
                     
                     with open(image_path, 'wb') as f:
                         f.write(image_data)
                     
-                    temp_files_created.append(image_path)  # Track for cleanup if needed
+                    temp_files_created.append(image_path)
                     
-                    # Create task object (don't add to DB yet)
                     task_progress = TaskProgress(
                         agent_id=agent_id,
                         image_filename=unique_filename,
@@ -1215,13 +1172,12 @@ async def process_uploaded_zip(file_path: str, agent_id: str, db):
             if not tasks_to_add:
                 raise Exception("No images could be processed successfully")
             
-            # Add all tasks to database in a single transaction
             try:
                 for task in tasks_to_add:
                     db.add(task)
                 db.commit()
                 print(f"✅ Successfully created {len(tasks_to_add)} tasks for agent {agent_id}")
-                temp_files_created.clear()  # Success - don't cleanup files
+                temp_files_created.clear()
             except Exception as db_error:
                 if hasattr(db, 'rollback'):
                     db.rollback()
@@ -1232,7 +1188,6 @@ async def process_uploaded_zip(file_path: str, agent_id: str, db):
         if hasattr(db, 'rollback'):
             db.rollback()
         
-        # Cleanup any files created before the error
         for temp_file in temp_files_created:
             try:
                 if os.path.exists(temp_file):
@@ -1244,7 +1199,6 @@ async def process_uploaded_zip(file_path: str, agent_id: str, db):
         raise Exception(f"ZIP processing failed: {str(e)}")
     
     finally:
-        # Always clean up the original ZIP file
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
@@ -1260,8 +1214,7 @@ async def process_uploaded_zip(file_path: str, agent_id: str, db):
         "timestamp": datetime.now().isoformat()
     }
 
-# ===================== CLEANUP AND MAINTENANCE =====================
-
+# Periodic cleanup
 async def periodic_cleanup():
     """Clean up old upload sessions every hour"""
     while True:
@@ -1270,7 +1223,6 @@ async def periodic_cleanup():
             expired_sessions = []
             
             for upload_id, session in upload_sessions.items():
-                # Remove sessions older than 2 hours
                 if (now - session["created_at"]).total_seconds() > 7200:
                     expired_sessions.append(upload_id)
             
@@ -1284,11 +1236,9 @@ async def periodic_cleanup():
         except Exception as e:
             print(f"❌ Error in periodic cleanup: {e}")
         
-        # Wait 1 hour before next cleanup
         await asyncio.sleep(3600)
 
-# ===================== UPLOAD SESSIONS MANAGEMENT =====================
-
+# Upload sessions management
 @app.get("/api/admin/upload-sessions")
 def get_upload_sessions():
     """Get current upload sessions (admin only)"""
@@ -1305,8 +1255,7 @@ def get_upload_sessions():
         }
     return {"upload_sessions": sessions_info}
 
-# ===================== ADDITIONAL ADMIN ENDPOINTS =====================
-
+# Additional admin endpoints
 @app.post("/api/admin/reset-password/{agent_id}")
 async def reset_agent_password(agent_id: str, db = Depends(db_dependency)):
     """Reset agent password"""
@@ -1318,13 +1267,11 @@ async def reset_agent_password(agent_id: str, db = Depends(db_dependency)):
         if not agent:
             raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
         
-        # Generate new password
         import secrets
         import string
         alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
         new_password = ''.join(secrets.choice(alphabet) for _ in range(12))
         
-        # Update password
         agent.password = new_password
         db.commit()
         
@@ -1403,7 +1350,6 @@ async def force_logout_agent(agent_id: str, db = Depends(db_dependency)):
         if not agent:
             raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
         
-        # Find active session and close it
         active_session = db.query(AgentSession).filter(
             AgentSession.agent_id == agent_id,
             AgentSession.logout_time.is_(None)
@@ -1471,7 +1417,6 @@ async def test_data_availability(db = Depends(db_dependency)):
         if not database_ready:
             raise HTTPException(status_code=503, detail="Database not ready")
         
-        # Count records in each table
         agent_count = db.query(Agent).count()
         task_count = db.query(TaskProgress).count()
         submission_count = db.query(SubmittedForm).count()
@@ -1538,8 +1483,7 @@ async def get_session_report(
         print(f"❌ Error in session report: {e}")
         raise HTTPException(status_code=500, detail=f"Session report failed: {str(e)}")
 
-# ===================== EXPORT ENDPOINTS (PLACEHOLDERS) =====================
-
+# Export endpoints (placeholders)
 @app.get("/api/admin/export-excel")
 async def export_excel(
     agent_id: Optional[str] = None,
@@ -1566,14 +1510,13 @@ async def export_sessions(
     """Export session report to Excel - ready for implementation"""
     return JSONResponse(
         content={
-            "message": "Session export feature - ready for implementation", 
+            "message": "Session export feature - ready for implementation",
             "note": "Add pandas and openpyxl implementation here for full session export functionality"
         },
         status_code=501
     )
 
-# ===================== MAIN ENTRY POINT =====================
-
+# Main entry point
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
@@ -1587,12 +1530,4 @@ if __name__ == "__main__":
     print(f"🛣️ Routes ready: {routes_ready}")
     print(f"🏃 Starting server on port {port}")
     print("=" * 60)
-    # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
-
-
-
-
-
-
-
