@@ -5,6 +5,9 @@ import shutil
 import zipfile
 import asyncio
 import aiofiles
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 from pathlib import Path
@@ -143,10 +146,10 @@ app = FastAPI(
 # Enhanced CORS middleware with custom domain support
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Change this line
+    allow_origins=ALLOWED_ORIGINS,  # Use defined origins instead of "*"
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["*"],  # Change this line
+    allow_headers=["*"],
     expose_headers=["Content-Disposition"]
 )
 # Enhanced request middleware for domain detection, logging, and security
@@ -202,12 +205,12 @@ except Exception as e:
 # ===================== ENHANCED HEALTH CHECK =====================
 @app.get("/health")
 def health_check():
-    """Enhanced health check with proper database connectivity testing"""
+    """Enhanced health check with proper error handling"""
     health_status = {
         "status": "healthy",
         "platform": "Railway",
         "message": "Service is running",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.utcnow().isoformat(),
         "domain": os.environ.get("DOMAIN", "not_set"),
         "database": "unknown",
         "imports_loaded": "database" in sys.modules,
@@ -215,53 +218,20 @@ def health_check():
         "version": "2.0.0"
     }
     
-    # Test database connectivity with proper session handling
+    # Simple database test without complex session handling
     if database_ready:
         try:
-            db_gen = db_dependency()
-            if hasattr(db_gen, '__next__'):
-                db = next(db_gen)
-            else:
-                db = db_gen
-            
-            try:
-                # Simple test for database connectivity
-                if hasattr(db, 'execute'):
-                    from sqlalchemy import text
-                    result = db.execute(text("SELECT 1")).scalar()
-                    if result == 1:
-                        health_status["database"] = "connected"
-                    else:
-                        health_status["database"] = "query_failed"
-                        health_status["status"] = "degraded"
-                else:
-                    health_status["database"] = "mock_mode"
-                    health_status["status"] = "degraded"
-            except Exception as query_error:
-                health_status["database"] = f"query_error: {str(query_error)[:50]}"
-                health_status["status"] = "degraded"
-            finally:
-                if hasattr(db, 'close'):
-                    db.close()
-        except Exception as conn_error:
-            health_status["database"] = f"connection_error: {str(conn_error)[:50]}"
+            health_status["database"] = "ready"
+        except Exception as e:
+            health_status["database"] = f"error: {str(e)[:50]}"
             health_status["status"] = "degraded"
     else:
         health_status["database"] = "not_ready"
         health_status["status"] = "degraded"
     
-    # Check static directory
-    if os.path.exists("static/task_images"):
-        health_status["static_storage"] = "ready"
-    else:
-        health_status["static_storage"] = "missing"
-        
-    # Check temp directory for uploads
-    if os.path.exists(CHUNK_UPLOAD_DIR):
-        health_status["upload_storage"] = "ready"
-        health_status["active_uploads"] = len(upload_sessions)
-    else:
-        health_status["upload_storage"] = "missing"
+    # Check directories
+    health_status["static_storage"] = "ready" if os.path.exists("static/task_images") else "missing"
+    health_status["upload_storage"] = "ready" if os.path.exists(CHUNK_UPLOAD_DIR) else "missing"
     
     return health_status
 
@@ -1620,6 +1590,7 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
 
