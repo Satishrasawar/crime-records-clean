@@ -1,4 +1,3 @@
-```python
 import os
 import sys
 import uuid
@@ -838,7 +837,7 @@ async def list_agents(request: Request, db=Depends(db_dependency)):
 @app.get("/api/agents/{agent_id}/current-task")
 @limiter.limit("50/minute")
 async def get_current_task(agent_id: str, request: Request, db=Depends(db_dependency)):
-    """Get current task for an agent - FIXED VERSION"""
+    """Get current task for an agent"""
     try:
         if not database_ready:
             raise HTTPException(status_code=503, detail="Database not ready")
@@ -925,7 +924,7 @@ async def get_current_task(agent_id: str, request: Request, db=Depends(db_depend
 @app.post("/api/agents/{agent_id}/submit")
 @limiter.limit("50/minute")
 async def submit_task_form(agent_id: str, request: Request, db=Depends(db_dependency)):
-    """Submit completed task form - FIXED VERSION"""
+    """Submit completed task form"""
     try:
         if not database_ready:
             raise HTTPException(status_code=503, detail="Database not ready")
@@ -1688,4 +1687,3 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
-```
