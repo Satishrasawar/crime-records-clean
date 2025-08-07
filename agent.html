@@ -143,10 +143,6 @@
             font-size: 16px;
             background: #f8f9fa;
             transition: all 0.3s ease;
-            autocomplete: off;
-            autocapitalize: off;
-            autocorrect: off;
-            spellcheck: false;
         }
         
         .form-group input:focus {
@@ -227,7 +223,7 @@
             margin-bottom: 10px;
             flex-shrink: 0;
         }
-
+        
         .form-grid {
             display: grid;
             grid-template-columns: repeat(6, 1fr);
@@ -254,10 +250,6 @@
             border-radius: 4px;
             font-size: 13px;
             height: 32px;
-            autocomplete: off;
-            autocapitalize: off;
-            autocorrect: off;
-            spellcheck: false;
         }
 
         .form-group-task input.protected {
@@ -268,6 +260,11 @@
         .form-group-task input.protected:focus {
             background: #fff;
             border-color: #667eea;
+        }
+        
+        .form-group-task input.error {
+            border-color: #dc3545 !important;
+            background-color: #f8d7da !important;
         }
         
         .datetime-input {
@@ -386,6 +383,7 @@
             border-radius: 10px;
             font-size: 14px;
             border-left: 4px solid;
+            animation: slideIn 0.3s ease-out;
         }
         
         .alert-success {
@@ -404,6 +402,17 @@
             background: #d1ecf1;
             color: #0c5460;
             border-left-color: #17a2b8;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .security-warning {
@@ -560,7 +569,7 @@
                     <p>Agent Dashboard Login</p>
                 </div>
                 
-                <form id="loginForm" class="login-form" autocomplete="off" spellcheck="false">
+                <form id="loginForm" class="login-form">
                     <div class="form-group">
                         <label for="agent_id">Agent ID</label>
                         <div class="input-container">
@@ -623,7 +632,6 @@
             <!-- FORM SECTION -->
             <div class="form-section">
                 <form id="taskForm" autocomplete="off" spellcheck="false">
-                    <input type="hidden" id="currentTaskId" name="task_id">
                     <div class="form-grid">
                         <!-- Row 1 -->
                         <div class="form-group-task">
@@ -658,7 +666,7 @@
                                    autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" required>
                         </div>
                         
-                        <!-- Additional rows with all the same fields as before -->
+                        <!-- Row 2 -->
                         <div class="form-group-task">
                             <label>Report Dist No:</label>
                             <input type="text" name="Rpt_Dist_No" class="protected"
@@ -817,491 +825,488 @@
     </div>
 
     <script>
-        let currentAgentId = null;
-        let currentTaskId = null;
+        // Application State
+        let currentUser = null;
         let currentTaskIndex = 0;
         let totalTasks = 0;
-        let isSubmitting = false;
+        let completedTasks = 0;
+        let taskData = [];
 
-        // FIXED Configuration - Use current domain
-        const CONFIG = {
-            API_BASE_URL: '', // Empty = current domain
-            MESSAGES: {
-                LOGIN_SUCCESS: 'Login successful',
-                LOGIN_FAILED: 'Invalid credentials. Please check your Agent ID and password.',
-                TASK_SUBMITTED: 'Task submitted successfully!',
-                LOADING_TASK: 'Loading next task...',
-                NETWORK_ERROR: 'Network error occurred. Please check your connection.',
-                ALL_COMPLETED: 'All Tasks Completed!',
-                LOGOUT_SUCCESS: 'Logged out successfully'
+        // Security features
+        let pasteAttempts = 0;
+        const MAX_PASTE_ATTEMPTS = 3;
+
+        // Sample task data (in production, this would come from a server)
+        const sampleTasks = [
+            {
+                id: 1,
+                imageName: "crime_report_001.jpg",
+                imageUrl: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjZjhmOWZhIi8+Cjx0ZXh0IHg9IjIwMCIgeT0iMTUwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNjY3ZWVhIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiPkNyaW1lIFJlcG9ydCBJbWFnZSAxPC90ZXh0Pgo8L3N2Zz4K",
+                data: {
+                    DR_NO: "DR2024001",
+                    Date_Rptd: "01/15/2024 10:30 AM",
+                    DATE_OCC: "01/15/2024 08:45 AM",
+                    TIME_OCC: "08:45 AM",
+                    Unique_Identifier: "UID001",
+                    AREA_NAME: "Central Division",
+                    Rpt_Dist_No: "101",
+                    VIN: "1HGCM82633A",
+                    Crm: "330",
+                    Crm_Cd_Desc: "BURGLARY FROM VEHICLE",
+                    Mocodes: "0344 0913",
+                    Vict_Age: "35",
+                    Geolocation: "(34.0522, -118.2437)",
+                    DEPARTMENT: "LAPD",
+                    Premis_Cd: "108",
+                    Premis_Desc: "PARKING LOT",
+                    ARREST_KEY: "N",
+                    PD_DESC: "77TH STREET",
+                    CCD_LONCOD: "77",
+                    Status_Desc: "Invest Cont",
+                    LAW_CODE: "459 PC",
+                    SubAgency: "CENTRAL",
+                    Charge: "BURGLARY",
+                    Race: "H",
+                    LOCATION: "1200 W 7TH ST",
+                    SeqID: "12345",
+                    LAT: "34.0522",
+                    LON: "-118.2437",
+                    Point: "POINT(-118.2437 34.0522)",
+                    Shape__Area: "0"
+                }
+            },
+            {
+                id: 2,
+                imageName: "crime_report_002.jpg", 
+                imageUrl: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjZjhmOWZhIi8+Cjx0ZXh0IHg9IjIwMCIgeT0iMTUwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNzY0YmEyIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiPkNyaW1lIFJlcG9ydCBJbWFnZSAyPC90ZXh0Pgo8L3N2Zz4K",
+                data: {
+                    DR_NO: "DR2024002",
+                    Date_Rptd: "01/16/2024 02:15 PM",
+                    DATE_OCC: "01/16/2024 01:20 PM",
+                    TIME_OCC: "01:20 PM",
+                    Unique_Identifier: "UID002",
+                    AREA_NAME: "North Division",
+                    Rpt_Dist_No: "102",
+                    VIN: "2T1BURHE9FC",
+                    Crm: "210",
+                    Crm_Cd_Desc: "ROBBERY",
+                    Mocodes: "0230 1822",
+                    Vict_Age: "28",
+                    Geolocation: "(34.0928, -118.2681)",
+                    DEPARTMENT: "LAPD",
+                    Premis_Cd: "101",
+                    Premis_Desc: "STREET",
+                    ARREST_KEY: "Y",
+                    PD_DESC: "HOLLYWOOD",
+                    CCD_LONCOD: "06",
+                    Status_Desc: "Adult Arrest",
+                    LAW_CODE: "211 PC",
+                    SubAgency: "HOLLYWOOD",
+                    Charge: "ROBBERY",
+                    Race: "B",
+                    LOCATION: "6000 HOLLYWOOD BLVD",
+                    SeqID: "12346",
+                    LAT: "34.0928",
+                    LON: "-118.2681",
+                    Point: "POINT(-118.2681 34.0928)",
+                    Shape__Area: "0"
+                }
+            },
+            {
+                id: 3,
+                imageName: "crime_report_003.jpg",
+                imageUrl: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjZjhmOWZhIi8+Cjx0ZXh0IHg9IjIwMCIgeT0iMTUwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjMjhhNzQ1IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiPkNyaW1lIFJlcG9ydCBJbWFnZSAzPC90ZXh0Pgo8L3N2Zz4K",
+                data: {
+                    DR_NO: "DR2024003",
+                    Date_Rptd: "01/17/2024 09:45 AM",
+                    DATE_OCC: "01/17/2024 07:30 AM",
+                    TIME_OCC: "07:30 AM",
+                    Unique_Identifier: "UID003",
+                    AREA_NAME: "South Division",
+                    Rpt_Dist_No: "103",
+                    VIN: "5NPE24AF2FH",
+                    Crm: "624",
+                    Crm_Cd_Desc: "BATTERY - SIMPLE ASSAULT",
+                    Mocodes: "0415 1243",
+                    Vict_Age: "42",
+                    Geolocation: "(34.0194, -118.2863)",
+                    DEPARTMENT: "LAPD",
+                    Premis_Cd: "502",
+                    Premis_Desc: "RESIDENCE",
+                    ARREST_KEY: "N",
+                    PD_DESC: "SOUTHWEST",
+                    CCD_LONCOD: "03",
+                    Status_Desc: "Invest Cont",
+                    LAW_CODE: "242 PC",
+                    SubAgency: "SOUTHWEST",
+                    Charge: "BATTERY",
+                    Race: "W",
+                    LOCATION: "3500 S VERMONT AVE",
+                    SeqID: "12347",
+                    LAT: "34.0194",
+                    LON: "-118.2863",
+                    Point: "POINT(-118.2863 34.0194)",
+                    Shape__Area: "0"
+                }
             }
+        ];
+
+        // Valid credentials (in production, this would be server-side authentication)
+        const validCredentials = {
+            'agent001': 'password123',
+            'agent002': 'secure456',
+            'admin': 'admin789'
         };
 
-       function getApiUrl(endpoint) {
-                return endpoint;
-           }
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSecurity();
+            setupEventListeners();
+            loadTaskData();
+        });
 
-        // Security functions
+        // Security initialization
+        function initializeSecurity() {
+            // Disable right-click context menu
+            document.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+                showSecurityWarning();
+            });
+
+            // Monitor paste attempts
+            document.addEventListener('paste', function(e) {
+                const target = e.target;
+                if (target.classList && target.classList.contains('protected')) {
+                    e.preventDefault();
+                    pasteAttempts++;
+                    showSecurityWarning();
+                    
+                    if (pasteAttempts >= MAX_PASTE_ATTEMPTS) {
+                        alert('Multiple security violations detected. Session will be logged.');
+                    }
+                }
+            });
+
+            // Disable keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                // Disable Ctrl+V, Ctrl+C, Ctrl+A, F12, etc.
+                if ((e.ctrlKey && (e.key === 'v' || e.key === 'c' || e.key === 'a')) || 
+                    e.key === 'F12' || 
+                    (e.ctrlKey && e.shiftKey && e.key === 'I')) {
+                    
+                    const target = e.target;
+                    if (target.classList && target.classList.contains('protected')) {
+                        e.preventDefault();
+                        showSecurityWarning();
+                    }
+                }
+            });
+        }
+
+        // Show security warning
         function showSecurityWarning() {
             const warning = document.getElementById('securityWarning');
             warning.style.display = 'flex';
+            
             setTimeout(() => {
                 warning.style.display = 'none';
             }, 2000);
         }
 
-        function preventCopyPaste(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            showSecurityWarning();
-            return false;
-        }
-
-        function isProtectedInput(element) {
-            return element && element.classList && element.classList.contains('protected');
-        }
-
-        function blockCopyPasteShortcuts(e) {
-            if (isProtectedInput(e.target)) {
-                if ((e.ctrlKey || e.metaKey) && ['c', 'v', 'x'].includes(e.key.toLowerCase())) {
-                    preventCopyPaste(e);
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        // Initialize security and form setup
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 Page loaded - initializing...');
+        // Setup event listeners
+        function setupEventListeners() {
+            // Login form submission
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
             
-            // Apply copy/paste protection to task form inputs
-            const taskFormInputs = document.querySelectorAll('#taskForm input');
-            taskFormInputs.forEach(input => {
-                input.classList.add('protected');
-                input.addEventListener('copy', preventCopyPaste);
-                input.addEventListener('paste', preventCopyPaste);
-                input.addEventListener('cut', preventCopyPaste);
-                input.addEventListener('contextmenu', preventCopyPaste);
-                input.setAttribute('autocomplete', 'off');
-                input.setAttribute('autocapitalize', 'off');
-                input.setAttribute('autocorrect', 'off');
-                input.setAttribute('spellcheck', 'false');
-            });
-
-            document.addEventListener('keydown', blockCopyPasteShortcuts);
-
-            // Form validation for datetime inputs
-            const dateTimeInputs = document.querySelectorAll('input[name="Date_Rptd"], input[name="DATE_OCC"]');
-            dateTimeInputs.forEach(input => {
-                input.addEventListener('blur', function(e) {
-                    const pattern = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} (AM|PM)$/;
-                    if (e.target.value && !pattern.test(e.target.value)) {
-                        e.target.style.borderColor = '#dc3545';
-                        e.target.title = 'Format: MM/DD/YYYY HH:MM AM/PM (e.g., 11/04/2021 12:30 PM)';
-                    } else {
-                        e.target.style.borderColor = '#667eea';
-                        e.target.title = '';
-                    }
+            // Task form input validation
+            const taskInputs = document.querySelectorAll('#taskForm input');
+            taskInputs.forEach(input => {
+                input.addEventListener('blur', validateInput);
+                input.addEventListener('input', function() {
+                    this.classList.remove('error');
                 });
             });
-            
-            const timeInput = document.querySelector('input[name="TIME_OCC"]');
-            if (timeInput) {
-                timeInput.addEventListener('blur', function(e) {
-                    const pattern = /^\d{2}:\d{2} (AM|PM)$/;
-                    if (e.target.value && !pattern.test(e.target.value)) {
-                        e.target.style.borderColor = '#dc3545';
-                        e.target.title = 'Format: HH:MM AM/PM (e.g., 02:30 PM)';
-                    } else {
-                        e.target.style.borderColor = '#e1e8ed';
-                        e.target.title = '';
-                    }
-                });
-            }
-        });
+        }
 
-        // FIXED Login form handler - Use simple agent validation first
-        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        // Handle login
+        function handleLogin(e) {
             e.preventDefault();
-            console.log('🔑 Login form submitted');
-            
-            const loginBtn = document.getElementById('loginBtn');
-            const originalText = loginBtn.textContent;
-            loginBtn.textContent = 'Signing In...';
-            loginBtn.disabled = true;
             
             const agentId = document.getElementById('agent_id').value.trim();
-            const password = document.getElementById('password').value.trim();
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
             
-            try {
-                console.log('🔑 Attempting login for agent:', agentId);
-                
-                // FIXED: Check if agent exists first using the working endpoint
-                const checkResponse = await fetch(getApiUrl('/api/agents'));
-                
-                if (!checkResponse.ok) {
-                    throw new Error('Unable to connect to server');
-                }
-                
-                const agents = await checkResponse.json();
-                console.log('📋 Retrieved agents list:', agents.length);
-                
-                // Find agent with matching ID and password
-                const matchingAgent = agents.find(agent => 
-                    agent.agent_id === agentId && agent.password === password
-                );
-                
-                if (matchingAgent) {
-                    console.log('✅ Agent found and authenticated:', matchingAgent.agent_id);
-                    currentAgentId = matchingAgent.agent_id;
-                    document.getElementById('agentName').textContent = matchingAgent.name || agentId;
-                    showAlert(CONFIG.MESSAGES.LOGIN_SUCCESS, 'success');
+            // Basic validation
+            if (!agentId || !password) {
+                showAlert('Please enter both Agent ID and password.', 'error');
+                return;
+            }
+            
+            // Disable button and show loading
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Signing In...';
+            
+            // Simulate authentication delay
+            setTimeout(() => {
+                if (validCredentials[agentId] && validCredentials[agentId] === password) {
+                    // Successful login
+                    currentUser = {
+                        agentId: agentId,
+                        name: agentId.toUpperCase(),
+                        loginTime: new Date()
+                    };
                     
-                    setTimeout(() => {
-                        showTaskSection();
-                        loadCurrentTask();
-                    }, 1000);
+                    showTaskSection();
+                    loadNextTask();
                 } else {
-                    console.log('❌ Invalid credentials');
-                    showAlert(CONFIG.MESSAGES.LOGIN_FAILED, 'error');
+                    // Failed login
+                    showAlert('Invalid credentials. Please check your Agent ID and password.', 'error');
+                    
+                    // Reset form
+                    document.getElementById('password').value = '';
+                    document.getElementById('password').focus();
                 }
                 
-            } catch (error) {
-                console.error('❌ Login error:', error);
-                showAlert(CONFIG.MESSAGES.NETWORK_ERROR, 'error');
-            } finally {
-                loginBtn.textContent = originalText;
+                // Re-enable button
                 loginBtn.disabled = false;
-            }
-        });
-
-        // FIXED Submit and Next function
-        async function submitAndNext() {
-            console.log('🚀 submitAndNext called');
-            
-            if (isSubmitting) {
-                console.log('⚠️ Already submitting, ignoring duplicate call');
-                return;
-            }
-            
-            if (!currentAgentId) {
-                showAlert('Please login first', 'error');
-                return;
-            }
-            
-            const form = document.getElementById('taskForm');
-            if (!form) {
-                showAlert('Form not found', 'error');
-                return;
-            }
-            
-            // Check if form has data
-            const inputs = form.querySelectorAll('input[type!="hidden"]');
-            let hasData = false;
-            let filledCount = 0;
-            
-            inputs.forEach(input => {
-                if (input.value && input.value.trim() !== '') {
-                    hasData = true;
-                    filledCount++;
-                }
-            });
-            
-            console.log(`📊 Form validation: ${filledCount} fields filled out of ${inputs.length} total`);
-            
-            if (!hasData) {
-                showAlert('Please fill at least one field before submitting', 'error');
-                return;
-            }
-            
-            isSubmitting = true;
-            
-            const submitBtn = document.getElementById('submitBtn');
-            const originalText = submitBtn.textContent;
-            submitBtn.textContent = 'Submitting...';
-            submitBtn.disabled = true;
-            showLoadingSpinner(true);
-            
-            try {
-                console.log('📤 Starting submission process...');
-                
-                const formData = new FormData(form);
-                formData.append('agent_id', currentAgentId);
-                
-                if (currentTaskId) {
-                    formData.append('task_id', currentTaskId);
-                }
-                
-                // Log form data
-                console.log('📤 Form data being submitted:');
-                let dataCount = 0;
-                for (let [key, value] of formData.entries()) {
-                    if (value && value.toString().trim() !== '') {
-                        console.log(`  ${key}: ${value}`);
-                        dataCount++;
-                    }
-                }
-                console.log(`📊 Total data fields: ${dataCount}`);
-                
-                // FIXED: Use the correct endpoint
-                const submitUrl = `/api/agents/${currentAgentId}/submit`;
-                console.log('📤 Submitting to:', submitUrl);
-                
-                const response = await fetch(submitUrl, {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                console.log('📡 Response status:', response.status);
-                
-                let result;
-                try {
-                    const responseText = await response.text();
-                    console.log('📥 Raw response:', responseText.substring(0, 200) + '...');
-                    result = JSON.parse(responseText);
-                } catch (parseError) {
-                    console.error('❌ JSON parse error:', parseError);
-                    throw new Error('Invalid response from server');
-                }
-                
-                console.log('📥 Parsed response:', result);
-                
-                if (response.ok && result.success) {
-                    console.log('✅ Submission successful!');
-                    showAlert(CONFIG.MESSAGES.TASK_SUBMITTED, 'success');
-                    
-                    clearFormButKeepTaskId();
-                    
-                    setTimeout(async () => {
-                        try {
-                            await loadCurrentTask();
-                            console.log('✅ Next task loaded');
-                        } catch (error) {
-                            console.error('❌ Error loading next task:', error);
-                            showAlert('Error loading next task: ' + error.message, 'error');
-                        }
-                    }, 1000);
-                    
-                } else {
-                    console.log('❌ Submission failed:', result.detail || result.message || 'Unknown error');
-                    showAlert(result.detail || result.message || 'Submission failed. Please try again.', 'error');
-                }
-                
-            } catch (error) {
-                console.error('❌ Submit error:', error);
-                showAlert('Network error: ' + error.message, 'error');
-            } finally {
-                submitBtn.textContent = originalText;
-                submitBtn.disabled = false;
-                isSubmitting = false;
-                showLoadingSpinner(false);
-                console.log('🔄 Submit process completed');
-            }
+                loginBtn.textContent = 'Sign In to Dashboard';
+            }, 1500);
         }
 
-        function clearFormButKeepTaskId() {
-            const form = document.getElementById('taskForm');
-            const taskId = currentTaskId;
-            form.reset();
-            if (taskId) {
-                document.getElementById('currentTaskId').value = taskId;
-            }
+        // Load task data
+        function loadTaskData() {
+            taskData = [...sampleTasks];
+            totalTasks = taskData.length;
+            currentTaskIndex = 0;
+            completedTasks = 0;
         }
 
-        // FIXED Load current task function
-        async function loadCurrentTask() {
-            if (!currentAgentId) {
-                console.log('❌ No agent ID for loading task');
-                return;
-            }
-            
-            try {
-                console.log('📋 Loading current task for agent:', currentAgentId);
-                showLoadingSpinner(true);
-                
-                const taskUrl = `/api/agents/${currentAgentId}/current-task`;
-                console.log('📋 Fetching from:', taskUrl);
-                
-                const response = await fetch(taskUrl);
-                console.log('📡 Task response status:', response.status);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const result = await response.json();
-                console.log('📊 Task data received:', result);
-                
-                await processTaskResponse(result);
-                
-            } catch (error) {
-                console.error('❌ Failed to load current task:', error);
-                showAlert('Failed to load task: ' + error.message, 'error');
-                
-                setTimeout(() => {
-                    checkIfCompleted();
-                }, 2000);
-            } finally {
-                showLoadingSpinner(false);
-            }
+        // Show task section
+        function showTaskSection() {
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('taskSection').classList.remove('hidden');
+            document.getElementById('agentName').textContent = currentUser.name;
+            updateProgressInfo();
         }
 
-        // FIXED Process task response
-        async function processTaskResponse(result) {
-            console.log('🔄 Processing task response:', result);
-            
-            if (result.completed || result.message === 'All tasks completed') {
-                console.log('✅ All tasks completed');
-                document.getElementById('totalCompleted').textContent = result.total_completed || result.total_tasks || 'All';
+        // Update progress information
+        function updateProgressInfo() {
+            const progressInfo = document.getElementById('progressInfo');
+            progressInfo.textContent = ` | Task ${currentTaskIndex + 1} of ${totalTasks} | Completed: ${completedTasks}`;
+        }
+
+        // Load next task
+        function loadNextTask() {
+            if (currentTaskIndex >= totalTasks) {
                 showCompletedSection();
                 return;
             }
             
-            if (result.task) {
-                currentTaskId = result.task.id;
-                console.log('📋 Set current task ID to:', currentTaskId);
+            const task = taskData[currentTaskIndex];
+            
+            // Show loading spinner
+            showLoading(true);
+            
+            setTimeout(() => {
+                // Load image
+                document.getElementById('taskImage').src = task.imageUrl;
+                document.getElementById('imageName').textContent = task.imageName;
                 
-                if (result.image_url || result.task.image_path) {
-                    const imageUrl = result.image_url || result.task.image_path;
-                    console.log('🖼️ Loading image:', imageUrl);
-                    
-                    const taskImage = document.getElementById('taskImage');
-                    taskImage.src = imageUrl;
-                    
-                    taskImage.onerror = function() {
-                        console.error('❌ Failed to load image:', imageUrl);
-                        this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkltYWdlIG5vdCBmb3VuZDwvdGV4dD48L3N2Zz4=';
-                        showAlert('Image could not be loaded. Please contact admin.', 'error');
-                    };
-                    
-                    taskImage.onload = function() {
-                        console.log('✅ Image loaded successfully');
-                    };
-                    
-                    document.getElementById('imageName').textContent = 
-                        result.image_name || 
-                        result.task.image_filename || 
-                        'Task Image';
-                    
-                    document.getElementById('currentTaskId').value = currentTaskId;
-                    
-                    const progressText = result.progress || `${(result.current_index || 0)}/${result.total_images || 1}`;
-                    document.getElementById('progressInfo').textContent = `Progress: ${progressText}`;
-                    
-                    console.log('✅ Task loaded successfully');
-                } else {
-                    console.log('❌ No image URL found in response');
-                    showAlert('No image found for this task. Please contact admin.', 'error');
+                // Pre-fill form with any existing data
+                populateForm(task.data);
+                
+                // Update progress
+                updateProgressInfo();
+                
+                // Hide loading spinner
+                showLoading(false);
+                
+                // Focus first input
+                const firstInput = document.querySelector('#taskForm input[required]');
+                if (firstInput) {
+                    firstInput.focus();
                 }
-            } else {
-                console.log('❌ No task found in response');
-                showAlert('No task data found. Please contact admin.', 'error');
-            }
+            }, 1000);
         }
 
-        function checkIfCompleted() {
-            console.log('🔄 Checking if all tasks completed...');
-            showCompletedSection();
+        // Populate form with data
+        function populateForm(data) {
+            const form = document.getElementById('taskForm');
+            const inputs = form.querySelectorAll('input');
+            
+            inputs.forEach(input => {
+                const fieldName = input.name;
+                if (data[fieldName]) {
+                    input.value = data[fieldName];
+                } else {
+                    input.value = '';
+                }
+            });
         }
 
-        function showLoadingSpinner(show) {
+        // Show/hide loading spinner
+        function showLoading(show) {
             const spinner = document.getElementById('loadingSpinner');
-            if (spinner) {
-                spinner.style.display = show ? 'block' : 'none';
+            spinner.style.display = show ? 'block' : 'none';
+        }
+
+        // Validate input
+        function validateInput(e) {
+            const input = e.target;
+            const value = input.value.trim();
+            
+            // Basic required field validation
+            if (input.hasAttribute('required') && !value) {
+                input.classList.add('error');
+                return false;
+            }
+            
+            // Date/time validation
+            if (input.classList.contains('datetime-input')) {
+                const dateTimeRegex = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}\s+(0?[1-9]|1[0-2]):[0-5][0-9]\s+(AM|PM)$/i;
+                if (value && !dateTimeRegex.test(value)) {
+                    input.classList.add('error');
+                    showAlert('Please enter date/time in format: MM/DD/YYYY HH:MM AM/PM', 'error');
+                    return false;
+                }
+            }
+            
+            input.classList.remove('error');
+            return true;
+        }
+
+        // Clear form
+        function clearForm() {
+            const form = document.getElementById('taskForm');
+            const inputs = form.querySelectorAll('input');
+            
+            inputs.forEach(input => {
+                if (!input.classList.contains('protected') || confirm('Are you sure you want to clear protected fields?')) {
+                    input.value = '';
+                    input.classList.remove('error');
+                }
+            });
+            
+            // Focus first input
+            const firstInput = form.querySelector('input[required]');
+            if (firstInput) {
+                firstInput.focus();
             }
         }
 
-        function showTaskSection() {
-            document.getElementById('loginSection').classList.add('hidden');
-            document.getElementById('taskSection').classList.remove('hidden');
-            document.getElementById('completedSection').classList.add('hidden');
+        // Submit and move to next task
+        function submitAndNext() {
+            const form = document.getElementById('taskForm');
+            const inputs = form.querySelectorAll('input[required]');
+            let isValid = true;
+            
+            // Validate all required fields
+            inputs.forEach(input => {
+                if (!validateInput({ target: input })) {
+                    isValid = false;
+                }
+            });
+            
+            if (!isValid) {
+                showAlert('Please fill in all required fields correctly.', 'error');
+                return;
+            }
+            
+            // Collect form data
+            const formData = new FormData(form);
+            const taskSubmission = {
+                taskId: taskData[currentTaskIndex].id,
+                agentId: currentUser.agentId,
+                submissionTime: new Date(),
+                data: Object.fromEntries(formData)
+            };
+            
+            // Simulate submission
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+            
+            setTimeout(() => {
+                // Log submission (in production, send to server)
+                console.log('Task submitted:', taskSubmission);
+                
+                // Update counters
+                completedTasks++;
+                currentTaskIndex++;
+                
+                // Show success message
+                showAlert('Task submitted successfully!', 'success');
+                
+                // Reset button
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit & Next';
+                
+                // Load next task
+                setTimeout(() => {
+                    loadNextTask();
+                }, 1000);
+                
+            }, 1500);
         }
 
+        // Show completed section
         function showCompletedSection() {
-            document.getElementById('loginSection').classList.add('hidden');
             document.getElementById('taskSection').classList.add('hidden');
             document.getElementById('completedSection').classList.remove('hidden');
+            document.getElementById('totalCompleted').textContent = completedTasks;
         }
 
-        function showLoginSection() {
-            document.getElementById('loginSection').classList.remove('hidden');
-            document.getElementById('taskSection').classList.add('hidden');
-            document.getElementById('completedSection').classList.add('hidden');
-        }
-
-        function clearForm() {
-            if (confirm('Are you sure you want to clear all form data?')) {
-                document.getElementById('taskForm').reset();
-                if (currentTaskId) {
-                    document.getElementById('currentTaskId').value = currentTaskId;
-                }
-                console.log('🧹 Form cleared');
-            }
-        }
-
-        async function logout() {
-            console.log('👋 Logging out...');
+        // Check for new tasks
+        function checkForNewTasks() {
+            showLoading(true);
             
-            if (currentAgentId) {
-                try {
-                    const response = await fetch(getApiUrl(`/api/agents/${currentAgentId}/logout`), {
-                        method: 'POST'
-                    });
-                    if (response.ok) {
-                        const data = await response.json();
-                        showAlert(`${CONFIG.MESSAGES.LOGOUT_SUCCESS}. Session: ${data.session_duration || 'Unknown'}`, 'success');
-                    }
-                } catch (error) {
-                    console.log('Logout API call failed, but logging out locally');
-                    showAlert('Logged out locally', 'info');
-                }
-            }
-            
-            currentAgentId = null;
-            currentTaskId = null;
-            currentTaskIndex = 0;
-            totalTasks = 0;
-            isSubmitting = false;
-            showLoginSection();
+            setTimeout(() => {
+                showLoading(false);
+                showAlert('No new tasks available at this time.', 'info');
+            }, 2000);
         }
 
-        async function checkForNewTasks() {
-            console.log('🔄 Checking for new tasks...');
-            showLoadingSpinner(true);
-            
-            try {
-                await loadCurrentTask();
+        // Logout function
+        function logout() {
+            if (confirm('Are you sure you want to logout? Any unsaved progress will be lost.')) {
+                // Reset application state
+                currentUser = null;
+                currentTaskIndex = 0;
+                completedTasks = 0;
                 
-                if (currentAgentId && currentTaskId) {
-                    showTaskSection();
-                } else {
-                    showAlert('No new tasks available', 'info');
-                }
-            } catch (error) {
-                console.error('❌ Error checking for new tasks:', error);
-                showAlert('Error checking for tasks: ' + error.message, 'error');
-            } finally {
-                showLoadingSpinner(false);
+                // Clear forms
+                document.getElementById('loginForm').reset();
+                document.getElementById('taskForm').reset();
+                
+                // Show login section
+                document.getElementById('taskSection').classList.add('hidden');
+                document.getElementById('completedSection').classList.add('hidden');
+                document.getElementById('loginSection').classList.remove('hidden');
+                
+                // Focus agent ID input
+                document.getElementById('agent_id').focus();
             }
         }
 
-        function showAlert(message, type) {
+        // Show alert messages
+        function showAlert(message, type = 'info') {
+            // Remove existing alerts
             const existingAlerts = document.querySelectorAll('.alert');
             existingAlerts.forEach(alert => alert.remove());
             
+            // Create new alert
             const alert = document.createElement('div');
             alert.className = `alert alert-${type}`;
             alert.textContent = message;
             
-            if (!document.getElementById('loginSection').classList.contains('hidden')) {
-                const loginCard = document.querySelector('.login-card');
-                loginCard.parentNode.insertBefore(alert, loginCard.nextSibling);
-            } else {
-                const container = document.querySelector('.container');
-                container.insertBefore(alert, container.firstChild);
-            }
+            // Insert at appropriate location
+            const targetSection = document.getElementById('loginSection').classList.contains('hidden') ? 
+                                 document.getElementById('taskSection') : 
+                                 document.getElementById('loginSection');
             
+            targetSection.insertBefore(alert, targetSection.firstChild);
+            
+            // Auto-remove after delay
             setTimeout(() => {
                 if (alert.parentNode) {
                     alert.remove();
@@ -1309,52 +1314,79 @@
             }, 5000);
         }
 
-        // Debug function
-        function debugSubmit() {
-            console.log('🧪 Debug Submit Info:');
-            console.log('- Current Agent ID:', currentAgentId);
-            console.log('- Current Task ID:', currentTaskId);
-            console.log('- Is Submitting:', isSubmitting);
-            console.log('- API Base URL:', CONFIG.API_BASE_URL);
-            
-            const form = document.getElementById('taskForm');
-            if (form) {
-                const inputs = form.querySelectorAll('input[type!="hidden"]');
-                let filledCount = 0;
-                inputs.forEach(input => {
-                    if (input.value && input.value.trim() !== '') {
-                        filledCount++;
-                    }
-                });
-                console.log(`- Form has ${filledCount}/${inputs.length} fields filled`);
-            } else {
-                console.log('- Form not found!');
-            }
-            
-            const submitBtn = document.getElementById('submitBtn');
-            console.log('- Submit button found:', !!submitBtn);
-            console.log('- Submit button enabled:', submitBtn ? !submitBtn.disabled : 'N/A');
-        }
-
         // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                if (!document.getElementById('taskSection').classList.contains('hidden')) {
-                    e.preventDefault();
-                    submitAndNext();
-                }
+            // Alt + S for Submit (when in task section)
+            if (e.altKey && e.key === 's' && !document.getElementById('taskSection').classList.contains('hidden')) {
+                e.preventDefault();
+                submitAndNext();
             }
             
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
+            // Alt + C for Clear form
+            if (e.altKey && e.key === 'c' && !document.getElementById('taskSection').classList.contains('hidden')) {
                 e.preventDefault();
-                debugSubmit();
+                clearForm();
+            }
+            
+            // Escape for logout confirmation
+            if (e.key === 'Escape' && currentUser) {
+                logout();
             }
         });
 
-        console.log('🚀 Agent panel initialized');
-        console.log('🔗 API Base URL:', CONFIG.API_BASE_URL);
-        console.log('💡 Debug tip: Press Ctrl+Shift+D to see debug info, or type debugSubmit() in console');
+        // Auto-save functionality (saves to localStorage as backup)
+        function autoSave() {
+            if (!currentUser) return;
+            
+            const form = document.getElementById('taskForm');
+            const formData = new FormData(form);
+            const saveData = {
+                agentId: currentUser.agentId,
+                taskIndex: currentTaskIndex,
+                timestamp: Date.now(),
+                data: Object.fromEntries(formData)
+            };
+            
+            try {
+                const savedTasks = JSON.parse(localStorage.getItem('taskBackups') || '[]');
+                savedTasks.push(saveData);
+                
+                // Keep only last 10 saves
+                if (savedTasks.length > 10) {
+                    savedTasks.shift();
+                }
+                
+                localStorage.setItem('taskBackups', JSON.stringify(savedTasks));
+            } catch (e) {
+                console.warn('Auto-save failed:', e);
+            }
+        }
+
+        // Auto-save every 30 seconds
+        setInterval(autoSave, 30000);
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'hidden' && currentUser) {
+                autoSave();
+            }
+        });
+
+        // Handle page unload
+        window.addEventListener('beforeunload', function(e) {
+            if (currentUser) {
+                autoSave();
+                const message = 'You have unsaved work. Are you sure you want to leave?';
+                e.returnValue = message;
+                return message;
+            }
+        });
+
+        // Error handling
+        window.addEventListener('error', function(e) {
+            console.error('Application error:', e.error);
+            showAlert('An unexpected error occurred. Please refresh the page.', 'error');
+        });
     </script>
 </body>
 </html>
-
