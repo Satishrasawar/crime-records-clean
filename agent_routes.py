@@ -1,29 +1,83 @@
-from fastapi import APIRouter, Form, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Form, Depends, HTTPException, UploadFile, File, Request, Security
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Agent, TaskProgress, SubmittedForm, AgentSession
+from app.models import Agent, TaskProgress, SubmittedForm, AgentSession, Admin
 from app.schemas import AgentStatusUpdateSchema
 from app.security import hash_password, verify_password
 import os
 import secrets
 import string
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import zipfile
 import io
 import pandas as pd
 from typing import Optional
+import jwt
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
-# Utility function to generate agent ID and password
+# JWT Configuration
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", secrets.token_urlsafe(32))
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/admin/login")
+
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+@router.post("/api/admin/login")
+@limiter.limit("5/minute")
+async def admin_login(request: Request, db: Session = Depends(get_db)):
+    """Secure admin login with JWT token and hashed password"""
+    try:
+        data = await request.json()
+        username = data.get("username")
+        password = data.get("password")
+
+        if not username or not password:
+            raise HTTPException(status_code=400, detail="Username and password are required")
+        if len(username) < 4 or len(password) < 8:
+            raise HTTPException(status_code=400, detail="Username must be at least 4 characters and password at least 8 characters")
+
+        admin = db.query(Admin).filter(Admin.username == username).first()
+        if not admin or not verify_password(password, admin.hashed_password):
+            print(f"❌ Invalid admin login attempt for {username}")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        if not admin.is_active:
+            print(f"❌ Admin {username} is not active")
+            raise HTTPException(status_code=403, detail="Account is not active")
+
+        access_token = create_access_token(data={"sub": username})
+        print(f"✅ Admin login successful for {username}")
+
+        return {
+            "success": True,
+            "access_token": access_token,
+            "token_type": "bearer",
+            "message": "Login successful"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Admin login error: {e}")
+        raise HTTPException(status_code=500, detail="Login failed")
+
 def generate_agent_credentials():
     agent_id = "AGT" + "".join(secrets.choice(string.digits) for _ in range(6))
     password = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(8))
     return agent_id, password
 
-# Utility function to get images for specific agent
 def get_agent_image_files(agent_id: str):
     """Get all image files assigned to a specific agent"""
     agent_folder = f"static/task_images/agent_{agent_id}"
@@ -163,7 +217,6 @@ def get_all_agents(db: Session = Depends(get_db)):
     
     return result
 
-# Add new endpoint to get agent password (admin only)
 @router.get("/api/admin/agent-password/{agent_id}")
 def get_agent_password(agent_id: str, db: Session = Depends(get_db)):
     """Get agent password for admin (this should be protected in production)"""
@@ -179,7 +232,6 @@ def get_agent_password(agent_id: str, db: Session = Depends(get_db)):
         "can_reset": True
     }
 
-# Add endpoint to reset agent password
 @router.post("/api/admin/reset-password/{agent_id}")
 def reset_agent_password(agent_id: str, db: Session = Depends(get_db)):
     """Reset agent password and return new one"""
@@ -221,7 +273,6 @@ def delete_agent(agent_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Agent deleted successfully"}
 
-# FIXED LOGIN ENDPOINT - MATCHES OLD WORKING SYSTEM
 @router.post("/api/agents/login")
 async def login_agent(
     agent_id: str = Form(...),
@@ -256,8 +307,8 @@ async def login_agent(
         new_session = AgentSession(
             agent_id=agent_id,
             login_time=datetime.utcnow(),
-            ip_address="127.0.0.1",
-            user_agent="Web Browser"
+            ip_address="127.0.0.1",  # Should get real IP in production
+            user_agent="Web Browser"  # Should get real UA in production
         )
         
         db.add(new_session)
@@ -265,17 +316,13 @@ async def login_agent(
         
         print(f"✅ Login successful for {agent_id}")
         
-        # RETURN EXACTLY LIKE OLD SYSTEM (no "success" field)
         return {
             "message": "Login successful", 
             "agent_id": agent.agent_id, 
-            "name": agent.name,
-            "session_id": new_session.id,
-            "login_time": new_session.login_time.isoformat()
+            "name": agent.name
         }
     except Exception as e:
         print(f"❌ Session creation error: {e}")
-        # Even if session tracking fails, allow login - EXACTLY like old system
         return {
             "message": "Login successful", 
             "agent_id": agent.agent_id, 
@@ -284,13 +331,11 @@ async def login_agent(
 
 @router.post("/api/agents/{agent_id}/logout")
 async def logout_agent(agent_id: str, db: Session = Depends(get_db)):
-    """Handle agent logout and update session"""
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     
     try:
-        # Find active session
         active_session = db.query(AgentSession).filter(
             AgentSession.agent_id == agent_id,
             AgentSession.logout_time.is_(None)
@@ -313,13 +358,12 @@ async def logout_agent(agent_id: str, db: Session = Depends(get_db)):
 
 @router.post("/api/admin/force-logout/{agent_id}")
 async def force_logout_agent(agent_id: str, db: Session = Depends(get_db)):
-    """Admin force logout an agent"""
+    """Force logout an agent"""
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     
     try:
-        # End active session
         active_session = db.query(AgentSession).filter(
             AgentSession.agent_id == agent_id,
             AgentSession.logout_time.is_(None)
@@ -347,7 +391,7 @@ async def get_session_report(
     date_to: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """Get detailed session report for admin"""
+    """Get session report"""
     try:
         query = db.query(AgentSession)
         
@@ -355,12 +399,10 @@ async def get_session_report(
             query = query.filter(AgentSession.agent_id == agent_id)
         
         if date_from:
-            from_date = datetime.fromisoformat(date_from)
-            query = query.filter(AgentSession.login_time >= from_date)
+            query = query.filter(AgentSession.login_time >= datetime.strptime(date_from, '%Y-%m-%d'))
         
         if date_to:
-            to_date = datetime.fromisoformat(date_to)
-            query = query.filter(AgentSession.login_time <= to_date)
+            query = query.filter(AgentSession.login_time <= datetime.strptime(date_to, '%Y-%m-%d'))
         
         sessions = query.order_by(AgentSession.login_time.desc()).all()
         
@@ -371,7 +413,7 @@ async def get_session_report(
                 "session_id": session.id,
                 "agent_id": session.agent_id,
                 "agent_name": agent.name if agent else "Unknown",
-                "login_time": session.login_time.isoformat(),
+                "login_time": session.login_time.isoformat() if session.login_time else None,
                 "logout_time": session.logout_time.isoformat() if session.logout_time else None,
                 "duration_minutes": session.duration_minutes,
                 "is_active": session.logout_time is None
@@ -379,22 +421,18 @@ async def get_session_report(
         
         return result
     except Exception as e:
-        print(f"Session report error: {e}")
-        return []
+        print(f"❌ Error in session report: {e}")
+        raise HTTPException(status_code=500, detail=f"Session report failed: {str(e)}")
 
-# FIXED CURRENT TASK ENDPOINT - MATCHES OLD WORKING SYSTEM  
 @router.get("/api/agents/{agent_id}/current-task")
 def get_current_task(agent_id: str, db: Session = Depends(get_db)):
-    """FIXED: Get current task using OLD WORKING SYSTEM logic"""
     print(f"📋 Getting current task for agent: {agent_id}")
     
-    # Verify agent exists
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
     if not agent:
         print(f"❌ Agent not found: {agent_id}")
         raise HTTPException(status_code=404, detail="Agent not found")
     
-    # Get or create progress tracker - EXACTLY like old system
     progress = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).first()
     if not progress:
         progress = TaskProgress(agent_id=agent_id, current_index=0)
@@ -403,7 +441,6 @@ def get_current_task(agent_id: str, db: Session = Depends(get_db)):
         db.refresh(progress)
         print(f"📋 Created new progress tracker for {agent_id}")
 
-    # Get images for this specific agent - EXACTLY like old system
     image_files = get_agent_image_files(agent_id)
     
     if not image_files:
@@ -411,7 +448,6 @@ def get_current_task(agent_id: str, db: Session = Depends(get_db)):
         return {"message": "No tasks assigned", "completed": True}
     
     if progress.current_index >= len(image_files):
-        # Get total completed count
         completed_count = db.query(SubmittedForm).filter(SubmittedForm.agent_id == agent_id).count()
         print(f"✅ All tasks completed for {agent_id}: {completed_count} submissions")
         return {
@@ -422,7 +458,6 @@ def get_current_task(agent_id: str, db: Session = Depends(get_db)):
 
     current_image = image_files[progress.current_index]
     
-    # Determine the correct path - EXACTLY like old system
     agent_folder = f"static/task_images/agent_{agent_id}"
     if os.path.exists(agent_folder) and current_image in os.listdir(agent_folder):
         image_url = f"/static/task_images/agent_{agent_id}/{current_image}"
@@ -440,7 +475,7 @@ def get_current_task(agent_id: str, db: Session = Depends(get_db)):
         "task_number": progress.current_index + 1,
         "completed": False
     }
-    # FIXED SUBMIT ENDPOINT - MATCHES OLD WORKING SYSTEM
+
 @router.post("/api/agents/{agent_id}/submit")
 async def submit_task_data(
     agent_id: str,
@@ -476,16 +511,13 @@ async def submit_task_data(
     Shape__Area: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """FIXED: Submit task data using OLD WORKING SYSTEM logic"""
     print(f"📤 Submit request received for agent: {agent_id}")
     
-    # Verify agent exists
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
     if not agent:
         print(f"❌ Agent not found: {agent_id}")
         raise HTTPException(status_code=404, detail="Agent not found")
     
-    # Get current progress to know which image this relates to
     progress = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).first()
     current_image_name = None
     
@@ -495,7 +527,6 @@ async def submit_task_data(
             current_image_name = image_files[progress.current_index]
         print(f"📋 Current task index: {progress.current_index}, Image: {current_image_name}")
     
-    # Create form data dictionary - EXACTLY like old system
     form_data = {
         "DR_NO": DR_NO, "Date_Rptd": Date_Rptd, "DATE_OCC": DATE_OCC, "TIME_OCC": TIME_OCC,
         "Unique_Identifier": Unique_Identifier, "AREA_NAME": AREA_NAME, "Rpt_Dist_No": Rpt_Dist_No,
@@ -506,26 +537,23 @@ async def submit_task_data(
         "LAW_CODE": LAW_CODE, "SubAgency": SubAgency, "Charge": Charge, "Race": Race,
         "LOCATION": LOCATION, "SeqID": SeqID, "LAT": LAT, "LON": LON,
         "Point": Point, "Shape__Area": Shape__Area,
-        "image_name": current_image_name  # Track which image this data is for
+        "image_name": current_image_name
     }
     
     print(f"📝 Form data prepared with {len([k for k, v in form_data.items() if v and str(v).strip()])} filled fields")
     
     try:
-        # Save submission - EXACTLY like old system (NO task_id field)
         submission = SubmittedForm(
             agent_id=agent_id,
-            form_data=json.dumps(form_data),  # Store as JSON string
+            form_data=json.dumps(form_data),
             submitted_at=datetime.utcnow()
         )
         db.add(submission)
         
-        # ✅ IMPORTANT: Update progress to next task AFTER successful submission
         if progress:
             progress.current_index += 1
             progress.updated_at = datetime.utcnow()
         else:
-            # Create progress if it doesn't exist
             progress = TaskProgress(agent_id=agent_id, current_index=1)
             db.add(progress)
         
@@ -539,29 +567,23 @@ async def submit_task_data(
             "submission_id": submission.id,
             "next_task_index": progress.current_index
         }
-        
     except Exception as db_error:
         print(f"❌ Database error during submission: {db_error}")
         if hasattr(db, 'rollback'):
             db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to save submission: {str(db_error)}")
 
-# ===== ADMIN ROUTES =====
-
 @router.get("/api/admin/statistics")
 def get_admin_statistics(db: Session = Depends(get_db)):
-    """Get system statistics for admin dashboard"""
     total_agents = db.query(Agent).count()
     active_agents = db.query(Agent).filter(Agent.status == "active").count()
     total_submissions = db.query(SubmittedForm).count()
     
-    # Calculate total tasks (images) across all agents
     total_tasks = 0
     for agent in db.query(Agent).all():
         agent_images = get_agent_image_files(agent.agent_id)
         total_tasks += len(agent_images)
     
-    # Pending tasks = total tasks - completed tasks
     pending_tasks = max(0, total_tasks - total_submissions)
     
     return {
@@ -578,23 +600,17 @@ async def upload_task_images(
     zip_file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    """Upload ZIP file with images and assign to specific agent"""
-    
-    # Verify agent exists
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     
-    # Verify file is ZIP
     if not zip_file.filename.endswith('.zip'):
         raise HTTPException(status_code=400, detail="File must be a ZIP archive")
     
     try:
-        # Create agent-specific directory
         agent_dir = f"static/task_images/agent_{agent_id}"
         os.makedirs(agent_dir, exist_ok=True)
         
-        # Read ZIP file content
         zip_content = await zip_file.read()
         
         images_processed = 0
@@ -602,7 +618,6 @@ async def upload_task_images(
         
         with zipfile.ZipFile(io.BytesIO(zip_content), 'r') as zip_ref:
             for file_info in zip_ref.filelist:
-                # Skip directories and non-image files
                 if file_info.is_dir():
                     continue
                 
@@ -610,14 +625,11 @@ async def upload_task_images(
                 if file_ext not in supported_extensions:
                     continue
                 
-                # Extract image
                 with zip_ref.open(file_info) as source_file:
-                    # Create safe filename (remove path components)
                     safe_filename = os.path.basename(file_info.filename)
                     if not safe_filename:
                         continue
                     
-                    # Ensure unique filename
                     counter = 1
                     original_name = safe_filename
                     while os.path.exists(os.path.join(agent_dir, safe_filename)):
@@ -625,18 +637,15 @@ async def upload_task_images(
                         safe_filename = f"{name}_{counter}{ext}"
                         counter += 1
                     
-                    # Save image
                     image_path = os.path.join(agent_dir, safe_filename)
                     with open(image_path, 'wb') as dest_file:
                         dest_file.write(source_file.read())
                     
                     images_processed += 1
                     
-                    # Limit to prevent excessive uploads
                     if images_processed >= 5000:
                         break
         
-        # Reset agent's progress to start from beginning
         progress = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).first()
         if progress:
             progress.current_index = 0
@@ -652,7 +661,6 @@ async def upload_task_images(
             "images_processed": images_processed,
             "agent_directory": agent_dir
         }
-        
     except zipfile.BadZipFile:
         raise HTTPException(status_code=400, detail="Invalid ZIP file")
     except Exception as e:
@@ -665,13 +673,10 @@ def export_to_excel(
     date_to: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """Export submitted data to Excel file"""
-    
+    """Export submitted data to Excel"""
     try:
-        # Build query
         query = db.query(SubmittedForm)
         
-        # Apply filters
         if agent_id:
             query = query.filter(SubmittedForm.agent_id == agent_id)
         
@@ -685,25 +690,21 @@ def export_to_excel(
         if date_to:
             try:
                 to_date = datetime.fromisoformat(date_to)
-                # Add 23:59:59 to include the whole day
                 to_date = to_date.replace(hour=23, minute=59, second=59)
                 query = query.filter(SubmittedForm.submitted_at <= to_date)
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid date_to format. Use YYYY-MM-DD")
         
-        # Get all submissions
         submissions = query.order_by(SubmittedForm.submitted_at.desc()).all()
         
         if not submissions:
             raise HTTPException(status_code=404, detail="No data found with current filters")
         
-        # Prepare data for Excel
         excel_data = []
         for submission in submissions:
             try:
                 form_data = json.loads(submission.form_data)
                 
-                # Create row with metadata first
                 row_data = {
                     'Submission_ID': submission.id,
                     'Agent_ID': submission.agent_id,
@@ -711,7 +712,6 @@ def export_to_excel(
                     'Image_Name': form_data.get('image_name', 'Unknown')
                 }
                 
-                # Add all form fields
                 form_fields = [
                     'DR_NO', 'Date_Rptd', 'DATE_OCC', 'TIME_OCC', 'Unique_Identifier',
                     'AREA_NAME', 'Rpt_Dist_No', 'VIN', 'Crm', 'Crm_Cd_Desc', 'Mocodes',
@@ -733,24 +733,19 @@ def export_to_excel(
         if not excel_data:
             raise HTTPException(status_code=404, detail="No valid data found")
         
-        # Import pandas here to catch import errors
         try:
             import pandas as pd
         except ImportError:
             raise HTTPException(status_code=500, detail="pandas not installed. Run: pip install pandas")
         
-        # Create DataFrame
         df = pd.DataFrame(excel_data)
         
-        # Create Excel file in memory
         output = io.BytesIO()
         
         try:
-            # Use openpyxl engine
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df.to_excel(writer, sheet_name='Crime Records Data', index=False)
                 
-                # Auto-adjust column widths
                 workbook = writer.book
                 worksheet = writer.sheets['Crime Records Data']
                 
@@ -765,7 +760,6 @@ def export_to_excel(
                         except:
                             pass
                     
-                    # Set width with min 10, max 50
                     adjusted_width = min(max(max_length + 2, 10), 50)
                     worksheet.column_dimensions[column_letter].width = adjusted_width
         
@@ -774,11 +768,9 @@ def export_to_excel(
         
         output.seek(0)
         
-        # Create filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"crime_records_export_{timestamp}.xlsx"
         
-        # Return file as download
         headers = {
             "Content-Disposition": f"attachment; filename={filename}",
             "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
