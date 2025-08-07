@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Client Records System</title>
-    <style>
-        /* Part 2: CSS Styles */
-        body {
+    body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
     padding: 20px;
@@ -365,17 +363,6 @@ form {
     cursor: pointer;
     margin-left: 10px;
 }
-        
-    </style>
-</head>
-<body>
-    /* Part 1: HTML Structure (without <html>, <head>, <body> tags) */
-        <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Client Records System</title>
 </head>
 <body>
     <!-- Login Screen -->
@@ -681,11 +668,7 @@ form {
             </div>
         </div>
     </div>
-</body>
-</html>
-    <script>
-        /* Part 3: JavaScript Logic */
-        // Configuration
+    // Configuration
 const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:8000' : ''; // Adjust for production
 const SESSION_KEY = 'admin_session';
 const REMEMBER_KEY = 'admin_remember';
@@ -1899,6 +1882,5 @@ setInterval(cleanupFileReferences, 5 * 60 * 1000);
 
 console.log('✅ Admin Dashboard initialized successfully');
 console.log('🔗 Using dynamic BASE_URL for API calls');
-    </script>
 </body>
 </html>
