@@ -20,9 +20,9 @@ class Agent(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Relationships
+    # FIXED: Corrected relationships
     submitted_forms = relationship("SubmittedForm", back_populates="agent")
-    login_sessions = relationship("AgentSession", back_populates="login_sessions")
+    login_sessions = relationship("AgentSession", back_populates="agent")  # FIXED: was "login_sessions"
 
 class TaskProgress(Base):
     __tablename__ = "task_progress"
@@ -64,7 +64,7 @@ class AgentSession(Base):
     ip_address = Column(String, nullable=True)
     user_agent = Column(String, nullable=True)
     
-    agent = relationship("Agent", back_populates="login_sessions")
+    agent = relationship("Agent", back_populates="login_sessions")  # FIXED: matches Agent class
 
 class ImageAssignment(Base):
     __tablename__ = "image_assignments"
@@ -78,9 +78,11 @@ class ImageAssignment(Base):
 
 class Admin(Base):
     __tablename__ = "admins"
+    
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
+    username = Column(String(50), unique=True, index=True, nullable=False)  # FIXED: Added length and nullable
+    hashed_password = Column(String(255), nullable=False)  # FIXED: Added length and nullable
+    email = Column(String(100), nullable=True)  # ADDED: Missing email field
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_login = Column(DateTime, nullable=True)  # ADDED: Track last login
