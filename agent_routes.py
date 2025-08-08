@@ -1,3 +1,4 @@
+# agent_routes.py - Part 1: Imports and Setup
 from fastapi import APIRouter, Form, Depends, HTTPException, UploadFile, File, Request, Security
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordBearer
@@ -34,6 +35,27 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def generate_agent_credentials():
+    """Generate unique agent ID and secure password"""
+    agent_id = "AGT" + "".join(secrets.choice(string.digits) for _ in range(6))
+    password = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(8))
+    return agent_id, password
+
+def get_agent_image_files(agent_id: str):
+    """Get all image files assigned to a specific agent"""
+    agent_folder = f"static/task_images/agent_{agent_id}"
+    if not os.path.exists(agent_folder):
+        # Fallback to general folder
+        agent_folder = "static/task_images/crime_records_wide"
+    
+    if not os.path.exists(agent_folder):
+        return []
+    
+    return sorted([f for f in os.listdir(agent_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+
+# ===================== ADMIN LOGIN ENDPOINTS =====================
+# agent_routes.py - Part 2: Admin Login Functions
 
 @router.post("/api/admin/login")
 @limiter.limit("5/minute")
@@ -161,7 +183,8 @@ async def admin_login(request: Request, db: Session = Depends(get_db)):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
-        # SIMPLE TEST LOGIN ENDPOINT (NO JWT)
+
+# SIMPLE TEST LOGIN ENDPOINT (NO JWT)
 @router.post("/api/admin/simple-login")
 @limiter.limit("10/minute")
 async def simple_admin_login(request: Request, db: Session = Depends(get_db)):
@@ -269,6 +292,8 @@ async def admin_login_options(request: Request):
             "Access-Control-Allow-Headers": "Content-Type, Authorization",
         }
     )
+    # agent_routes.py - Part 3: Debug Endpoints
+
 # ===================== ADMIN DEBUG ENDPOINTS =====================
 @router.post("/api/admin/debug-create")
 @limiter.limit("1/minute")
@@ -508,95 +533,16 @@ async def debug_reset_admin(request: Request, db: Session = Depends(get_db)):
             db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to reset password: {str(e)}")
 
-def generate_agent_credentials():
-    agent_id = "AGT" + "".join(secrets.choice(string.digits) for _ in range(6))
-    password = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(8))
-    return agent_id, password
+# ===================== AGENT REGISTRATION - REMOVED/DISABLED =====================
+# NOTE: Agent registration is now handled in main.py to avoid conflicts
+# This section has been removed to prevent duplicate endpoints
+# agent_routes.py - Part 4: Agent Management Functions
 
-def get_agent_image_files(agent_id: str):
-    """Get all image files assigned to a specific agent"""
-    agent_folder = f"static/task_images/agent_{agent_id}"
-    if not os.path.exists(agent_folder):
-        # Fallback to general folder
-        agent_folder = "static/task_images/crime_records_wide"
-    
-    if not os.path.exists(agent_folder):
-        return []
-    
-    return sorted([f for f in os.listdir(agent_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
-    @router.post("/api/agents/register")
-async def register_agent(
-    name: str = Form(...),
-    email: str = Form(...),
-    mobile: str = Form(...),
-    dob: str = Form(...),
-    country: str = Form(...),
-    gender: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    """Register a new agent with auto-generated credentials"""
-    
-    # Check if email already exists
-    existing_agent = db.query(Agent).filter(Agent.email == email).first()
-    if existing_agent:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    # Generate unique credentials
-    agent_id, password = generate_agent_credentials()
-    
-    # Ensure unique agent ID (very unlikely collision, but safety first)
-    max_attempts = 10
-    attempt = 0
-    while db.query(Agent).filter(Agent.agent_id == agent_id).first() and attempt < max_attempts:
-        agent_id, password = generate_agent_credentials()
-        attempt += 1
-    
-    if attempt >= max_attempts:
-        raise HTTPException(status_code=500, detail="Failed to generate unique agent ID")
-    
-    try:
-        # Create new agent
-        hashed_pwd = hash_password(password)
-        new_agent = Agent(
-            agent_id=agent_id,
-            name=name,
-            email=email,
-            mobile=mobile,
-            dob=dob,
-            country=country,
-            gender=gender,
-            hashed_password=hashed_pwd,
-            status="active"
-        )
-        
-        db.add(new_agent)
-        db.commit()
-        db.refresh(new_agent)
-        
-        # Create initial task progress entry
-        progress = TaskProgress(agent_id=agent_id, current_index=0)
-        db.add(progress)
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": "Agent registered successfully",
-            "agent_id": agent_id,
-            "password": password,
-            "agent_details": {
-                "name": name,
-                "email": email,
-                "mobile": mobile,
-                "status": "active"
-            }
-        }
-        
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+# ===================== AGENT MANAGEMENT ENDPOINTS =====================
 
 @router.get("/api/agents")
 def get_all_agents(db: Session = Depends(get_db)):
+    """Get all agents with their statistics"""
     agents = db.query(Agent).all()
     result = []
     
@@ -632,7 +578,7 @@ def get_all_agents(db: Session = Depends(get_db)):
             "agent_id": agent.agent_id,
             "name": agent.name,
             "email": agent.email,
-            "password": "***HIDDEN***",  # We'll show this in admin but keep it secure
+            "password": agent.password,  # Show plain password for admin
             "status": agent.status,
             "tasks_completed": completed_count,
             "created_at": agent.created_at.isoformat() if agent.created_at else None,
@@ -658,11 +604,10 @@ def get_agent_password(agent_id: str, db: Session = Depends(get_db)):
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     
-    # In production, you'd want additional security here
-    # For now, we'll return a regenerated password since we can't decrypt the hash
     return {
         "agent_id": agent_id,
-        "message": "Password is hashed and cannot be retrieved. Generate new password if needed.",
+        "password": agent.password,  # Return plain password
+        "message": f"Password for agent {agent_id}: {agent.password}",
         "can_reset": True
     }
 
@@ -676,8 +621,8 @@ def reset_agent_password(agent_id: str, db: Session = Depends(get_db)):
     # Generate new password
     _, new_password = generate_agent_credentials()
     
-    # Update password
-    agent.hashed_password = hash_password(new_password)
+    # Update password (store as plain text for now)
+    agent.password = new_password
     db.commit()
     
     return {
@@ -688,6 +633,7 @@ def reset_agent_password(agent_id: str, db: Session = Depends(get_db)):
 
 @router.patch("/api/agents/{agent_id}/status")
 def update_agent_status(agent_id: str, status_data: AgentStatusUpdateSchema, db: Session = Depends(get_db)):
+    """Update agent status"""
     # Find by agent_id string, not integer id
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
     if not agent:
@@ -699,6 +645,7 @@ def update_agent_status(agent_id: str, status_data: AgentStatusUpdateSchema, db:
 
 @router.delete("/api/agents/{agent_id}")
 def delete_agent(agent_id: int, db: Session = Depends(get_db)):
+    """Delete an agent"""
     agent = db.query(Agent).filter(Agent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -706,6 +653,9 @@ def delete_agent(agent_id: int, db: Session = Depends(get_db)):
     db.delete(agent)
     db.commit()
     return {"message": "Agent deleted successfully"}
+    # agent_routes.py - Part 5: Agent Login and Task Management
+
+# ===================== AGENT LOGIN AND SESSION MANAGEMENT =====================
 
 @router.post("/api/agents/login")
 async def login_agent(
@@ -713,12 +663,17 @@ async def login_agent(
     password: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """FIXED: Login agent using OLD WORKING SYSTEM logic"""
+    """FIXED: Login agent using consistent password system"""
     print(f"🔑 Login attempt for agent: {agent_id}")
     
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-    if not agent or not verify_password(password, agent.hashed_password):
-        print(f"❌ Invalid credentials for {agent_id}")
+    if not agent:
+        print(f"❌ Agent not found: {agent_id}")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    # Use plain password comparison (since we store plain passwords now)
+    if agent.password != password:
+        print(f"❌ Invalid password for {agent_id}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     if agent.status != "active":
@@ -751,20 +706,26 @@ async def login_agent(
         print(f"✅ Login successful for {agent_id}")
         
         return {
+            "success": True,
             "message": "Login successful", 
             "agent_id": agent.agent_id, 
-            "name": agent.name
+            "name": agent.name,
+            "email": agent.email,
+            "status": agent.status
         }
     except Exception as e:
         print(f"❌ Session creation error: {e}")
         return {
+            "success": True,
             "message": "Login successful", 
             "agent_id": agent.agent_id, 
-            "name": agent.name
+            "name": agent.name,
+            "session_warning": "Session tracking unavailable"
         }
 
 @router.post("/api/agents/{agent_id}/logout")
 async def logout_agent(agent_id: str, db: Session = Depends(get_db)):
+    """Logout an agent"""
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -818,47 +779,11 @@ async def force_logout_agent(agent_id: str, db: Session = Depends(get_db)):
     
     return {"message": "Agent was not logged in"}
 
-@router.get("/api/admin/session-report")
-async def get_session_report(
-    agent_id: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    """Get session report"""
-    try:
-        query = db.query(AgentSession)
-        
-        if agent_id:
-            query = query.filter(AgentSession.agent_id == agent_id)
-        
-        if date_from:
-            query = query.filter(AgentSession.login_time >= datetime.strptime(date_from, '%Y-%m-%d'))
-        
-        if date_to:
-            query = query.filter(AgentSession.login_time <= datetime.strptime(date_to, '%Y-%m-%d'))
-        
-        sessions = query.order_by(AgentSession.login_time.desc()).all()
-        
-        result = []
-        for session in sessions:
-            agent = db.query(Agent).filter(Agent.agent_id == session.agent_id).first()
-            result.append({
-                "session_id": session.id,
-                "agent_id": session.agent_id,
-                "agent_name": agent.name if agent else "Unknown",
-                "login_time": session.login_time.isoformat() if session.login_time else None,
-                "logout_time": session.logout_time.isoformat() if session.logout_time else None,
-                "duration_minutes": session.duration_minutes,
-                "is_active": session.logout_time is None
-            })
-        
-        return result
-    except Exception as e:
-        print(f"❌ Error in session report: {e}")
-        raise HTTPException(status_code=500, detail=f"Session report failed: {str(e)}")
+# ===================== TASK MANAGEMENT =====================
+
 @router.get("/api/agents/{agent_id}/current-task")
 def get_current_task(agent_id: str, db: Session = Depends(get_db)):
+    """Get current task for an agent"""
     print(f"📋 Getting current task for agent: {agent_id}")
     
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
@@ -908,6 +833,9 @@ def get_current_task(agent_id: str, db: Session = Depends(get_db)):
         "task_number": progress.current_index + 1,
         "completed": False
     }
+    # agent_routes.py - Part 6: Task Submission and Statistics
+
+# ===================== TASK SUBMISSION =====================
 
 @router.post("/api/agents/{agent_id}/submit")
 async def submit_task_data(
@@ -944,6 +872,7 @@ async def submit_task_data(
     Shape__Area: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    """Submit task form data"""
     print(f"📤 Submit request received for agent: {agent_id}")
     
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
@@ -1006,8 +935,11 @@ async def submit_task_data(
             db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to save submission: {str(db_error)}")
 
+# ===================== STATISTICS AND REPORTING =====================
+
 @router.get("/api/admin/statistics")
 def get_admin_statistics(db: Session = Depends(get_db)):
+    """Get admin dashboard statistics"""
     total_agents = db.query(Agent).count()
     active_agents = db.query(Agent).filter(Agent.status == "active").count()
     total_submissions = db.query(SubmittedForm).count()
@@ -1027,12 +959,55 @@ def get_admin_statistics(db: Session = Depends(get_db)):
         "pending_tasks": pending_tasks
     }
 
+@router.get("/api/admin/session-report")
+async def get_session_report(
+    agent_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get session report"""
+    try:
+        query = db.query(AgentSession)
+        
+        if agent_id:
+            query = query.filter(AgentSession.agent_id == agent_id)
+        
+        if date_from:
+            query = query.filter(AgentSession.login_time >= datetime.strptime(date_from, '%Y-%m-%d'))
+        
+        if date_to:
+            query = query.filter(AgentSession.login_time <= datetime.strptime(date_to, '%Y-%m-%d'))
+        
+        sessions = query.order_by(AgentSession.login_time.desc()).all()
+        
+        result = []
+        for session in sessions:
+            agent = db.query(Agent).filter(Agent.agent_id == session.agent_id).first()
+            result.append({
+                "session_id": session.id,
+                "agent_id": session.agent_id,
+                "agent_name": agent.name if agent else "Unknown",
+                "login_time": session.login_time.isoformat() if session.login_time else None,
+                "logout_time": session.logout_time.isoformat() if session.logout_time else None,
+                "duration_minutes": session.duration_minutes,
+                "is_active": session.logout_time is None
+            })
+        
+        return result
+    except Exception as e:
+        print(f"❌ Error in session report: {e}")
+        raise HTTPException(status_code=500, detail=f"Session report failed: {str(e)}")
+
+# ===================== FILE UPLOAD AND TASK ASSIGNMENT =====================
+
 @router.post("/api/admin/upload-tasks")
 async def upload_task_images(
     agent_id: str = Form(...),
     zip_file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
+    """Upload ZIP file with task images for an agent"""
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -1098,6 +1073,9 @@ async def upload_task_images(
         raise HTTPException(status_code=400, detail="Invalid ZIP file")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        # agent_routes.py - Part 7: Data Export and Final Functions
+
+# ===================== DATA EXPORT AND PREVIEW =====================
 
 @router.get("/api/admin/export-excel")
 def export_to_excel(
@@ -1287,6 +1265,8 @@ async def test_data_availability(db: Session = Depends(get_db)):
         print(f"❌ Error testing data: {e}")
         raise HTTPException(status_code=500, detail=f"Data test failed: {str(e)}")
 
+# ===================== ADVANCED ADMIN FUNCTIONS =====================
+
 @router.get("/api/admin/agent-details/{agent_id}")
 async def get_agent_details(agent_id: str, db: Session = Depends(get_db)):
     """Get detailed information about a specific agent"""
@@ -1448,4 +1428,3 @@ async def check_system_health(db: Session = Depends(get_db)):
             "database_connected": False,
             "timestamp": datetime.utcnow().isoformat()
         }
-
