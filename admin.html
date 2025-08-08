@@ -1160,85 +1160,134 @@
             }
         }
 
-        // Setup agent registration form
-        function setupAgentRegistration() {
-            document.getElementById('agentRegistrationForm').addEventListener('submit', async function(e) {
-                e.preventDefault();
-                await registerNewAgent();
+    // Register new agent with validation
+async function registerNewAgent() {
+    // Get form values
+    const name = document.getElementById('agentName').value.trim();
+    const email = document.getElementById('agentEmail').value.trim();
+    const mobile = document.getElementById('agentMobile').value.trim();
+    const dob = document.getElementById('agentDob').value;
+    const country = document.getElementById('agentCountry').value.trim();
+    const gender = document.getElementById('agentGender').value;
+
+    // Validate required fields
+    if (!name || !email || !mobile || !dob || !country || !gender) {
+        showAlert('Please fill in all required fields', 'error');
+        return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        showAlert('Please enter a valid email address', 'error');
+        return;
+    }
+
+    // Validate mobile format
+    const mobileRegex = /^\+?\d{10,15}$/;
+    const cleanMobile = mobile.replace(/[\s\-]/g, '');
+    if (!mobileRegex.test(cleanMobile)) {
+        showAlert('Please enter a valid mobile number (10-15 digits)', 'error');
+        return;
+    }
+
+    // Validate date of birth
+    const dobDate = new Date(dob);
+    const today = new Date();
+    const age = Math.floor((today - dobDate) / (365.25 * 24 * 60 * 60 * 1000));
+    if (age < 18 || age > 80) {
+        showAlert('Agent must be between 18 and 80 years old', 'error');
+        return;
+    }
+
+    // Create FormData
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('email', email);
+    formData.append('mobile', cleanMobile);
+    formData.append('dob', dob);
+    formData.append('country', country);
+    formData.append('gender', gender);
+
+    const submitBtn = document.querySelector('#agentRegistrationForm button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.innerHTML = '<div class="loading-spinner"></div>Registering...';
+    submitBtn.disabled = true;
+
+    try {
+        console.log('🔄 Submitting agent registration...');
+        
+        const response = await makeAuthenticatedRequest(`${BASE_URL}/api/agents/register`, {
+            method: 'POST',
+            body: formData
+        });
+
+        console.log(`📡 Registration response status: ${response.status}`);
+
+        const result = await response.json();
+        console.log('📋 Registration result:', result);
+
+        if (response.ok && result.success) {
+            // Display credentials
+            const passwordElement = document.getElementById('newAgentPassword');
+            passwordElement.textContent = '••••••••';
+            passwordElement.dataset.password = result.password;
+            passwordElement.classList.add('hidden-password');
+            
+            document.getElementById('newAgentId').textContent = result.agent_id;
+            document.getElementById('newAgentCredentials').classList.remove('hidden');
+            
+            // Reset form
+            document.getElementById('agentRegistrationForm').reset();
+            
+            // Refresh agents list and selects
+            await Promise.all([
+                loadAgents(),
+                populateAgentSelects()
+            ]);
+            
+            showAlert(`Agent registered successfully! ID: ${result.agent_id}`, 'success');
+            
+            // Scroll to credentials
+            document.getElementById('newAgentCredentials').scrollIntoView({ 
+                behavior: 'smooth',
+                block: 'center'
             });
-        }
-
-        // Register new agent with validation
-        async function registerNewAgent() {
-            const email = document.getElementById('agentEmail').value;
-            const mobile = document.getElementById('agentMobile').value;
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            const mobileRegex = /^\+?\d{10,15}$/;
             
-            if (!emailRegex.test(email)) {
-                showAlert('Please enter a valid email address', 'error');
-                return;
-            }
-            if (!mobileRegex.test(mobile)) {
-                showAlert('Please enter a valid mobile number (10-15 digits)', 'error');
-                return;
-            }
-
-            const formData = new FormData(document.getElementById('agentRegistrationForm'));
+            // Auto-hide credentials after 2 minutes for security
+            setTimeout(() => {
+                document.getElementById('newAgentCredentials').classList.add('hidden');
+            }, 120000);
             
-            const submitBtn = document.querySelector('#agentRegistrationForm button[type="submit"]');
-            const originalText = submitBtn.textContent;
-            submitBtn.textContent = 'Registering...';
-            submitBtn.disabled = true;
-
-            try {
-                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/agents/register`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    if (!result.agent_id || !result.password) {
-                        throw new Error('Invalid server response: Missing agent_id or password');
-                    }
-                    const passwordElement = document.getElementById('newAgentPassword');
-                    passwordElement.textContent = '••••••••';
-                    passwordElement.dataset.password = result.password;
-                    document.getElementById('newAgentId').textContent = result.agent_id;
-                    document.getElementById('newAgentCredentials').classList.remove('hidden');
-                    
-                    document.getElementById('agentRegistrationForm').reset();
-                    
-                    await loadAgents();
-                    populateAgentSelects();
-                    
-                    showAlert(`Agent registered successfully! ID: ${result.agent_id}`, 'success');
-                    document.getElementById('newAgentCredentials').scrollIntoView({ behavior: 'smooth' });
-                } else {
-                    const error = result.detail || 'Unknown error occurred';
-                    if (response.status === 400) {
-                        showAlert(`Invalid input: ${error}`, 'error');
-                    } else if (response.status === 409) {
-                        showAlert(`Agent already exists: ${error}`, 'error');
-                    } else {
-                        showAlert(`Registration failed: ${error}`, 'error');
-                    }
-                }
-            } catch (error) {
-                if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-                    console.error('Registration error:', {
-                        message: error.message,
-                        stack: error.stack
-                    });
-                    showAlert('Network error during registration', 'error');
-                }
-            } finally {
-                submitBtn.textContent = originalText;
-                submitBtn.disabled = false;
+        } else {
+            const errorMessage = result.detail || result.message || 'Registration failed';
+            
+            if (response.status === 400) {
+                showAlert(`Validation Error: ${errorMessage}`, 'error');
+            } else if (response.status === 409) {
+                showAlert(`Agent Already Exists: ${errorMessage}`, 'error');
+            } else if (response.status === 503) {
+                showAlert('Service temporarily unavailable. Please try again later.', 'error');
+            } else {
+                showAlert(`Registration Failed: ${errorMessage}`, 'error');
             }
         }
+    } catch (error) {
+        console.error('❌ Registration error:', error);
+        
+        if (error.message === 'Authentication failed' || error.message === 'Session expired') {
+            showAlert('Your session has expired. Please login again.', 'error');
+            setTimeout(() => logout(), 2000);
+        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            showAlert('Network connection error. Please check your internet connection.', 'error');
+        } else {
+            showAlert('Registration failed due to a network error. Please try again.', 'error');
+        }
+    } finally {
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+    }
+}
 
         // Load all dashboard data
         async function loadDashboardData() {
@@ -2080,3 +2129,4 @@
     </script>
 </body>
 </html>
+
