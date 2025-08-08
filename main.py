@@ -946,8 +946,8 @@ async def register_new_agent(
         if existing_agent:
             raise HTTPException(status_code=409, detail="Agent with this email already exists")
         
-        # Generate unique agent ID
-       def generate_agent_id():
+       # Generate unique agent ID
+        def generate_agent_id():
             """Generate unique agent ID in format AGT followed by 6 digits"""
             while True:
                 # Generate 6-digit random number
@@ -1673,5 +1673,6 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
