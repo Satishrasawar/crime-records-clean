@@ -7,21 +7,22 @@ class Agent(Base):
     __tablename__ = "agents"
 
     id = Column(Integer, primary_key=True, index=True)
-    agent_id = Column(String, unique=True, index=True)
-    name = Column(String, nullable=False)
-    email = Column(String, unique=True, index=True)
-    mobile = Column(String, nullable=False)
-    dob = Column(String)  # Keep as String for compatibility
-    country = Column(String, nullable=False)
-    gender = Column(String, nullable=False)
-    password = Column(String, nullable=False)  # Direct password storage (current system)
-    hashed_password = Column(String, nullable=True)  # Keep for backwards compatibility
-    status = Column(String, default="active")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    agent_id = Column(String(50), unique=True, index=True, nullable=False)
+    name = Column(String(100), nullable=False)
+    email = Column(String(100), unique=True, index=True, nullable=False)
+    mobile = Column(String(20), nullable=False)
+    dob = Column(String(20), nullable=False)  # Keep as String for compatibility with existing data
+    country = Column(String(50), nullable=False)
+    gender = Column(String(20), nullable=False)
+    password = Column(String(100), nullable=False)  # Plain text password storage
+    hashed_password = Column(String(255), nullable=True)  # For future use
+    status = Column(String(20), default="active", nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     submitted_forms = relationship("SubmittedForm", back_populates="agent")
-    login_sessions = relationship("AgentSession", back_populates="agent")
+    login_sessions = relationship("AgentSession", back_populates="login_sessions")
 
 class TaskProgress(Base):
     __tablename__ = "task_progress"
@@ -82,3 +83,4 @@ class Admin(Base):
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
