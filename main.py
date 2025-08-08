@@ -187,7 +187,6 @@ else:
 
 # Rate limiting setup
 limiter = Limiter(key_func=get_remote_address)
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan - startup and shutdown events"""
@@ -283,7 +282,8 @@ try:
     print("✅ Static files configured")
 except Exception as e:
     print(f"❌ Static files setup failed: {e}")
-    # ===================== CLEANUP FUNCTIONS =====================
+
+# ===================== CLEANUP FUNCTIONS =====================
 def cleanup_upload_session(upload_id: str):
     """Clean up upload session and temporary files"""
     try:
@@ -327,8 +327,7 @@ async def periodic_cleanup():
         
         # Wait 1 hour before next cleanup
         await asyncio.sleep(3600)
-
-# ===================== ZIP PROCESSING FUNCTION =====================
+        # ===================== ZIP PROCESSING FUNCTION =====================
 async def process_uploaded_zip(file_path: str, agent_id: str, db):
     """Enhanced ZIP file processing with comprehensive error handling and cleanup"""
     temp_files_created = []
@@ -515,7 +514,8 @@ async def create_admin_user_endpoint(request: Request, db=Depends(db_dependency)
             db.rollback()
         print(f"❌ Error creating admin: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create admin: {str(e)}")
-        @app.post("/api/admin/simple-login")
+
+@app.post("/api/admin/simple-login")
 @limiter.limit("10/minute")
 async def admin_simple_login(request: Request, db=Depends(db_dependency)):
     """Simplified admin login endpoint"""
@@ -571,8 +571,7 @@ async def admin_simple_login(request: Request, db=Depends(db_dependency)):
     except Exception as e:
         print(f"❌ Login error: {e}")
         return {"success": False, "message": "Login error occurred"}
-
-@app.get("/api/admin/check-admin")
+        @app.get("/api/admin/check-admin")
 @limiter.limit("10/minute")
 async def check_admin_status(request: Request, db=Depends(db_dependency)):
     """Check admin user status"""
@@ -900,7 +899,8 @@ async def serve_admin_panel(request: Request):
         
     except Exception as e:
         return JSONResponse({"error": f"Could not serve admin panel: {e}"}, status_code=500)
-        # ===================== AGENT REGISTRATION ENDPOINT =====================
+
+# ===================== AGENT REGISTRATION ENDPOINT =====================
 @app.post("/api/agents/register")
 @limiter.limit("10/minute")
 async def register_new_agent(
@@ -1026,233 +1026,6 @@ async def register_new_agent(
             db.rollback()
         print(f"❌ Error registering agent: {e}")
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
-
-@app.get("/agent")
-@limiter.limit("50/minute")
-async def serve_agent_panel_redirect(request: Request):
-    """Redirect /agent to /agent.html"""
-    return FileResponse("agent.html") if os.path.exists("agent.html") else JSONResponse({"error": "Agent panel not found"}, status_code=404)
-
-@app.get("/agent.html") 
-@limiter.limit("50/minute")
-async def serve_agent_panel(request: Request):
-    """Serve agent interface"""
-    try:
-        if os.path.exists("agent.html"):
-            return FileResponse("agent.html", headers={
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache", 
-                "Expires": "0",
-                "Content-Type": "text/html"
-            })
-            
-        # If agent.html doesn't exist, create a basic one
-        basic_agent_html = """<!DOCTYPE html>
-<html>
-<head>
-    <title>Agent Portal - Agent Task System</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { color: #333; border-bottom: 2px solid #28a745; padding-bottom: 10px; }
-        .login-form { background: #f8f9fa; padding: 30px; border-radius: 8px; margin: 20px 0; }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
-        .form-group input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 16px; }
-        .form-group input:focus { border-color: #28a745; outline: none; }
-        .btn { background: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        .btn:hover { background: #218838; }
-        .info-box { background: #d1ecf1; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #17a2b8; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🔐 Agent Portal - Task Management System</h1>
-        
-        <div class="info-box">
-            <strong>Welcome to the Agent Portal!</strong><br>
-            Enter your Agent ID and Password to access your assigned tasks.
-        </div>
-
-        <div class="login-form">
-            <h3>Agent Login</h3>
-            <form id="loginForm">
-                <div class="form-group">
-                    <label for="agentId">Agent ID:</label>
-                    <input type="text" id="agentId" name="agentId" placeholder="Enter your Agent ID (e.g., AGT123456)" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="password">Password:</label>
-                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
-                </div>
-                
-                <button type="submit" class="btn">🚀 Login & View Tasks</button>
-            </form>
-        </div>
-
-        <div style="margin-top: 30px; padding: 20px; background: #e9ecef; border-radius: 5px;">
-            <h3>📋 Quick Links</h3>
-            <p><strong>Get Current Task:</strong> <code>GET /api/agents/{agent_id}/current-task</code></p>
-            <p><strong>Submit Task:</strong> <code>POST /api/agents/{agent_id}/submit</code></p>
-            <p><strong>View Progress:</strong> <code>GET /api/agents/{agent_id}/progress</code></p>
-        </div>
-    </div>
-
-    <script>
-        document.getElementById('loginForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const agentId = document.getElementById('agentId').value;
-            const password = document.getElementById('password').value;
-            
-            if (agentId && password) {
-                // Redirect to current task API endpoint for now
-                window.location.href = `/api/agents/${agentId}/current-task`;
-            } else {
-                alert('Please enter both Agent ID and Password');
-            }
-        });
-    </script>
-</body>
-</html>"""
-        
-        # Create agent.html file if it doesn't exist
-        with open("agent.html", "w") as f:
-            f.write(basic_agent_html)
-            
-        return FileResponse("agent.html", headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-            "Content-Type": "text/html"
-        })
-        
-    except Exception as e:
-        return JSONResponse({"error": f"Could not serve agent panel: {e}"}, status_code=500)
-
-# ===================== ENHANCED DEBUG ENDPOINTS =====================
-@app.get("/debug")
-@limiter.limit("50/minute")
-async def debug_info(request: Request):
-    """Enhanced debug endpoint with domain information"""
-    return {
-        "environment": {
-            "domain": os.environ.get("DOMAIN", "not_set"),
-            "port": os.environ.get("PORT", "not_set"),
-            "database_url_set": bool(os.environ.get("DATABASE_URL")),
-            "allowed_origins": ALLOWED_ORIGINS,
-            "allowed_origins_count": len(ALLOWED_ORIGINS)
-        },
-        "system": {
-            "files": os.listdir("."),
-            "python_version": sys.version,
-            "database_ready": database_ready,
-            "routes_ready": routes_ready
-        },
-        "features": {
-            "upload_sessions": len(upload_sessions),
-            "chunk_upload_dir_exists": os.path.exists(CHUNK_UPLOAD_DIR),
-            "static_dir_exists": os.path.exists("static"),
-            "static_images_dir_exists": os.path.exists("static/task_images")
-        }
-    }
-
-@app.get("/status")
-@limiter.limit("50/minute")
-async def system_status(request: Request):
-    """Enhanced system status endpoint"""
-    return {
-        "status": "operational",
-        "database": "ready" if database_ready else "failed",
-        "routes": "ready" if routes_ready else "failed", 
-        "domain": os.environ.get("DOMAIN", "railway"),
-        "health": "ok",
-        "chunked_upload": "enabled",
-        "active_uploads": len(upload_sessions),
-        "cors_origins": len(ALLOWED_ORIGINS)
-    }
-
-# ===================== STATISTICS ENDPOINT =====================
-@app.get("/api/admin/statistics")
-@limiter.limit("50/minute")
-async def get_admin_statistics(request: Request, db=Depends(db_dependency)):
-    """Get admin dashboard statistics"""
-    try:
-        if not database_ready:
-            return {
-                "total_agents": 0,
-                "total_tasks": 0,
-                "completed_tasks": 0,
-                "pending_tasks": 0,
-                "in_progress_tasks": 0
-            }
-        
-        total_agents = db.query(Agent).count()
-        total_tasks = db.query(TaskProgress).count()
-        completed_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'completed').count()
-        pending_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'pending').count()
-        in_progress_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'in_progress').count()
-        
-        return {
-            "total_agents": total_agents,
-            "total_tasks": total_tasks,
-            "completed_tasks": completed_tasks,
-            "pending_tasks": pending_tasks,
-            "in_progress_tasks": in_progress_tasks
-        }
-    except Exception as e:
-        print(f"❌ Error getting statistics: {e}")
-        return {
-            "total_agents": 0,
-            "total_tasks": 0,
-            "completed_tasks": 0,
-            "pending_tasks": 0,
-            "in_progress_tasks": 0
-        }
-
-# ===================== AGENTS ENDPOINTS =====================
-@app.get("/api/agents")
-@limiter.limit("50/minute")
-async def list_agents(request: Request, db=Depends(db_dependency)):
-    """List all agents with their statistics"""
-    try:
-        if not database_ready:
-            return []
-        
-        agents = db.query(Agent).all()
-        agent_list = []
-        
-        for agent in agents:
-            total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent.agent_id).count()
-            completed_tasks = db.query(TaskProgress).filter(
-                TaskProgress.agent_id == agent.agent_id,
-                TaskProgress.status == 'completed'
-            ).count()
-            
-            latest_session = db.query(AgentSession).filter(
-                AgentSession.agent_id == agent.agent_id
-            ).order_by(AgentSession.login_time.desc()).first()
-            
-            agent_data = {
-                "agent_id": agent.agent_id,
-                "name": agent.name,
-                "email": agent.email,
-                "password": agent.password,
-                "status": agent.status,
-                "tasks_completed": completed_tasks,
-                "total_tasks": total_tasks,
-                "last_login": latest_session.login_time.isoformat() if latest_session and latest_session.login_time else None,
-                "last_logout": latest_session.logout_time.isoformat() if latest_session and latest_session.logout_time else None,
-                "is_currently_logged_in": latest_session.logout_time is None if latest_session else False
-            }
-            agent_list.append(agent_data)
-        
-        return agent_list
-    except Exception as e:
-        print(f"❌ Error listing agents: {e}")
-        return []
 
 # ===================== TASK ENDPOINTS FOR AGENTS =====================
 @app.get("/api/agents/{agent_id}/current-task")
@@ -1590,211 +1363,232 @@ async def get_agent_progress(agent_id: str, request: Request, db=Depends(db_depe
             "skipped_tasks": 0,
             "completion_percentage": 0
         }
+        @app.get("/agent")
+@limiter.limit("50/minute")
+async def serve_agent_panel_redirect(request: Request):
+    """Redirect /agent to /agent.html"""
+    return FileResponse("agent.html") if os.path.exists("agent.html") else JSONResponse({"error": "Agent panel not found"}, status_code=404)
 
-# ===================== STANDARD UPLOAD ENDPOINT =====================
-@app.post("/api/admin/upload-tasks")
-@limiter.limit("10/minute")
-async def upload_tasks_standard(
-    request: Request,
-    zip_file: UploadFile = File(...),
-    agent_id: str = Form(...),
-    db=Depends(db_dependency)
-):
-    """Standard upload endpoint for smaller files"""
+@app.get("/agent.html") 
+@limiter.limit("50/minute")
+async def serve_agent_panel(request: Request):
+    """Serve agent interface"""
+    try:
+        if os.path.exists("agent.html"):
+            return FileResponse("agent.html", headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache", 
+                "Expires": "0",
+                "Content-Type": "text/html"
+            })
+            
+        # If agent.html doesn't exist, create a basic one
+        basic_agent_html = """<!DOCTYPE html>
+<html>
+<head>
+    <title>Agent Portal - Agent Task System</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 2px solid #28a745; padding-bottom: 10px; }
+        .login-form { background: #f8f9fa; padding: 30px; border-radius: 8px; margin: 20px 0; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        .form-group input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 16px; }
+        .form-group input:focus { border-color: #28a745; outline: none; }
+        .btn { background: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .btn:hover { background: #218838; }
+        .info-box { background: #d1ecf1; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #17a2b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Agent Portal - Task Management System</h1>
+        
+        <div class="info-box">
+            <strong>Welcome to the Agent Portal!</strong><br>
+            Enter your Agent ID and Password to access your assigned tasks.
+        </div>
+
+        <div class="login-form">
+            <h3>Agent Login</h3>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="agentId">Agent ID:</label>
+                    <input type="text" id="agentId" name="agentId" placeholder="Enter your Agent ID (e.g., AGT123456)" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                </div>
+                
+                <button type="submit" class="btn">🚀 Login & View Tasks</button>
+            </form>
+        </div>
+
+        <div style="margin-top: 30px; padding: 20px; background: #e9ecef; border-radius: 5px;">
+            <h3>📋 Quick Links</h3>
+            <p><strong>Get Current Task:</strong> <code>GET /api/agents/{agent_id}/current-task</code></p>
+            <p><strong>Submit Task:</strong> <code>POST /api/agents/{agent_id}/submit</code></p>
+            <p><strong>View Progress:</strong> <code>GET /api/agents/{agent_id}/progress</code></p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const agentId = document.getElementById('agentId').value;
+            const password = document.getElementById('password').value;
+            
+            if (agentId && password) {
+                // Redirect to current task API endpoint for now
+                window.location.href = `/api/agents/${agentId}/current-task`;
+            } else {
+                alert('Please enter both Agent ID and Password');
+            }
+        });
+    </script>
+</body>
+</html>"""
+        
+        # Create agent.html file if it doesn't exist
+        with open("agent.html", "w") as f:
+            f.write(basic_agent_html)
+            
+        return FileResponse("agent.html", headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "Content-Type": "text/html"
+        })
+        
+    except Exception as e:
+        return JSONResponse({"error": f"Could not serve agent panel: {e}"}, status_code=500)
+
+# ===================== ENHANCED DEBUG ENDPOINTS =====================
+@app.get("/debug")
+@limiter.limit("50/minute")
+async def debug_info(request: Request):
+    """Enhanced debug endpoint with domain information"""
+    return {
+        "environment": {
+            "domain": os.environ.get("DOMAIN", "not_set"),
+            "port": os.environ.get("PORT", "not_set"),
+            "database_url_set": bool(os.environ.get("DATABASE_URL")),
+            "allowed_origins": ALLOWED_ORIGINS,
+            "allowed_origins_count": len(ALLOWED_ORIGINS)
+        },
+        "system": {
+            "files": os.listdir("."),
+            "python_version": sys.version,
+            "database_ready": database_ready,
+            "routes_ready": routes_ready
+        },
+        "features": {
+            "upload_sessions": len(upload_sessions),
+            "chunk_upload_dir_exists": os.path.exists(CHUNK_UPLOAD_DIR),
+            "static_dir_exists": os.path.exists("static"),
+            "static_images_dir_exists": os.path.exists("static/task_images")
+        }
+    }
+
+@app.get("/status")
+@limiter.limit("50/minute")
+async def system_status(request: Request):
+    """Enhanced system status endpoint"""
+    return {
+        "status": "operational",
+        "database": "ready" if database_ready else "failed",
+        "routes": "ready" if routes_ready else "failed", 
+        "domain": os.environ.get("DOMAIN", "railway"),
+        "health": "ok",
+        "chunked_upload": "enabled",
+        "active_uploads": len(upload_sessions),
+        "cors_origins": len(ALLOWED_ORIGINS)
+    }
+
+# ===================== STATISTICS ENDPOINT =====================
+@app.get("/api/admin/statistics")
+@limiter.limit("50/minute")
+async def get_admin_statistics(request: Request, db=Depends(db_dependency)):
+    """Get admin dashboard statistics"""
     try:
         if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        if agent.status != "active":
-            raise HTTPException(status_code=400, detail=f"Agent {agent_id} is not active")
-        
-        # Save uploaded file temporarily
-        temp_file_path = f"temp_{uuid.uuid4().hex}_{zip_file.filename}"
-        
-        with open(temp_file_path, "wb") as buffer:
-            content = await zip_file.read()
-            buffer.write(content)
-        
-        # Process the ZIP file
-        result = await process_uploaded_zip(temp_file_path, agent_id, db)
-        
-        return result
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Upload error: {e}")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
-
-# ===================== CHUNKED UPLOAD ENDPOINTS =====================
-@app.post("/api/admin/init-chunked-upload")
-@limiter.limit("10/minute")
-async def init_chunked_upload(
-    request: Request,
-    filename: str = Form(...),
-    filesize: int = Form(...),
-    total_chunks: int = Form(...),
-    agent_id: str = Form(...)
-):
-    """Initialize a chunked upload session for large files"""
-    try:
-        # Validate agent exists (if database is ready)
-        if database_ready:
-            db_gen = db_dependency()
-            if hasattr(db_gen, '__next__'):
-                db = next(db_gen)
-            else:
-                db = db_gen
-                
-            try:
-                agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-                if not agent:
-                    raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-                if agent.status != "active":
-                    raise HTTPException(status_code=400, detail=f"Agent {agent_id} is not active")
-            finally:
-                if hasattr(db, 'close'):
-                    db.close()
-        
-        # Create unique upload ID
-        upload_id = str(uuid.uuid4())
-        upload_dir = os.path.join(CHUNK_UPLOAD_DIR, upload_id)
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        # Store upload session info
-        upload_sessions[upload_id] = {
-            "filename": filename,
-            "filesize": filesize,
-            "total_chunks": total_chunks,
-            "agent_id": agent_id,
-            "received_chunks": set(),
-            "upload_dir": upload_dir,
-            "created_at": datetime.now()
-        }
-        
-        print(f"🚀 Initialized chunked upload: {upload_id} for {filename} ({filesize} bytes, {total_chunks} chunks)")
-        
-        return {
-            "upload_id": upload_id, 
-            "status": "initialized",
-            "message": f"Ready to receive {total_chunks} chunks"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Failed to initialize chunked upload: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to initialize upload: {str(e)}")
-
-@app.post("/api/admin/upload-chunk")
-@limiter.limit("50/minute")
-async def upload_chunk(
-    request: Request,
-    upload_id: str = Form(...),
-    chunk_index: int = Form(...),
-    chunk: UploadFile = File(...)
-):
-    """Upload a single chunk of a large file"""
-    try:
-        if upload_id not in upload_sessions:
-            raise HTTPException(status_code=404, detail="Upload session not found")
-        
-        session = upload_sessions[upload_id]
-        
-        # Validate chunk index
-        if chunk_index >= session["total_chunks"] or chunk_index < 0:
-            raise HTTPException(status_code=400, detail=f"Invalid chunk index: {chunk_index}")
-        
-        # Check if chunk already uploaded
-        if chunk_index in session["received_chunks"]:
             return {
-                "status": "chunk_already_exists",
-                "chunk_index": chunk_index,
-                "received_chunks": len(session["received_chunks"]),
-                "total_chunks": session["total_chunks"]
+                "total_agents": 0,
+                "total_tasks": 0,
+                "completed_tasks": 0,
+                "pending_tasks": 0,
+                "in_progress_tasks": 0
             }
         
-        chunk_path = os.path.join(session["upload_dir"], f"chunk_{chunk_index:06d}")
-        
-        # Save chunk to disk
-        async with aiofiles.open(chunk_path, 'wb') as f:
-            content = await chunk.read()
-            await f.write(content)
-        
-        # Mark chunk as received
-        session["received_chunks"].add(chunk_index)
-        
-        print(f"📦 Received chunk {chunk_index + 1}/{session['total_chunks']} for upload {upload_id}")
+        total_agents = db.query(Agent).count()
+        total_tasks = db.query(TaskProgress).count()
+        completed_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'completed').count()
+        pending_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'pending').count()
+        in_progress_tasks = db.query(TaskProgress).filter(TaskProgress.status == 'in_progress').count()
         
         return {
-            "status": "chunk_uploaded",
-            "chunk_index": chunk_index,
-            "received_chunks": len(session["received_chunks"]),
-            "total_chunks": session["total_chunks"],
-            "progress_percentage": (len(session["received_chunks"]) / session["total_chunks"]) * 100
+            "total_agents": total_agents,
+            "total_tasks": total_tasks,
+            "completed_tasks": completed_tasks,
+            "pending_tasks": pending_tasks,
+            "in_progress_tasks": in_progress_tasks
         }
-        
-    except HTTPException:
-        raise
     except Exception as e:
-        print(f"❌ Failed to upload chunk {chunk_index}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to upload chunk: {str(e)}")
+        print(f"❌ Error getting statistics: {e}")
+        return {
+            "total_agents": 0,
+            "total_tasks": 0,
+            "completed_tasks": 0,
+            "pending_tasks": 0,
+            "in_progress_tasks": 0
+        }
 
-@app.post("/api/admin/finalize-chunked-upload")
-@limiter.limit("10/minute")
-async def finalize_chunked_upload(request: Request, upload_id: str = Form(...), db=Depends(db_dependency)):
-    """Combine all chunks and process the complete file"""
+# ===================== AGENTS ENDPOINTS =====================
+@app.get("/api/agents")
+@limiter.limit("50/minute")
+async def list_agents(request: Request, db=Depends(db_dependency)):
+    """List all agents with their statistics"""
     try:
-        if upload_id not in upload_sessions:
-            raise HTTPException(status_code=404, detail="Upload session not found")
+        if not database_ready:
+            return []
         
-        session = upload_sessions[upload_id]
+        agents = db.query(Agent).all()
+        agent_list = []
         
-        # Verify all chunks received
-        if len(session["received_chunks"]) != session["total_chunks"]:
-            missing_chunks = set(range(session["total_chunks"])) - session["received_chunks"]
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Missing chunks: {sorted(list(missing_chunks))[:10]}{'...' if len(missing_chunks) > 10 else ''}"
-            )
+        for agent in agents:
+            total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent.agent_id).count()
+            completed_tasks = db.query(TaskProgress).filter(
+                TaskProgress.agent_id == agent.agent_id,
+                TaskProgress.status == 'completed'
+            ).count()
+            
+            latest_session = db.query(AgentSession).filter(
+                AgentSession.agent_id == agent.agent_id
+            ).order_by(AgentSession.login_time.desc()).first()
+            
+            agent_data = {
+                "agent_id": agent.agent_id,
+                "name": agent.name,
+                "email": agent.email,
+                "password": agent.password,
+                "status": agent.status,
+                "tasks_completed": completed_tasks,
+                "total_tasks": total_tasks,
+                "last_login": latest_session.login_time.isoformat() if latest_session and latest_session.login_time else None,
+                "last_logout": latest_session.logout_time.isoformat() if latest_session and latest_session.logout_time else None,
+                "is_currently_logged_in": latest_session.logout_time is None if latest_session else False
+            }
+            agent_list.append(agent_data)
         
-        print(f"🔄 Combining {session['total_chunks']} chunks for upload {upload_id}")
-        
-        # Combine chunks into final file
-        final_file_path = os.path.join(session["upload_dir"], session["filename"])
-        
-        with open(final_file_path, 'wb') as final_file:
-            for chunk_index in range(session["total_chunks"]):
-                chunk_path = os.path.join(session["upload_dir"], f"chunk_{chunk_index:06d}")
-                if os.path.exists(chunk_path):
-                    with open(chunk_path, 'rb') as chunk_file:
-                        final_file.write(chunk_file.read())
-                    # Clean up chunk file immediately
-                    os.remove(chunk_path)
-                else:
-                    raise HTTPException(status_code=500, detail=f"Chunk {chunk_index} file not found")
-        
-        print(f"✅ Successfully combined all chunks into {final_file_path}")
-        
-        # Process the complete ZIP file
-        result = await process_uploaded_zip(final_file_path, session["agent_id"], db)
-        
-        # Clean up upload session
-        cleanup_upload_session(upload_id)
-        
-        return result
-        
-    except HTTPException:
-        cleanup_upload_session(upload_id)
-        raise
+        return agent_list
     except Exception as e:
-        print(f"❌ Failed to finalize upload {upload_id}: {e}")
-        cleanup_upload_session(upload_id)
-        raise HTTPException(status_code=500, detail=f"Failed to finalize upload: {str(e)}")
+        print(f"❌ Error listing agents: {e}")
+        return []
 
 # ===================== UPLOAD SESSIONS MANAGEMENT =====================
 @app.get("/api/admin/upload-sessions")
@@ -1815,125 +1609,6 @@ async def get_upload_sessions(request: Request):
     return {"upload_sessions": sessions_info}
 
 # ===================== ADDITIONAL ADMIN ENDPOINTS =====================
-@app.post("/api/admin/reset-password/{agent_id}")
-@limiter.limit("10/minute")
-async def reset_agent_password(agent_id: str, request: Request, db=Depends(db_dependency)):
-    """Reset agent password"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        # Generate new password
-        import secrets
-        import string
-        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-        new_password = ''.join(secrets.choice(alphabet) for _ in range(12))
-        
-        # Update password
-        agent.password = new_password
-        db.commit()
-        
-        return {
-            "success": True,
-            "new_password": new_password,
-            "message": f"Password reset successfully for agent {agent_id}"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error resetting password for {agent_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Password reset failed: {str(e)}")
-
-@app.get("/api/admin/agent-password/{agent_id}")
-@limiter.limit("50/minute")
-async def get_agent_password(agent_id: str, request: Request, db=Depends(db_dependency)):
-    """Get agent password information"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        return {
-            "message": f"Password for agent {agent_id} is: {agent.password}",
-            "agent_id": agent_id,
-            "password": agent.password
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error getting password for {agent_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error retrieving password: {str(e)}")
-
-@app.patch("/api/agents/{agent_id}/status")
-@limiter.limit("10/minute")
-async def update_agent_status(agent_id: str, status_data: dict, request: Request, db=Depends(db_dependency)):
-    """Update agent status"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        new_status = status_data.get("status")
-        if new_status not in ["active", "inactive"]:
-            raise HTTPException(status_code=400, detail="Status must be 'active' or 'inactive'")
-        
-        agent.status = new_status
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": f"Agent {agent_id} status updated to {new_status}"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error updating status for {agent_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Status update failed: {str(e)}")
-
-@app.post("/api/admin/force-logout/{agent_id}")
-@limiter.limit("10/minute")
-async def force_logout_agent(agent_id: str, request: Request, db=Depends(db_dependency)):
-    """Force logout an agent"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        # Find active session and close it
-        active_session = db.query(AgentSession).filter(
-            AgentSession.agent_id == agent_id,
-            AgentSession.logout_time.is_(None)
-        ).first()
-        
-        if active_session:
-            active_session.logout_time = datetime.now()
-            db.commit()
-            return {"success": True, "message": f"Agent {agent_id} logged out successfully"}
-        else:
-            return {"success": True, "message": f"Agent {agent_id} was not logged in"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error forcing logout for {agent_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Force logout failed: {str(e)}")
-
 @app.get("/api/admin/preview-data")
 @limiter.limit("50/minute")
 async def preview_data(
@@ -1978,119 +1653,6 @@ async def preview_data(
         print(f"❌ Error in data preview: {e}")
         raise HTTPException(status_code=500, detail=f"Preview failed: {str(e)}")
 
-@app.get("/api/admin/test-data")
-@limiter.limit("50/minute")
-async def test_data_availability(request: Request, db=Depends(db_dependency)):
-    """Test data availability"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        # Count records in each table
-        agent_count = db.query(Agent).count()
-        task_count = db.query(TaskProgress).count()
-        submission_count = db.query(SubmittedForm).count()
-        session_count = db.query(AgentSession).count()
-        
-        return {
-            "success": True,
-            "message": f"Data available - Agents: {agent_count}, Tasks: {task_count}, Submissions: {submission_count}, Sessions: {session_count}",
-            "counts": {
-                "agents": agent_count,
-                "tasks": task_count,
-                "submissions": submission_count,
-                "sessions": session_count
-            }
-        }
-        
-    except Exception as e:
-        print(f"❌ Error testing data: {e}")
-        raise HTTPException(status_code=500, detail=f"Data test failed: {str(e)}")
-
-@app.get("/api/admin/session-report")
-@limiter.limit("50/minute")
-async def get_session_report(
-    request: Request,
-    agent_id: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    db=Depends(db_dependency)
-):
-    """Get session report"""
-    try:
-        if not database_ready:
-            raise HTTPException(status_code=503, detail="Database not ready")
-        
-        query = db.query(AgentSession).join(Agent)
-        
-        if agent_id:
-            query = query.filter(AgentSession.agent_id == agent_id)
-        
-        if date_from:
-            query = query.filter(AgentSession.login_time >= datetime.strptime(date_from, '%Y-%m-%d'))
-        
-        if date_to:
-            query = query.filter(AgentSession.login_time <= datetime.strptime(date_to, '%Y-%m-%d'))
-        
-        sessions = query.order_by(AgentSession.login_time.desc()).limit(100).all()
-        
-        result = []
-        for session in sessions:
-            duration_minutes = None
-            if session.logout_time and session.login_time:
-                duration = session.logout_time - session.login_time
-                duration_minutes = int(duration.total_seconds() / 60)
-            
-            result.append({
-                "agent_id": session.agent_id,
-                "agent_name": session.agent.name if session.agent else "Unknown",
-                "login_time": session.login_time.isoformat() if session.login_time else None,
-                "logout_time": session.logout_time.isoformat() if session.logout_time else None,
-                "duration_minutes": duration_minutes
-            })
-        
-        return result
-        
-    except Exception as e:
-        print(f"❌ Error in session report: {e}")
-        raise HTTPException(status_code=500, detail=f"Session report failed: {str(e)}")
-
-# ===================== EXPORT ENDPOINTS (PLACEHOLDERS) =====================
-@app.get("/api/admin/export-excel")
-@limiter.limit("10/minute")
-async def export_excel(
-    request: Request,
-    agent_id: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    db=Depends(db_dependency)
-):
-    """Export submitted data to Excel - ready for implementation"""
-    return JSONResponse(
-        content={
-            "message": "Excel export feature - ready for implementation with pandas/openpyxl",
-            "note": "Add pandas and openpyxl implementation here for full Excel export functionality"
-        },
-        status_code=501
-    )
-
-@app.get("/api/admin/export-sessions")
-@limiter.limit("10/minute")
-async def export_sessions(
-    request: Request,
-    agent_id: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    db=Depends(db_dependency)
-):
-    """Export session report to Excel - ready for implementation"""
-    return JSONResponse(
-        content={
-            "message": "Session export feature - ready for implementation", 
-            "note": "Add pandas and openpyxl implementation here for full session export functionality"
-        },
-        status_code=501
-    )
 # ===================== MAIN ENTRY POINT =====================
 if __name__ == "__main__":
     import uvicorn
@@ -2107,5 +1669,3 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
-
-
