@@ -789,7 +789,15 @@
             });
         }
 
-        // FIXED: Handle login attempt with multiple authentication methods
+        // Setup agent registration form
+        function setupAgentRegistration() {
+            document.getElementById('agentRegistrationForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await registerNewAgent();
+            });
+        }
+
+        // Handle login attempt with multiple authentication methods
         async function handleLogin() {
             if (lockoutTime && Date.now() < lockoutTime) {
                 const remainingTime = Math.ceil((lockoutTime - Date.now()) / 1000);
@@ -806,7 +814,6 @@
             loginBtn.disabled = true;
 
             try {
-                // Add timeout to prevent hanging
                 const timeoutPromise = new Promise((_, reject) => 
                     setTimeout(() => reject(new Error('Login timeout')), 10000)
                 );
@@ -843,11 +850,10 @@
             }
         }
 
-        // FIXED: Multiple authentication methods with fallback
+        // Multiple authentication methods with fallback
         async function validateCredentials(username, password) {
             console.log(`🔐 Validating credentials for: ${username}`);
             
-            // Method 1: Try main admin login endpoint
             try {
                 console.log('🔄 Trying main admin login endpoint...');
                 const response = await fetch(`${BASE_URL}/api/admin/login`, {
@@ -872,7 +878,6 @@
                 console.log('❌ Main login endpoint error:', error.message);
             }
 
-            // Method 2: Try simple login endpoint
             try {
                 console.log('🔄 Trying simple login endpoint...');
                 const response = await fetch(`${BASE_URL}/api/admin/simple-login`, {
@@ -895,7 +900,6 @@
                 console.log('❌ Simple login endpoint error:', error.message);
             }
 
-            // Method 3: Try test login endpoint
             try {
                 console.log('🔄 Trying test login endpoint...');
                 const response = await fetch(`${BASE_URL}/api/admin/test-login`, {
@@ -918,7 +922,6 @@
                 console.log('❌ Test login endpoint error:', error.message);
             }
 
-            // Method 4: Hardcoded fallback for development
             if (username === "admin" && password === "admin123") {
                 console.log('✅ Hardcoded credentials matched!');
                 return true;
@@ -962,7 +965,6 @@
                 
                 if (data.success) {
                     showAlert('Admin user created successfully!', 'success');
-                    // Update form with credentials
                     document.getElementById('adminUsername').value = 'admin';
                     document.getElementById('adminPassword').value = 'admin123';
                 } else {
@@ -1005,7 +1007,7 @@
             const session = {
                 authenticated: true,
                 loginTime: Date.now(),
-                expiry: Date.now() + (2 * 60 * 60 * 1000), // 2 hours
+                expiry: Date.now() + (2 * 60 * 60 * 1000),
                 username: document.getElementById('adminUsername').value
             };
             
@@ -1013,7 +1015,7 @@
             
             if (rememberMe) {
                 const rememberToken = {
-                    expiry: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+                    expiry: Date.now() + (7 * 24 * 60 * 60 * 1000)
                 };
                 localStorage.setItem(REMEMBER_KEY, JSON.stringify(rememberToken));
             }
@@ -1030,6 +1032,7 @@
                 return null;
             }
         }
+
         // Setup session timeout and monitoring
         function setupSessionTimeout() {
             if (sessionTimeout) {
@@ -1160,134 +1163,123 @@
             }
         }
 
-    // Register new agent with validation
-async function registerNewAgent() {
-    // Get form values
-    const name = document.getElementById('agentName').value.trim();
-    const email = document.getElementById('agentEmail').value.trim();
-    const mobile = document.getElementById('agentMobile').value.trim();
-    const dob = document.getElementById('agentDob').value;
-    const country = document.getElementById('agentCountry').value.trim();
-    const gender = document.getElementById('agentGender').value;
+        // Register new agent with validation
+        async function registerNewAgent() {
+            const name = document.getElementById('agentName').value.trim();
+            const email = document.getElementById('agentEmail').value.trim();
+            const mobile = document.getElementById('agentMobile').value.trim();
+            const dob = document.getElementById('agentDob').value;
+            const country = document.getElementById('agentCountry').value.trim();
+            const gender = document.getElementById('agentGender').value;
 
-    // Validate required fields
-    if (!name || !email || !mobile || !dob || !country || !gender) {
-        showAlert('Please fill in all required fields', 'error');
-        return;
-    }
+            if (!name || !email || !mobile || !dob || !country || !gender) {
+                showAlert('Please fill in all required fields', 'error');
+                return;
+            }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-        showAlert('Please enter a valid email address', 'error');
-        return;
-    }
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showAlert('Please enter a valid email address', 'error');
+                return;
+            }
 
-    // Validate mobile format
-    const mobileRegex = /^\+?\d{10,15}$/;
-    const cleanMobile = mobile.replace(/[\s\-]/g, '');
-    if (!mobileRegex.test(cleanMobile)) {
-        showAlert('Please enter a valid mobile number (10-15 digits)', 'error');
-        return;
-    }
+            const mobileRegex = /^\+?\d{10,15}$/;
+            const cleanMobile = mobile.replace(/[\s\-]/g, '');
+            if (!mobileRegex.test(cleanMobile)) {
+                showAlert('Please enter a valid mobile number (10-15 digits)', 'error');
+                return;
+            }
 
-    // Validate date of birth
-    const dobDate = new Date(dob);
-    const today = new Date();
-    const age = Math.floor((today - dobDate) / (365.25 * 24 * 60 * 60 * 1000));
-    if (age < 18 || age > 80) {
-        showAlert('Agent must be between 18 and 80 years old', 'error');
-        return;
-    }
+            const dobDate = new Date(dob);
+            const today = new Date();
+            const age = Math.floor((today - dobDate) / (365.25 * 24 * 60 * 60 * 1000));
+            if (age < 18 || age > 80) {
+                showAlert('Agent must be between 18 and 80 years old', 'error');
+                return;
+            }
 
-    // Create FormData
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('email', email);
-    formData.append('mobile', cleanMobile);
-    formData.append('dob', dob);
-    formData.append('country', country);
-    formData.append('gender', gender);
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('email', email);
+            formData.append('mobile', cleanMobile);
+            formData.append('dob', dob);
+            formData.append('country', country);
+            formData.append('gender', gender);
 
-    const submitBtn = document.querySelector('#agentRegistrationForm button[type="submit"]');
-    const originalText = submitBtn.textContent;
-    submitBtn.innerHTML = '<div class="loading-spinner"></div>Registering...';
-    submitBtn.disabled = true;
+            const submitBtn = document.querySelector('#agentRegistrationForm button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.innerHTML = '<div class="loading-spinner"></div>Registering...';
+            submitBtn.disabled = true;
 
-    try {
-        console.log('🔄 Submitting agent registration...');
-        
-        const response = await makeAuthenticatedRequest(`${BASE_URL}/api/agents/register`, {
-            method: 'POST',
-            body: formData
-        });
+            try {
+                console.log('🔄 Submitting agent registration...');
+                
+                const response = await makeAuthenticatedRequest(`${BASE_URL}/api/agents/register`, {
+                    method: 'POST',
+                    body: formData
+                });
 
-        console.log(`📡 Registration response status: ${response.status}`);
+                console.log(`📡 Registration response status: ${response.status}`);
 
-        const result = await response.json();
-        console.log('📋 Registration result:', result);
+                const result = await response.json();
+                console.log('📋 Registration result:', result);
 
-        if (response.ok && result.success) {
-            // Display credentials
-            const passwordElement = document.getElementById('newAgentPassword');
-            passwordElement.textContent = '••••••••';
-            passwordElement.dataset.password = result.password;
-            passwordElement.classList.add('hidden-password');
-            
-            document.getElementById('newAgentId').textContent = result.agent_id;
-            document.getElementById('newAgentCredentials').classList.remove('hidden');
-            
-            // Reset form
-            document.getElementById('agentRegistrationForm').reset();
-            
-            // Refresh agents list and selects
-            await Promise.all([
-                loadAgents(),
-                populateAgentSelects()
-            ]);
-            
-            showAlert(`Agent registered successfully! ID: ${result.agent_id}`, 'success');
-            
-            // Scroll to credentials
-            document.getElementById('newAgentCredentials').scrollIntoView({ 
-                behavior: 'smooth',
-                block: 'center'
-            });
-            
-            // Auto-hide credentials after 2 minutes for security
-            setTimeout(() => {
-                document.getElementById('newAgentCredentials').classList.add('hidden');
-            }, 120000);
-            
-        } else {
-            const errorMessage = result.detail || result.message || 'Registration failed';
-            
-            if (response.status === 400) {
-                showAlert(`Validation Error: ${errorMessage}`, 'error');
-            } else if (response.status === 409) {
-                showAlert(`Agent Already Exists: ${errorMessage}`, 'error');
-            } else if (response.status === 503) {
-                showAlert('Service temporarily unavailable. Please try again later.', 'error');
-            } else {
-                showAlert(`Registration Failed: ${errorMessage}`, 'error');
+                if (response.ok && result.success) {
+                    const passwordElement = document.getElementById('newAgentPassword');
+                    passwordElement.textContent = '••••••••';
+                    passwordElement.dataset.password = result.password;
+                    passwordElement.classList.add('hidden-password');
+                    
+                    document.getElementById('newAgentId').textContent = result.agent_id;
+                    document.getElementById('newAgentCredentials').classList.remove('hidden');
+                    
+                    document.getElementById('agentRegistrationForm').reset();
+                    
+                    await Promise.all([
+                        loadAgents(),
+                        populateAgentSelects()
+                    ]);
+                    
+                    showAlert(`Agent registered successfully! ID: ${result.agent_id}`, 'success');
+                    
+                    document.getElementById('newAgentCredentials').scrollIntoView({ 
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                    
+                    setTimeout(() => {
+                        document.getElementById('newAgentCredentials').classList.add('hidden');
+                    }, 120000);
+                    
+                } else {
+                    const errorMessage = result.detail || result.message || 'Registration failed';
+                    
+                    if (response.status === 400) {
+                        showAlert(`Validation Error: ${errorMessage}`, 'error');
+                    } else if (response.status === 409) {
+                        showAlert(`Agent Already Exists: ${errorMessage}`, 'error');
+                    } else if (response.status === 503) {
+                        showAlert('Service temporarily unavailable. Please try again later.', 'error');
+                    } else {
+                        showAlert(`Registration Failed: ${errorMessage}`, 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Registration error:', error);
+                
+                if (error.message === 'Authentication failed' || error.message === 'Session expired') {
+                    showAlert('Your session has expired. Please login again.', 'error');
+                    setTimeout(() => logout(), 2000);
+                } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                    showAlert('Network connection error. Please check your internet connection.', 'error');
+                } else {
+                    showAlert('Registration failed due to a network error. Please try again.', 'error');
+                }
+            } finally {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
             }
         }
-    } catch (error) {
-        console.error('❌ Registration error:', error);
-        
-        if (error.message === 'Authentication failed' || error.message === 'Session expired') {
-            showAlert('Your session has expired. Please login again.', 'error');
-            setTimeout(() => logout(), 2000);
-        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
-            showAlert('Network connection error. Please check your internet connection.', 'error');
-        } else {
-            showAlert('Registration failed due to a network error. Please try again.', 'error');
-        }
-    } finally {
-        submitBtn.textContent = originalText;
-        submitBtn.disabled = false;
-    }
-}
 
         // Load all dashboard data
         async function loadDashboardData() {
@@ -1479,6 +1471,7 @@ async function registerNewAgent() {
                 }
             });
         }
+
         // Setup drag and drop functionality
         function setupDragAndDrop() {
             const uploadArea = document.getElementById('uploadArea');
@@ -1831,6 +1824,7 @@ async function registerNewAgent() {
             document.getElementById('fileSizeWarning').classList.add('hidden');
             updateUploadButtonState();
         }
+
         // Export data to Excel
         async function exportToExcel() {
             const filters = {
@@ -2016,117 +2010,9 @@ async function registerNewAgent() {
             }
 
             setTimeout(() => {
-                if (alert.parentNode) {
-                    alert.remove();
-                }
+                alert.remove();
             }, 5000);
         }
-
-        // Security enhancements
-        document.addEventListener('contextmenu', function(e) {
-            if (e.target.closest('.credential-value') || e.target.closest('input[type="password"]')) {
-                e.preventDefault();
-            }
-        });
-
-        document.addEventListener('dragstart', function(e) {
-            if (e.target.closest('.credential-value') || e.target.closest('input[type="password"]')) {
-                e.preventDefault();
-            }
-        });
-
-        window.addEventListener('beforeunload', function() {
-            const passwordInputs = document.querySelectorAll('input[type="password"]');
-            passwordInputs.forEach(input => input.value = '');
-            
-            if (uploadController) {
-                uploadController.abort();
-            }
-        });
-
-        history.pushState(null, null, location.href);
-        window.addEventListener('popstate', function() {
-            history.pushState(null, null, location.href);
-        });
-
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) {
-                const session = getSession();
-                if (session && session.expiry > Date.now()) {
-                    extendSession();
-                }
-            }
-        });
-
-        let suspiciousActivityCount = 0;
-        const MAX_SUSPICIOUS_ACTIVITIES = 5;
-
-        function detectSuspiciousActivity(activityType) {
-            suspiciousActivityCount++;
-            
-            if (suspiciousActivityCount >= MAX_SUSPICIOUS_ACTIVITIES) {
-                showAlert('Suspicious activity detected. Session will be terminated for security.', 'error');
-                setTimeout(() => {
-                    logout();
-                }, 3000);
-            }
-        }
-
-        document.getElementById('adminPassword').addEventListener('input', function() {
-            if (failedAttempts >= 2) {
-                if (this.value.length > 3) {
-                    suspiciousActivityCount = 0;
-                }
-            }
-        });
-
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && e.shiftKey && e.key === 'L') {
-                e.preventDefault();
-                if (getSession()) {
-                    logout();
-                    showAlert('Quick logout activated', 'info');
-                }
-            }
-            
-            if (e.key === 'Escape' && uploadController) {
-                cancelUpload();
-            }
-        });
-
-        function showSessionInfo() {
-            const session = getSession();
-            if (session) {
-                const timeRemaining = Math.max(0, Math.floor((session.expiry - Date.now()) / 60000));
-                console.log(`Session active. Time remaining: ${timeRemaining} minutes`);
-            }
-        }
-
-        setInterval(showSessionInfo, 10 * 60 * 1000);
-
-        window.addEventListener('online', function() {
-            showAlert('Internet connection restored', 'success');
-        });
-
-        window.addEventListener('offline', function() {
-            showAlert('Internet connection lost. Upload will pause.', 'error');
-        });
-
-        function cleanupFileReferences() {
-            if (selectedZipFile && !uploadController) {
-                const fileName = selectedZipFile.name;
-                selectedZipFile = null;
-                console.log(`Cleaned up memory for file: ${fileName}`);
-            }
-        }
-
-        setInterval(cleanupFileReferences, 5 * 60 * 1000);
-
-        console.log('✅ COMPLETE Admin Dashboard initialized successfully');
-        console.log('🔗 Using dynamic BASE_URL for API calls');
-        console.log('🔧 ALL ORIGINAL FUNCTIONALITY PRESERVED + FIXED LOGIN');
-
     </script>
 </body>
 </html>
-
