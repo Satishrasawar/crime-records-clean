@@ -18,7 +18,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 
 def create_default_admin():
-    """FIXED: Create default admin user with proper error handling"""
+    """Create default admin user with proper error handling"""
     try:
         print("🔧 Setting up admin user...")
         
@@ -327,7 +327,8 @@ async def periodic_cleanup():
         
         # Wait 1 hour before next cleanup
         await asyncio.sleep(3600)
-        # ===================== ZIP PROCESSING FUNCTION =====================
+
+# ===================== ZIP PROCESSING FUNCTION =====================
 async def process_uploaded_zip(file_path: str, agent_id: str, db):
     """Enhanced ZIP file processing with comprehensive error handling and cleanup"""
     temp_files_created = []
@@ -465,7 +466,7 @@ async def process_uploaded_zip(file_path: str, agent_id: str, db):
         "timestamp": datetime.now().isoformat()
     }
 
-# ===================== ADMIN DEBUG ENDPOINTS (NEW) =====================
+# ===================== ADMIN DEBUG ENDPOINTS =====================
 @app.post("/api/admin/create-admin")
 @limiter.limit("1/minute")
 async def create_admin_user_endpoint(request: Request, db=Depends(db_dependency)):
@@ -571,7 +572,8 @@ async def admin_simple_login(request: Request, db=Depends(db_dependency)):
     except Exception as e:
         print(f"❌ Login error: {e}")
         return {"success": False, "message": "Login error occurred"}
-        @app.get("/api/admin/check-admin")
+
+@app.get("/api/admin/check-admin")
 @limiter.limit("10/minute")
 async def check_admin_status(request: Request, db=Depends(db_dependency)):
     """Check admin user status"""
@@ -778,7 +780,8 @@ async def root(request: Request):
             "enhanced_security"
         ]
     }
-    # ===================== ENHANCED STATIC FILE SERVING =====================
+
+# ===================== ENHANCED STATIC FILE SERVING =====================
 @app.get("/admin")
 @limiter.limit("50/minute")
 async def serve_admin_panel_redirect(request: Request):
@@ -810,7 +813,7 @@ async def serve_admin_panel(request: Request):
         h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
         .status { background: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #28a745; }
         .api-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 30px; }
-        .api-link { background: #f8f9fa; padding: 20px; border-radius: 5px; border-left: 4px solid #007bff; }
+        .api-link { background: #f8f9fa; padding: 20px; border-radius: 5px; border какое left: 4px solid #007bff; }
         .api-link h3 { margin: 0 0 10px 0; color: #007bff; }
         .api-link a { color: #007bff; text-decoration: none; font-family: monospace; }
         .api-link a:hover { text-decoration: underline; }
@@ -948,7 +951,7 @@ async def register_new_agent(
             """Generate unique agent ID in format AGT followed by 6 digits"""
             while True:
                 # Generate 6-digit random number
-                agent_number = secrets.randbelow(900000) + 100000  # Ensures 6 digits
+撒                agent_number = secrets.randbelow(900000) + 100000  # Ensures 6 digits
                 agent_id = f"AGT{agent_number}"
                 
                 # Check if ID already exists
@@ -1363,7 +1366,8 @@ async def get_agent_progress(agent_id: str, request: Request, db=Depends(db_depe
             "skipped_tasks": 0,
             "completion_percentage": 0
         }
-        @app.get("/agent")
+
+@app.get("/agent")
 @limiter.limit("50/minute")
 async def serve_agent_panel_redirect(request: Request):
     """Redirect /agent to /agent.html"""
