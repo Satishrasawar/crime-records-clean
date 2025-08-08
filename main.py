@@ -515,6 +515,62 @@ async def create_admin_user_endpoint(request: Request, db=Depends(db_dependency)
             db.rollback()
         print(f"❌ Error creating admin: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create admin: {str(e)}")
+        @app.post("/api/admin/simple-login")
+@limiter.limit("10/minute")
+async def admin_simple_login(request: Request, db=Depends(db_dependency)):
+    """Simplified admin login endpoint"""
+    try:
+        data = await request.json()
+        username = data.get("username")
+        password = data.get("password")
+        
+        print(f"🔐 Admin login attempt: {username}")
+        
+        if not username or not password:
+            return {"success": False, "message": "Username and password required"}
+        
+        # Check hardcoded credentials first
+        if username == "admin" and password == "admin123":
+            print("✅ Hardcoded admin login successful")
+            return {
+                "success": True,
+                "message": "Login successful",
+                "access_token": "admin_token_" + str(int(datetime.now().timestamp())),
+                "user": {
+                    "username": username,
+                    "role": "admin"
+                }
+            }
+        
+        # Try database validation if available
+        if database_ready:
+            try:
+                from app.models import Admin
+                from app.security import verify_password
+                
+                admin = db.query(Admin).filter(Admin.username == username).first()
+                if admin and admin.is_active:
+                    if verify_password(password, admin.hashed_password):
+                        print("✅ Database admin login successful")
+                        return {
+                            "success": True,
+                            "message": "Login successful",
+                            "access_token": "admin_token_" + str(int(datetime.now().timestamp())),
+                            "user": {
+                                "username": username,
+                                "email": admin.email,
+                                "role": "admin"
+                            }
+                        }
+            except Exception as db_error:
+                print(f"⚠️ Database login failed, fallback to hardcoded: {db_error}")
+        
+        print("❌ Admin login failed")
+        return {"success": False, "message": "Invalid credentials"}
+        
+    except Exception as e:
+        print(f"❌ Login error: {e}")
+        return {"success": False, "message": "Login error occurred"}
 
 @app.get("/api/admin/check-admin")
 @limiter.limit("10/minute")
@@ -844,6 +900,132 @@ async def serve_admin_panel(request: Request):
         
     except Exception as e:
         return JSONResponse({"error": f"Could not serve admin panel: {e}"}, status_code=500)
+        # ===================== AGENT REGISTRATION ENDPOINT =====================
+@app.post("/api/agents/register")
+@limiter.limit("10/minute")
+async def register_new_agent(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    mobile: str = Form(...),
+    dob: str = Form(...),
+    country: str = Form(...),
+    gender: str = Form(...),
+    db=Depends(db_dependency)
+):
+    """Register a new agent with auto-generated credentials"""
+    try:
+        if not database_ready:
+            raise HTTPException(status_code=503, detail="Database not ready")
+        
+        import secrets
+        import string
+        from datetime import datetime
+        
+        # Validate required fields
+        if not all([name, email, mobile, dob, country, gender]):
+            raise HTTPException(status_code=400, detail="All fields are required")
+        
+        # Validate email format
+        import re
+        email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+        if not re.match(email_pattern, email):
+            raise HTTPException(status_code=400, detail="Invalid email format")
+        
+        # Validate mobile format (basic validation)
+        mobile_pattern = r'^\+?\d{10,15}$'
+        clean_mobile = mobile.replace(' ', '').replace('-', '')
+        if not re.match(mobile_pattern, clean_mobile):
+            raise HTTPException(status_code=400, detail="Invalid mobile number format")
+        
+        # Check if agent with same email already exists
+        existing_agent = db.query(Agent).filter(Agent.email == email).first()
+        if existing_agent:
+            raise HTTPException(status_code=409, detail="Agent with this email already exists")
+        
+        # Generate unique agent ID
+        def generate_agent_id():
+            """Generate unique agent ID in format AGT followed by 6 digits"""
+            while True:
+                # Generate 6-digit random number
+                agent_number = secrets.randbelow(900000) + 100000  # Ensures 6 digits
+                agent_id = f"AGT{agent_number}"
+                
+                # Check if ID already exists
+                existing = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+                if not existing:
+                    return agent_id
+        
+        # Generate secure password
+        def generate_password():
+            """Generate secure password with letters, numbers, and special characters"""
+            alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+            password = ''.join(secrets.choice(alphabet) for _ in range(12))
+            
+            # Ensure password has at least one letter, number, and special char
+            if (any(c.isalpha() for c in password) and 
+                any(c.isdigit() for c in password) and 
+                any(c in "!@#$%^&*" for c in password)):
+                return password
+            else:
+                return generate_password()  # Recursively generate until valid
+        
+        # Generate credentials
+        agent_id = generate_agent_id()
+        password = generate_password()
+        
+        # Parse date of birth
+        try:
+            dob_date = datetime.strptime(dob, '%Y-%m-%d').date()
+            dob_str = dob  # Keep as string for compatibility
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        
+        # Create new agent
+        new_agent = Agent(
+            agent_id=agent_id,
+            name=name.strip(),
+            email=email.strip().lower(),
+            mobile=clean_mobile,
+            dob=dob_str,  # Store as string
+            country=country.strip(),
+            gender=gender,
+            password=password,  # Store plain password for now
+            status="active",
+            created_at=datetime.now()
+        )
+        
+        # Save to database
+        db.add(new_agent)
+        db.commit()
+        db.refresh(new_agent)
+        
+        print(f"✅ New agent registered: {agent_id} - {name}")
+        
+        # Return success response with credentials
+        return {
+            "success": True,
+            "message": "Agent registered successfully!",
+            "agent_id": agent_id,
+            "password": password,
+            "agent_details": {
+                "name": name,
+                "email": email,
+                "mobile": clean_mobile,
+                "status": "active",
+                "created_at": new_agent.created_at.isoformat()
+            }
+        }
+        
+    except HTTPException:
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        raise
+    except Exception as e:
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        print(f"❌ Error registering agent: {e}")
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 @app.get("/agent")
 @limiter.limit("50/minute")
@@ -1925,4 +2107,5 @@ if __name__ == "__main__":
     print("=" * 60)
     # Railway requires binding to 0.0.0.0 and the PORT environment variable
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
