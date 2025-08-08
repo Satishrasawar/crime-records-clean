@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Setup & Debug Tool</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px 40px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.5em;
+        }
+        .content {
+            padding: 40px;
+        }
+        .section {
+            background: #f8f9fa;
+            margin-bottom: 30px;
+            padding: 30px;
+            border-radius: 10px;
+            border-left: 5px solid #667eea;
+        }
+        .section h2 {
+            color: #2c3e50;
+            margin-top: 0;
+            font-size: 1.8em;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px 10px 10px 0;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+            color: #212529;
+        }
+        .btn-info {
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+            color: white;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            margin: 15px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .status-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-card h4 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        .status-card .value {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        .status-good { border-left-color: #28a745; color: #28a745; }
+        .status-warning { border-left-color: #ffc107; color: #856404; }
+        .status-error { border-left-color: #dc3545; color: #dc3545; }
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .hidden { display: none; }
+        .credentials-box {
+            background: #e8f5e8;
+            border: 2px solid #4caf50;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .credentials-box h3 {
+            margin-top: 0;
+            color: #2e7d32;
+        }
+        .credential-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .copy-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .navigation-links {
+            background: #e9ecef;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .navigation-links h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .nav-link {
+            display: inline-block;
+            margin: 5px 10px;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        .nav-link:hover {
+            background: #0056b3;
+            color: white;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Admin Setup & Debug Tool</h1>
+            <p>Initialize and test admin credentials for the Client Records System</p>
+        </div>
+
+        <div class="content">
+            <!-- Navigation Links -->
+            <div class="navigation-links">
+                <h3>🚀 Quick Navigation</h3>
+                <a href="/admin.html" class="nav-link">📊 Main Admin Panel</a>
+                <a href="/agent.html" class="nav-link">👤 Agent Portal</a>
+                <a href="/health" class="nav-link" target="_blank">🏥 System Health</a>
+                <a href="/debug" class="nav-link" target="_blank">🔍 Debug Info</a>
+            </div>
+
+            <!-- System Status -->
+            <div class="section">
+                <h2>📊 System Status</h2>
+                <button class="btn btn-info" onclick="checkSystemStatus()">🔄 Refresh Status</button>
+                <div id="systemStatus" class="status-grid">
+                    <div class="status-card">
+                        <h4>System</h4>
+                        <div class="value" id="systemHealth">Checking...</div>
+                    </div>
+                    <div class="status-card">
+                        <h4>Database</h4>
+                        <div class="value" id="databaseStatus">Checking...</div>
+                    </div>
+                    <div class="status-card">
+                        <h4>Admin User</h4>
+                        <div class="value" id="adminStatus">Checking...</div>
+                    </div>
+                    <div class="status-card">
+                        <h4>Authentication</h4>
+                        <div class="value" id="authStatus">Checking...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Management -->
+            <div class="section">
+                <h2>👤 Admin User Management</h2>
+                <p>Create, check, and manage admin user credentials for the system.</p>
+                
+                <div style="margin: 20px 0;">
+                    <button class="btn btn-primary" onclick="checkAdminUser()" id="checkAdminBtn">
+                        🔍 Check Admin Status
+                    </button>
+                    <button class="btn btn-success" onclick="createAdminUser()" id="createAdminBtn">
+                        ➕ Create Admin User
+                    </button>
+                    <button class="btn btn-warning" onclick="resetAdminPassword()" id="resetPasswordBtn">
+                        🔄 Reset Password
+                    </button>
+                </div>
+
+                <div id="adminCredentials" class="credentials-box hidden">
+                    <h3>✅ Admin Credentials Ready!</h3>
+                    <div class="credential-item">
+                        <span><strong>Username:</strong> <span id="adminUsername">admin</span></span>
+                        <button class="copy-btn" onclick="copyToClipboard('admin')">📋 Copy</button>
+                    </div>
+                    <div class="credential-item">
+                        <span><strong>Password:</strong> <span id="adminPassword">admin123</span></span>
+                        <button class="copy-btn" onclick="copyToClipboard('admin123')">📋 Copy</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Login Testing -->
+            <div class="section">
+                <h2>🧪 Login Testing</h2>
+                <p>Test different login endpoints to ensure authentication is working properly.</p>
+                
+                <div class="form-group">
+                    <label for="testUsername">Test Username:</label>
+                    <input type="text" id="testUsername" value="admin" placeholder="Enter username">
+                </div>
+                
+                <div class="form-group">
+                    <label for="testPassword">Test Password:</label>
+                    <input type="password" id="testPassword" value="admin123" placeholder="Enter password">
+                </div>
+
+                <div style="margin: 20px 0;">
+                    <button class="btn btn-primary" onclick="testMainLogin()" id="testMainBtn">
+                        🔐 Test Main Login
+                    </button>
+                    <button class="btn btn-info" onclick="testSimpleLogin()" id="testSimpleBtn">
+                        🧪 Test Simple Login
+                    </button>
+                    <button class="btn btn-warning" onclick="testDebugLogin()" id="testDebugBtn">
+                        🐛 Test Debug Login
+                    </button>
+                </div>
+            </div>
+
+            <!-- API Testing -->
+            <div class="section">
+                <h2>🔌 API Endpoint Testing</h2>
+                <p>Test various API endpoints to ensure the backend is responding correctly.</p>
+                
+                <div style="margin: 20px 0;">
+                    <button class="btn btn-info" onclick="testHealthEndpoint()">
+                        🏥 Test Health Check
+                    </button>
+                    <button class="btn btn-info" onclick="testAdminStatusEndpoint()">
+                        📊 Test Admin Status
+                    </button>
+                    <button class="btn btn-info" onclick="testDebugEndpoint()">
+                        🔍 Test Debug Info
+                    </button>
+                    <button class="btn btn-success" onclick="testAllEndpoints()">
+                        🚀 Test All Endpoints
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results Display -->
+            <div class="section">
+                <h2>📋 Test Results</h2>
+                <div id="alertContainer"></div>
+                <div id="resultDisplay" class="code-block hidden"></div>
+                <button class="btn btn-danger" onclick="clearResults()" id="clearResultsBtn" style="margin-top: 10px;">
+                    🧹 Clear Results
+                </button>
+            </div>
+
+            <!-- Instructions -->
+            <div class="section">
+                <h2>📝 Setup Instructions</h2>
+                <div class="alert alert-info">
+                    <strong>🎯 Quick Setup Process:</strong><br>
+                    1. Click <strong>"Check Admin Status"</strong> to see if admin user exists<br>
+                    2. If no admin exists, click <strong>"Create Admin User"</strong><br>
+                    3. Test login with <strong>"Test Main Login"</strong><br>
+                    4. If successful, go to <strong><a href="/admin.html">Main Admin Panel</a></strong><br>
+                    5. Use credentials: <code>admin</code> / <code>admin123</code>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <strong>⚠️ Troubleshooting:</strong><br>
+                    • If tests fail, check the <strong>System Status</strong> section<br>
+                    • Try <strong>"Reset Password"</strong> if login issues persist<br>
+                    • Use <strong>"Test All Endpoints"</strong> to check API connectivity<br>
+                    • Check browser console for detailed error messages
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Admin Setup Tool initialized');
+            checkSystemStatus();
+        });
+
+        // Utility Functions
+        function showAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alertContainer.appendChild(alert);
+            
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.remove();
+                }
+            }, 5000);
+        }
+
+        function showResults(data, title = '') {
+            const resultDisplay = document.getElementById('resultDisplay');
+            resultDisplay.textContent = (title ? `${title}:\n\n` : '') + JSON.stringify(data, null, 2);
+            resultDisplay.classList.remove('hidden');
+        }
+
+        function clearResults() {
+            document.getElementById('resultDisplay').classList.add('hidden');
+            document.getElementById('alertContainer').innerHTML = '';
+        }
+
+        function updateStatus(elementId, status, className = '') {
+            const element = document.getElementById(elementId);
+            element.textContent = status;
+            element.className = `value ${className}`;
+        }
+
+        function setButtonLoading(buttonId, loading = true) {
+            const button = document.getElementById(buttonId);
+            if (loading) {
+                button.disabled = true;
+                button.innerHTML = '<div class="loading-spinner"></div>' + button.textContent.replace(/[🔍🧪🔐🚀➕🔄]/g, '');
+            } else {
+                button.disabled = false;
+                // Restore original text - this is a simple restore, you might want to store original text
+                location.reload(); // Quick fix - reload to restore buttons
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showAlert('Copied to clipboard!', 'success');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showAlert('Copied to clipboard!', 'success');
+            });
+        }
+
+        // Main Functions
+        async function checkSystemStatus() {
+            console.log('🔍 Checking system status...');
+            
+            // Check Health
+            try {
+                const healthResponse = await fetch(`${BASE_URL}/health`);
+                const healthData = await healthResponse.json();
+                
+                updateStatus('systemHealth', healthData.status || 'Unknown', 
+                    healthData.status === 'healthy' ? 'status-good' : 'status-warning');
+                updateStatus('databaseStatus', healthData.database || 'Unknown',
+                    healthData.database === 'connected' ? 'status-good' : 'status-error');
+            } catch (error) {
+                updateStatus('systemHealth', 'Error', 'status-error');
+                updateStatus('databaseStatus', 'Error', 'status-error');
+            }
+
+            // Check Admin User
+            try {
+                const adminResponse = await fetch(`${BASE_URL}/api/admin/check-admin`);
+                const adminData = await adminResponse.json();
+                
+                if (adminData.admin_exists) {
+                    updateStatus('adminStatus', 'Exists', 'status-good');
+                    document.getElementById('adminCredentials').classList.remove('hidden');
+                } else {
+                    updateStatus('adminStatus', 'Not Found', 'status-warning');
+                    document.getElementById('adminCredentials').classList.add('hidden');
+                }
+            } catch (error) {
+                updateStatus('adminStatus', 'Error', 'status-error');
+            }
+
+            // Test Authentication
+            try {
+                const authResponse = await fetch(`${BASE_URL}/api/admin/simple-login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password: 'admin123' })
+                });
+                const authData = await authResponse.json();
+                
+                updateStatus('authStatus', authData.success ? 'Working' : 'Failed',
+                    authData.success ? 'status-good' : 'status-error');
+            } catch (error) {
+                updateStatus('authStatus', 'Error', 'status-error');
+            }
+        }
+
+        async function checkAdminUser() {
+            setButtonLoading('checkAdminBtn');
+            try {
+                console.log('🔍 Checking admin user...');
+                const response = await fetch(`${BASE_URL}/api/admin/check-admin`);
+                const data = await response.json();
+                
+                showResults(data, 'Admin User Check');
+                
+                if (data.admin_exists) {
+                    showAlert('✅ Admin user found and ready!', 'success');
+                    document.getElementById('adminCredentials').classList.remove('hidden');
+                } else {
+                    showAlert('⚠️ No admin user found. Click "Create Admin User" to create one.', 'warning');
+                }
+            } catch (error) {
+                showAlert('❌ Error checking admin user: ' + error.message, 'error');
+                showResults({error: error.message}, 'Admin Check Error');
+            }
+            setButtonLoading('checkAdminBtn', false);
+        }
+
+        async function createAdminUser() {
+            setButtonLoading('createAdminBtn');
+            try {
+                console.log('➕ Creating admin user...');
+                const response = await fetch(`${BASE_URL}/api/admin/create-admin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                
+                showResults(data, 'Create Admin User');
+                
+                if (data.success) {
+                    showAlert('✅ Admin user created successfully!', 'success');
+                    document.getElementById('adminCredentials').classList.remove('hidden');
+                    // Refresh system status
+                    await checkSystemStatus();
+                } else {
+                    showAlert('⚠️ Admin user might already exist: ' + (data.message || 'Unknown error'), 'warning');
+                }
+            } catch (error) {
+                showAlert('❌ Error creating admin user: ' + error.message, 'error');
+                showResults({error: error.message}, 'Create Admin Error');
+            }
+            setButtonLoading('createAdminBtn', false);
+        }
+
+        async function resetAdminPassword() {
+            setButtonLoading('resetPasswordBtn');
+            try {
+                console.log('🔄 Resetting admin password...');
+                const response = await fetch(`${BASE_URL}/api/admin/reset-admin-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                
+                showResults(data, 'Reset Admin Password');
+                
+                if (data.success) {
+                    showAlert('✅ Admin password reset successfully!', 'success');
+                    document.getElementById('testUsername').value = 'admin';
+                    document.getElementById('testPassword').value = 'admin123';
+                    // Refresh system status
+                    await checkSystemStatus();
+                } else {
+                    showAlert('❌ Failed to reset password: ' + (data.message || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showAlert('❌ Error resetting password: ' + error.message, 'error');
+                showResults({error: error.message}, 'Reset Password Error');
+            }
+            setButtonLoading('resetPasswordBtn', false);
+        }
+
+        async function testMainLogin() {
+            setButtonLoading('testMainBtn');
+            try {
+                const username = document.getElementById('testUsername').value;
+                const password = document.getElementById('testPassword').value;
+                
+                console.log('🔐 Testing main login...');
+                const response = await fetch(`${BASE_URL}/api/admin/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
+                
+                showResults(data, 'Main Login Test');
+                
+                if (response.ok && data.success) {
+                    showAlert('✅ Main login successful!', 'success');
+                } else {
+                    showAlert('❌ Main login failed: ' + (data.detail || data.message || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showAlert('❌ Main login error: ' + error.message, 'error');
+                showResults({error: error.message}, 'Main Login Error');
+            }
+            setButtonLoading('testMainBtn', false);
+        }
+
+        async function testSimpleLogin() {
+            setButtonLoading('testSimpleBtn');
+            try {
+                const username = document.getElementById('testUsername').value;
+                const password = document.getElementById('testPassword').value;
+                
+                console.log('🧪 Testing simple login...');
+                const response = await fetch(`${BASE_URL}/api/admin/simple-login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
+                
+                showResults(data, 'Simple Login Test');
+                
+                if (data.success) {
+                    showAlert('✅ Simple login successful!', 'success');
+                } else {
+                    showAlert('❌ Simple login failed: ' + (data.message || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showAlert('❌ Simple login error: ' + error.message, 'error');
+                showResults({error: error.message}, 'Simple Login Error');
+            }
+            setButtonLoading('testSimpleBtn', false);
+        }
+
+        async function testDebugLogin() {
+            setButtonLoading('testDebugBtn');
+            try {
+                const username = document.getElementById('testUsername').value;
+                const password = document.getElementById('testPassword').value;
+                
+                console.log('🐛 Testing debug login...');
+                const response = await fetch(`${BASE_URL}/api/admin/test-login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
+                
+                showResults(data, 'Debug Login Test');
+                
+                if (data.success) {
+                    showAlert('✅ Debug login successful!', 'success');
+                } else {
+                    showAlert('❌ Debug login failed: ' + (data.message || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showAlert('❌ Debug login error: ' + error.message, 'error');
+                showResults({error: error.message}, 'Debug Login Error');
+            }
+            setButtonLoading('testDebugBtn', false);
+        }
+
+        async function testHealthEndpoint() {
+            try {
+                console.log('🏥 Testing health endpoint...');
+                const response = await fetch(`${BASE_URL}/health`);
+                const data = await response.json();
+                
+                showResults(data, 'Health Check');
+                showAlert('✅ Health endpoint working!', 'success');
+            } catch (error) {
+                showAlert('❌ Health endpoint error: ' + error.message, 'error');
+                showResults({error: error.message}, 'Health Check Error');
+            }
+        }
+
+        async function testAdminStatusEndpoint() {
+            try {
+                console.log('📊 Testing admin status endpoint...');
+                const response = await fetch(`${BASE_URL}/api/admin/status`);
+                const data = await response.json();
+                
+                showResults(data, 'Admin Status Check');
+                showAlert('✅ Admin status endpoint working!', 'success');
+            } catch (error) {
+                showAlert('❌ Admin status endpoint error: ' + error.message, 'error');
+                showResults({error: error.message}, 'Admin Status Error');
+            }
+        }
+
+        async function testDebugEndpoint() {
+            try {
+                console.log('🔍 Testing debug endpoint...');
+                const response = await fetch(`${BASE_URL}/debug`);
+                const data = await response.json();
+                
+                showResults(data, 'Debug Info');
+                showAlert('✅ Debug endpoint working!', 'success');
+            } catch (error) {
+                showAlert('❌ Debug endpoint error: ' + error.message, 'error');
+                showResults({error: error.message}, 'Debug Endpoint Error');
+            }
+        }
+
+        async function testAllEndpoints() {
+            showAlert('🚀 Testing all endpoints...', 'info');
+            clearResults();
+            
+            await testHealthEndpoint();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testAdminStatusEndpoint();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testDebugEndpoint();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await testSimpleLogin();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            await checkSystemStatus();
+            showAlert('✅ All endpoint tests completed!', 'success');
+        }
+
+        console.log('✅ Admin Setup Tool ready');
+        console.log('🔗 BASE_URL:', BASE_URL);
+    </script>
+</body>
+</html>
