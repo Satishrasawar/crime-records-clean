@@ -12,30 +12,51 @@ from datetime import datetime
 Base = declarative_base()
 
 class Agent(Base):
-    """Fixed Agent model - matches registration form exactly"""
     __tablename__ = "agents"
-    
-    # Primary key
+
+    # Primary fields
     id = Column(Integer, primary_key=True, index=True)
-    
-    # Required fields from registration form
-    agent_id = Column(String(50), unique=True, index=True, nullable=False)
-    name = Column(String(100), nullable=False)
-    email = Column(String(100), unique=True, index=True, nullable=False)
-    mobile = Column(String(20), nullable=False)
-    dob = Column(String(20), nullable=False)  # Store as string YYYY-MM-DD
-    country = Column(String(50), nullable=False)
-    gender = Column(String(20), nullable=False)
-    
-    # Authentication
+    agent_id = Column(String(10), unique=True, index=True, nullable=False)  # AGT123456
+    name = Column(String(255), nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    mobile = Column(String(20), unique=True, index=True, nullable=False)
     password = Column(String(255), nullable=False)  # Plain text for now
-    hashed_password = Column(String(255), nullable=True)  # For future upgrade
+    status = Column(String(20), default="active", nullable=False)  # active, inactive, pending, suspended
     
-    # Status and metadata
-    status = Column(String(20), default="active", nullable=False)
+    # Optional demographic fields (for compatibility with admin form)
+    dob = Column(Date, nullable=True)  # Date of birth
+    country = Column(String(100), nullable=True)
+    gender = Column(String(10), nullable=True)  # Male, Female, Other
+    
+    # Timestamp fields
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Additional tracking fields
+    last_login = Column(DateTime, nullable=True)
+    login_count = Column(Integer, default=0)
+    
+    def __repr__(self):
+        return f"<Agent(agent_id='{self.agent_id}', name='{self.name}', email='{self.email}')>"
 
+# Database migration script if you need to update existing database
+"""
+-- SQL to add missing columns to existing agents table:
+
+ALTER TABLE agents ADD COLUMN mobile VARCHAR(20);
+ALTER TABLE agents ADD COLUMN dob DATE;
+ALTER TABLE agents ADD COLUMN country VARCHAR(100);
+ALTER TABLE agents ADD COLUMN gender VARCHAR(10);
+ALTER TABLE agents ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+ALTER TABLE agents ADD COLUMN last_login TIMESTAMP NULL;
+ALTER TABLE agents ADD COLUMN login_count INTEGER DEFAULT 0;
+
+-- Add unique constraint on mobile (if not exists)
+ALTER TABLE agents ADD CONSTRAINT unique_mobile UNIQUE (mobile);
+
+-- Update existing records with default mobile numbers if needed
+UPDATE agents SET mobile = CONCAT('+1234567', LPAD(id, 3, '0')) WHERE mobile IS NULL;
+"""
 class Admin(Base):
     """Admin model for admin login"""
     __tablename__ = "admins"
@@ -605,3 +626,4 @@ async def login_agent(
             status_code=500,
             detail="Login failed due to a system error. Please try again."
         )
+
