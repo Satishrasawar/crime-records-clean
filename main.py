@@ -633,7 +633,7 @@ async def admin_register_agent(
 ):
     """Admin version of agent registration - same functionality as main endpoint"""
     return await register_new_agent(request, name, email, mobile, dob, country, gender, db)
-    # main.py - Part 4: Test Endpoints and Status Checks
+    # main.py - Part 4: FIXED Test Endpoints and Login (Rate Limiting Fix)
 
 # ===================== TEST AND STATUS ENDPOINTS =====================
 
@@ -729,16 +729,17 @@ async def check_registration_status(request: Request, db=Depends(db_dependency))
             "timestamp": datetime.now().isoformat()
         }
 
-# ===================== AGENT LOGIN ENDPOINT =====================
+# ===================== FIXED AGENT LOGIN ENDPOINT =====================
 
 @app.post("/api/agents/login")
 @limiter.limit("20/minute")
 async def login_agent(
+    request: Request,  # ← FIXED: Added request parameter for rate limiting
     agent_id: str = Form(...),
     password: str = Form(...),
     db=Depends(db_dependency)
 ):
-    """Fixed agent login endpoint"""
+    """Fixed agent login endpoint with proper rate limiting"""
     print(f"🔑 Login attempt for agent: {agent_id}")
     
     try:
@@ -829,6 +830,115 @@ async def login_agent(
     except HTTPException:
         raise
     except Exception as login_error:
+        print(f"❌ Login error: {login_error}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail="Login failed due to a system error. Please try again."
+        )
+
+# ===================== SIMPLE ENDPOINTS WITHOUT RATE LIMITING =====================
+# These endpoints work without request parameter for compatibility
+
+@app.post("/api/agents/login-simple")
+async def login_agent_simple(
+    agent_id: str = Form(...),
+    password: str = Form(...),
+    db=Depends(db_dependency)
+):
+    """Simple agent login without rate limiting (fallback)"""
+    print(f"🔑 Simple login attempt for agent: {agent_id}")
+    
+    try:
+        if not database_ready:
+            return {"success": False, "message": "Database not ready"}
+        
+        # Find agent
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id.strip()).first()
+        if not agent:
+            return {"success": False, "message": "Invalid credentials"}
+        
+        # Check password
+        if agent.password != password:
+            return {"success": False, "message": "Invalid credentials"}
+        
+        # Check if agent is active
+        if agent.status != "active":
+            return {"success": False, "message": "Account not active"}
+        
+        return {
+            "success": True,
+            "message": "Login successful",
+            "agent_id": agent.agent_id,
+            "name": agent.name,
+            "email": agent.email,
+            "status": agent.status
+        }
+        
+    except Exception as e:
+        print(f"❌ Simple login error: {e}")
+        return {"success": False, "message": "Login error occurred"}
+
+# ===================== COMPATIBILITY ENDPOINTS =====================
+
+@app.post("/api/agents/register-simple")
+async def register_agent_simple(
+    name: str = Form(...),
+    email: str = Form(...),
+    mobile: str = Form(...),
+    dob: str = Form(...),
+    country: str = Form(...),
+    gender: str = Form(...),
+    db=Depends(db_dependency)
+):
+    """Simple registration without rate limiting (fallback)"""
+    try:
+        if not database_ready:
+            return {"success": False, "message": "Database not ready"}
+        
+        # Basic validation
+        if not all([name.strip(), email.strip(), mobile.strip(), dob, country.strip(), gender]):
+            return {"success": False, "message": "All fields are required"}
+        
+        # Check for existing email
+        existing_agent = db.query(Agent).filter(Agent.email == email.strip().lower()).first()
+        if existing_agent:
+            return {"success": False, "message": "Email already registered"}
+        
+        # Generate credentials
+        agent_id = generate_unique_agent_id(db)
+        password = generate_secure_password()
+        
+        # Create agent
+        new_agent = Agent(
+            agent_id=agent_id,
+            name=name.strip(),
+            email=email.strip().lower(),
+            mobile=mobile.strip(),
+            dob=dob,
+            country=country.strip(),
+            gender=gender,
+            password=password,
+            status="active",
+            created_at=datetime.utcnow()
+        )
+        
+        db.add(new_agent)
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Agent registered successfully!",
+            "agent_id": agent_id,
+            "password": password
+        }
+        
+    except Exception as e:
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        print(f"❌ Simple registration error: {e}")
+        return {"success": False, "message": f"Registration failed: {str(e)}"}
         # main.py - Part 5: Admin Endpoints and Statistics
 
         print(f"❌ Login error: {login_error}")
@@ -1389,4 +1499,3 @@ if __name__ == "__main__":
     print(f"- Registration Test: http://localhost:{port}/api/test/register-agent")
     print("=" * 60)
     uvicorn.run(app, host="0.0.0.0", port=port)
-    
