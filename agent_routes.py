@@ -1,4 +1,4 @@
-# agent_routes.py - Part 1: Imports and Setup
+# agent_routes.py - Part 1: Imports, Setup & Utility Functions
 from fastapi import APIRouter, Form, Depends, HTTPException, UploadFile, File, Request, Security
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordBearer
@@ -19,6 +19,7 @@ from typing import Optional
 import jwt
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
+import re
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -39,8 +40,20 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
 def generate_agent_credentials():
     """Generate unique agent ID and secure password"""
     agent_id = "AGT" + "".join(secrets.choice(string.digits) for _ in range(6))
-    password = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(8))
+    password = "".join(secrets.choice(string.ascii_letters + string.digits + "!@#$%") for _ in range(10))
     return agent_id, password
+
+def validate_email(email: str) -> bool:
+    """Validate email format"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def validate_mobile(mobile: str) -> bool:
+    """Validate mobile number format"""
+    # Remove spaces, dashes, and parentheses
+    clean_mobile = re.sub(r'[\s\-\(\)]', '', mobile)
+    # Check if it's 10-15 digits
+    return re.match(r'^\+?[1-9]\d{9,14}$', clean_mobile) is not None
 
 def get_agent_image_files(agent_id: str):
     """Get all image files assigned to a specific agent"""
@@ -53,7 +66,181 @@ def get_agent_image_files(agent_id: str):
         return []
     
     return sorted([f for f in os.listdir(agent_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
-    # agent_routes.py - Part 2: Admin Login Functions
+    # agent_routes.py - Part 2: Agent Registration Endpoints
+
+# ===================== AGENT REGISTRATION ENDPOINTS =====================
+
+@router.post("/api/agents/register")
+@limiter.limit("3/minute")
+async def register_agent(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    mobile: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Register a new agent"""
+    try:
+        print(f"🆕 Agent registration attempt: {name}, {email}")
+        
+        # Validate input data
+        if not name or len(name.strip()) < 2:
+            raise HTTPException(status_code=400, detail="Name must be at least 2 characters long")
+        
+        if not validate_email(email):
+            raise HTTPException(status_code=400, detail="Invalid email format")
+        
+        if not validate_mobile(mobile):
+            raise HTTPException(status_code=400, detail="Invalid mobile number format. Use 10-15 digits")
+        
+        # Clean inputs
+        name = name.strip()
+        email = email.strip().lower()
+        mobile = re.sub(r'[\s\-\(\)]', '', mobile)
+        
+        # Check if agent already exists
+        existing_agent = db.query(Agent).filter(
+            (Agent.email == email) | (Agent.mobile == mobile)
+        ).first()
+        
+        if existing_agent:
+            if existing_agent.email == email:
+                raise HTTPException(status_code=400, detail="Email already registered")
+            else:
+                raise HTTPException(status_code=400, detail="Mobile number already registered")
+        
+        # Generate unique agent credentials
+        max_attempts = 10
+        agent_id = None
+        password = None
+        
+        for attempt in range(max_attempts):
+            temp_agent_id, temp_password = generate_agent_credentials()
+            # Check if agent_id is unique
+            existing_id = db.query(Agent).filter(Agent.agent_id == temp_agent_id).first()
+            if not existing_id:
+                agent_id = temp_agent_id
+                password = temp_password
+                break
+        
+        if not agent_id:
+            raise HTTPException(status_code=500, detail="Failed to generate unique agent ID")
+        
+        # Create new agent
+        new_agent = Agent(
+            agent_id=agent_id,
+            name=name,
+            email=email,
+            mobile=mobile,
+            password=password,  # Store plain password for now (can be hashed later)
+            status="pending",  # Start as pending, admin can activate
+            created_at=datetime.utcnow()
+        )
+        
+        db.add(new_agent)
+        db.commit()
+        db.refresh(new_agent)
+        
+        print(f"✅ Agent registered successfully: {agent_id}")
+        
+        return {
+            "success": True,
+            "message": "Registration successful! Please save your credentials.",
+            "agent_id": agent_id,
+            "password": password,
+            "name": name,
+            "email": email,
+            "mobile": mobile,
+            "status": "pending",
+            "instructions": [
+                "Save your Agent ID and Password securely",
+                "Your account is pending approval",
+                "Contact admin to activate your account",
+                "Use these credentials to log in once activated"
+            ]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Registration error: {e}")
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+@router.post("/api/agents/check-availability")
+@limiter.limit("10/minute")
+async def check_availability(
+    request: Request,
+    email: str = Form(None),
+    mobile: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    """Check if email or mobile is available for registration"""
+    try:
+        result = {"available": True, "message": "Available"}
+        
+        if email:
+            email = email.strip().lower()
+            if not validate_email(email):
+                return {"available": False, "message": "Invalid email format"}
+            
+            existing_email = db.query(Agent).filter(Agent.email == email).first()
+            if existing_email:
+                return {"available": False, "message": "Email already registered"}
+        
+        if mobile:
+            mobile = re.sub(r'[\s\-\(\)]', '', mobile)
+            if not validate_mobile(mobile):
+                return {"available": False, "message": "Invalid mobile format"}
+            
+            existing_mobile = db.query(Agent).filter(Agent.mobile == mobile).first()
+            if existing_mobile:
+                return {"available": False, "message": "Mobile number already registered"}
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Availability check error: {e}")
+        return {"available": False, "message": "Check failed"}
+
+@router.get("/api/agents/test-registration")
+@limiter.limit("5/minute")
+async def test_registration_system(request: Request, db: Session = Depends(get_db)):
+    """Test the registration system"""
+    try:
+        # Test database connectivity
+        agent_count = db.query(Agent).count()
+        
+        # Test credential generation
+        test_agent_id, test_password = generate_agent_credentials()
+        
+        return {
+            "system_status": "healthy",
+            "database_connected": True,
+            "current_agent_count": agent_count,
+            "sample_credentials": {
+                "agent_id": test_agent_id,
+                "password": test_password
+            },
+            "registration_endpoint": "/api/agents/register",
+            "required_fields": ["name", "email", "mobile"],
+            "validation_rules": {
+                "name": "Minimum 2 characters",
+                "email": "Valid email format",
+                "mobile": "10-15 digits, international format supported"
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "system_status": "error",
+            "error": str(e),
+            "database_connected": False
+        }
+        # agent_routes.py - Part 3: Admin Login & Authentication
 
 # ===================== ADMIN LOGIN ENDPOINTS =====================
 
@@ -153,7 +340,6 @@ async def admin_login(request: Request, db: Session = Depends(get_db)):
         if not password_valid:
             print(f"❌ Invalid password for admin {username}")
             raise HTTPException(status_code=401, detail="Invalid credentials")
-            # agent_routes.py - Part 3: Admin Management and Auth Endpoints
 
         # Create access token
         try:
@@ -401,66 +587,114 @@ async def debug_check_admin(request: Request, db: Session = Depends(get_db)):
         import traceback
         traceback.print_exc()
         return {"error": str(e)}
-        # agent_routes.py - Part 4: Agent Management Functions
+        # agent_routes.py - Part 4: Agent Management & Enhanced Functions
 
 # ===================== AGENT MANAGEMENT ENDPOINTS =====================
 
 @router.get("/api/agents")
 def get_all_agents(db: Session = Depends(get_db)):
-    """Get all agents with their statistics"""
-    agents = db.query(Agent).all()
-    result = []
-    
-    for agent in agents:
-        # Get task completion count
-        completed_count = db.query(SubmittedForm).filter(SubmittedForm.agent_id == agent.agent_id).count()
+    """Get all agents with enhanced statistics"""
+    try:
+        agents = db.query(Agent).order_by(Agent.created_at.desc()).all()
+        result = []
         
-        # Get login/logout times with proper error handling
-        try:
-            login_sessions = db.query(AgentSession).filter(
-                AgentSession.agent_id == agent.agent_id
-            ).order_by(AgentSession.login_time.desc()).limit(5).all()
-        except Exception as e:
-            print(f"Error querying sessions for agent {agent.agent_id}: {e}")
-            login_sessions = []
-        
-        last_login = None
-        last_logout = None
-        current_session = None
-        
-        if login_sessions:
-            # Find current active session
-            current_session = next((s for s in login_sessions if s.logout_time is None), None)
-            last_login = login_sessions[0].login_time.strftime('%Y-%m-%d %H:%M:%S') if login_sessions[0].login_time else None
+        for agent in agents:
+            # Get task completion count
+            completed_count = db.query(SubmittedForm).filter(SubmittedForm.agent_id == agent.agent_id).count()
             
-            # Find last completed session
-            completed_sessions = [s for s in login_sessions if s.logout_time is not None]
-            if completed_sessions:
-                last_logout = completed_sessions[0].logout_time.strftime('%Y-%m-%d %H:%M:%S')
+            # Get total assigned tasks
+            assigned_images = get_agent_image_files(agent.agent_id)
+            total_tasks = len(assigned_images)
+            
+            # Get session information with proper error handling
+            try:
+                sessions = db.query(AgentSession).filter(
+                    AgentSession.agent_id == agent.agent_id
+                ).order_by(AgentSession.login_time.desc()).limit(5).all()
+                
+                current_session = next((s for s in sessions if s.logout_time is None), None)
+                last_login = sessions[0].login_time if sessions else None
+                
+                completed_sessions = [s for s in sessions if s.logout_time is not None]
+                last_logout = completed_sessions[0].logout_time if completed_sessions else None
+                
+            except Exception as session_error:
+                print(f"Session query error for {agent.agent_id}: {session_error}")
+                current_session = None
+                last_login = None
+                last_logout = None
+                sessions = []
+            
+            # Calculate progress
+            progress_percentage = (completed_count / total_tasks * 100) if total_tasks > 0 else 0
+            
+            result.append({
+                "id": agent.id,
+                "agent_id": agent.agent_id,
+                "name": agent.name,
+                "email": agent.email,
+                "mobile": get_agent_mobile_safe(agent),  # Handle missing mobile field safely
+                "password": agent.password,
+                "status": agent.status,
+                "tasks_completed": completed_count,
+                "total_tasks": total_tasks,
+                "progress_percentage": round(progress_percentage, 2),
+                "created_at": agent.created_at.isoformat() if agent.created_at else None,
+                "last_login": last_login.strftime('%Y-%m-%d %H:%M:%S') if last_login else None,
+                "last_logout": last_logout.strftime('%Y-%m-%d %H:%M:%S') if last_logout else None,
+                "is_currently_logged_in": current_session is not None,
+                "recent_sessions": [
+                    {
+                        "login_time": s.login_time.strftime('%Y-%m-%d %H:%M:%S') if s.login_time else None,
+                        "logout_time": s.logout_time.strftime('%Y-%m-%d %H:%M:%S') if s.logout_time else None,
+                        "duration_minutes": s.duration_minutes
+                    } for s in sessions
+                ]
+            })
         
-        result.append({
-            "id": agent.id,
-            "agent_id": agent.agent_id,
-            "name": agent.name,
-            "email": agent.email,
-            "password": agent.password,  # Show plain password for admin
-            "status": agent.status,
-            "tasks_completed": completed_count,
-            "created_at": agent.created_at.isoformat() if agent.created_at else None,
-            "last_login": last_login,
-            "last_logout": last_logout,
-            "current_session_duration": None,  # We'll calculate this in frontend
-            "is_currently_logged_in": current_session is not None,
-            "recent_sessions": [
-                {
-                    "login_time": s.login_time.strftime('%Y-%m-%d %H:%M:%S') if s.login_time else None,
-                    "logout_time": s.logout_time.strftime('%Y-%m-%d %H:%M:%S') if s.logout_time else None,
-                    "duration_minutes": s.duration_minutes
-                } for s in login_sessions
-            ]
-        })
-    
-    return result
+        return {"success": True, "agents": result, "total_count": len(result)}
+        
+    except Exception as e:
+        print(f"❌ Error getting agents: {e}")
+        # Return the agents list format for compatibility
+        agents = db.query(Agent).all()
+        result = []
+        
+        for agent in agents:
+            completed_count = db.query(SubmittedForm).filter(SubmittedForm.agent_id == agent.agent_id).count()
+            result.append({
+                "id": agent.id,
+                "agent_id": agent.agent_id,
+                "name": agent.name,
+                "email": agent.email,
+                "password": agent.password,
+                "status": agent.status,
+                "tasks_completed": completed_count,
+                "created_at": agent.created_at.isoformat() if agent.created_at else None,
+                "last_login": None,
+                "last_logout": None,
+                "current_session_duration": None,
+                "is_currently_logged_in": False,
+                "recent_sessions": []
+            })
+        
+        return result
+
+@router.post("/api/admin/create-agent")
+@limiter.limit("10/minute")
+async def admin_create_agent(
+    request: Request,
+    name: str = Form(...),
+    email: str = Form(...),
+    mobile: str = Form(...),
+    status: str = Form("active"),
+    db: Session = Depends(get_db)
+):
+    """Admin endpoint to create agent with custom status"""
+    try:
+        # Validate inputs
+        if not validate_email(email):
+            raise HTTPException(status_code=500, detail=f"Failed to create agent: {str(e)}")
 
 @router.get("/api/admin/agent-password/{agent_id}")
 def get_agent_password(agent_id: str, db: Session = Depends(get_db)):
@@ -497,16 +731,60 @@ def reset_agent_password(agent_id: str, db: Session = Depends(get_db)):
     }
 
 @router.patch("/api/agents/{agent_id}/status")
-def update_agent_status(agent_id: str, status_data: AgentStatusUpdateSchema, db: Session = Depends(get_db)):
-    """Update agent status"""
-    # Find by agent_id string, not integer id
-    agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-    if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
-    
-    agent.status = status_data.status
-    db.commit()
-    return {"message": "Agent status updated successfully"}
+@limiter.limit("20/minute")
+async def update_agent_status(
+    agent_id: str, 
+    status_data: AgentStatusUpdateSchema, 
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Update agent status with enhanced validation"""
+    try:
+        # Find by agent_id string, not integer id
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        
+        valid_statuses = ["active", "inactive", "pending", "suspended"]
+        if status_data.status not in valid_statuses:
+            raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+        
+        old_status = agent.status
+        agent.status = status_data.status
+        
+        # If deactivating, logout any active sessions
+        if status_data.status in ["inactive", "suspended"]:
+            try:
+                active_sessions = db.query(AgentSession).filter(
+                    AgentSession.agent_id == agent_id,
+                    AgentSession.logout_time.is_(None)
+                ).all()
+                
+                for session in active_sessions:
+                    session.logout_time = datetime.utcnow()
+                    if session.login_time:
+                        duration = (session.logout_time - session.login_time).total_seconds() / 60
+                        session.duration_minutes = round(duration, 2)
+            except Exception as session_error:
+                print(f"⚠️ Session cleanup error: {session_error}")
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Agent status updated from {old_status} to {status_data.status}",
+            "agent_id": agent_id,
+            "old_status": old_status,
+            "new_status": status_data.status
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Status update error: {e}")
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update status: {str(e)}")
 
 @router.delete("/api/agents/{agent_id}")
 def delete_agent(agent_id: int, db: Session = Depends(get_db)):
@@ -517,84 +795,178 @@ def delete_agent(agent_id: int, db: Session = Depends(get_db)):
     
     db.delete(agent)
     db.commit()
-    return {"message": "Agent deleted successfully"}
+    return {"message": "Agent deleted successfully"} HTTPException(status_code=400, detail="Invalid email format")
+        
+        if not validate_mobile(mobile):
+            raise HTTPException(status_code=400, detail="Invalid mobile format")
+        
+        if status not in ["active", "inactive", "pending"]:
+            status = "active"
+        
+        # Check duplicates
+        existing = db.query(Agent).filter(
+            (Agent.email == email.lower()) | (Agent.mobile == mobile)
+        ).first()
+        
+        if existing:
+            raise HTTPException(status_code=400, detail="Email or mobile already exists")
+        
+        # Generate credentials
+        agent_id, password = generate_agent_credentials()
+        
+        # Ensure unique agent_id
+        while db.query(Agent).filter(Agent.agent_id == agent_id).first():
+            agent_id, password = generate_agent_credentials()
+        
+        new_agent = Agent(
+            agent_id=agent_id,
+            name=name.strip(),
+            email=email.strip().lower(),
+            mobile=mobile.strip(),
+            password=password,
+            status=status,
+            created_at=datetime.utcnow()
+        )
+        
+        db.add(new_agent)
+        db.commit()
+        db.refresh(new_agent)
+        
+        return {
+            "success": True,
+            "message": "Agent created successfully",
+            "agent_id": agent_id,
+            "password": password,
+            "name": name,
+            "email": email,
+            "mobile": mobile,
+            "status": status
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Admin create agent error: {e}")
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        raise
+# agent_routes.py - Part 5: Agent Login & Session Management
 
 # ===================== AGENT LOGIN AND SESSION MANAGEMENT =====================
 
 @router.post("/api/agents/login")
+@limiter.limit("5/minute")
 async def login_agent(
+    request: Request,
     agent_id: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """FIXED: Login agent using consistent password system"""
-    print(f"🔑 Login attempt for agent: {agent_id}")
-    
-    agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-    if not agent:
-        print(f"❌ Agent not found: {agent_id}")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    # Use plain password comparison (since we store plain passwords now)
-    if agent.password != password:
-        print(f"❌ Invalid password for {agent_id}")
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    if agent.status != "active":
-        print(f"❌ Agent {agent_id} is not active: {agent.status}")
-        raise HTTPException(status_code=403, detail="Agent account is not active")
-    
+    """Enhanced agent login with better error handling"""
     try:
-        # End any existing active sessions for this agent
-        active_sessions = db.query(AgentSession).filter(
-            AgentSession.agent_id == agent_id,
-            AgentSession.logout_time.is_(None)
-        ).all()
+        print(f"🔑 Login attempt for agent: {agent_id}")
         
-        for session in active_sessions:
-            session.logout_time = datetime.utcnow()
-            duration = (session.logout_time - session.login_time).total_seconds() / 60
-            session.duration_minutes = round(duration, 2)
+        # Validate inputs
+        if not agent_id or not agent_id.strip():
+            raise HTTPException(status_code=400, detail="Agent ID is required")
         
-        # Create new session
-        new_session = AgentSession(
-            agent_id=agent_id,
-            login_time=datetime.utcnow(),
-            ip_address="127.0.0.1",  # Should get real IP in production
-            user_agent="Web Browser"  # Should get real UA in production
-        )
+        if not password or not password.strip():
+            raise HTTPException(status_code=400, detail="Password is required")
         
-        db.add(new_session)
-        db.commit()
+        agent_id = agent_id.strip()
+        password = password.strip()
+        
+        # Find agent
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not agent:
+            print(f"❌ Agent not found: {agent_id}")
+            raise HTTPException(status_code=401, detail="Invalid agent ID or password")
+        
+        # Check password (handle both plain and hashed)
+        password_valid = False
+        try:
+            if agent.password.startswith('$2b$') or agent.password.startswith('$2a$'):
+                # Hashed password
+                password_valid = verify_password(password, agent.password)
+            else:
+                # Plain password
+                password_valid = (agent.password == password)
+        except Exception as pwd_error:
+            print(f"❌ Password verification error: {pwd_error}")
+            password_valid = (agent.password == password)  # Fallback to plain comparison
+        
+        if not password_valid:
+            print(f"❌ Invalid password for {agent_id}")
+            raise HTTPException(status_code=401, detail="Invalid agent ID or password")
+        
+        # Check agent status
+        if agent.status == "inactive":
+            raise HTTPException(status_code=403, detail="Account is inactive. Contact administrator.")
+        elif agent.status == "pending":
+            raise HTTPException(status_code=403, detail="Account is pending approval. Contact administrator.")
+        elif agent.status == "suspended":
+            raise HTTPException(status_code=403, detail="Account is suspended. Contact administrator.")
+        elif agent.status != "active":
+            raise HTTPException(status_code=403, detail=f"Account status: {agent.status}. Contact administrator.")
+        
+        # Handle sessions
+        try:
+            # End any existing active sessions for this agent
+            active_sessions = db.query(AgentSession).filter(
+                AgentSession.agent_id == agent_id,
+                AgentSession.logout_time.is_(None)
+            ).all()
+            
+            for session in active_sessions:
+                session.logout_time = datetime.utcnow()
+                if session.login_time:
+                    duration = (session.logout_time - session.login_time).total_seconds() / 60
+                    session.duration_minutes = round(duration, 2)
+            
+            # Create new session
+            new_session = AgentSession(
+                agent_id=agent_id,
+                login_time=datetime.utcnow(),
+                ip_address=request.client.host if hasattr(request, 'client') and hasattr(request.client, 'host') else "127.0.0.1",
+                user_agent=request.headers.get("user-agent", "Unknown")
+            )
+            
+            db.add(new_session)
+            db.commit()
+            
+        except Exception as session_error:
+            print(f"⚠️ Session creation error: {session_error}")
+            # Continue with login even if session tracking fails
         
         print(f"✅ Login successful for {agent_id}")
         
         return {
             "success": True,
-            "message": "Login successful", 
-            "agent_id": agent.agent_id, 
+            "message": "Login successful",
+            "agent_id": agent.agent_id,
             "name": agent.name,
             "email": agent.email,
-            "status": agent.status
+            "mobile": getattr(agent, 'mobile', 'N/A'),
+            "status": agent.status,
+            "login_time": datetime.utcnow().isoformat()
         }
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"❌ Session creation error: {e}")
-        return {
-            "success": True,
-            "message": "Login successful", 
-            "agent_id": agent.agent_id, 
-            "name": agent.name,
-            "session_warning": "Session tracking unavailable"
-        }
+        print(f"❌ Login error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Login failed due to server error")
 
 @router.post("/api/agents/{agent_id}/logout")
-async def logout_agent(agent_id: str, db: Session = Depends(get_db)):
-    """Logout an agent"""
-    agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-    if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
-    
+async def logout_agent(agent_id: str, request: Request, db: Session = Depends(get_db)):
+    """Enhanced logout with better error handling"""
     try:
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        
         active_session = db.query(AgentSession).filter(
             AgentSession.agent_id == agent_id,
             AgentSession.logout_time.is_(None)
@@ -602,18 +974,36 @@ async def logout_agent(agent_id: str, db: Session = Depends(get_db)):
         
         if active_session:
             active_session.logout_time = datetime.utcnow()
-            duration = (active_session.logout_time - active_session.login_time).total_seconds() / 60
-            active_session.duration_minutes = round(duration, 2)
+            if active_session.login_time:
+                duration = (active_session.logout_time - active_session.login_time).total_seconds() / 60
+                active_session.duration_minutes = round(duration, 2)
+                session_duration = f"{active_session.duration_minutes} minutes"
+            else:
+                session_duration = "Unknown duration"
+            
             db.commit()
             
             return {
+                "success": True,
                 "message": "Logout successful",
-                "session_duration": f"{active_session.duration_minutes} minutes"
+                "agent_id": agent_id,
+                "session_duration": session_duration,
+                "logout_time": active_session.logout_time.isoformat()
             }
+        else:
+            return {
+                "success": True,
+                "message": "Agent was not logged in",
+                "agent_id": agent_id
+            }
+            
     except Exception as e:
-        print(f"Logout session error: {e}")
-    
-    return {"message": "Logout successful"}
+        print(f"❌ Logout error: {e}")
+        return {
+            "success": True,
+            "message": "Logout completed (with errors)",
+            "error": str(e)
+        }
 
 @router.post("/api/admin/force-logout/{agent_id}")
 async def force_logout_agent(agent_id: str, db: Session = Depends(get_db)):
@@ -642,7 +1032,7 @@ async def force_logout_agent(agent_id: str, db: Session = Depends(get_db)):
         print(f"Force logout error: {e}")
     
     return {"message": "Agent was not logged in"}
-    # agent_routes.py - Part 5: Task Management and Statistics
+    # agent_routes.py - Part 6: Task Management & Operations
 
 # ===================== TASK MANAGEMENT =====================
 
@@ -804,24 +1194,54 @@ async def submit_task_data(
 @router.get("/api/admin/statistics")
 def get_admin_statistics(db: Session = Depends(get_db)):
     """Get admin dashboard statistics"""
-    total_agents = db.query(Agent).count()
-    active_agents = db.query(Agent).filter(Agent.status == "active").count()
-    total_submissions = db.query(SubmittedForm).count()
-    
-    total_tasks = 0
-    for agent in db.query(Agent).all():
-        agent_images = get_agent_image_files(agent.agent_id)
-        total_tasks += len(agent_images)
-    
-    pending_tasks = max(0, total_tasks - total_submissions)
-    
-    return {
-        "total_agents": total_agents,
-        "active_agents": active_agents,
-        "total_tasks": total_tasks,
-        "completed_tasks": total_submissions,
-        "pending_tasks": pending_tasks
-    }
+    try:
+        total_agents = db.query(Agent).count()
+        active_agents = db.query(Agent).filter(Agent.status == "active").count()
+        total_submissions = db.query(SubmittedForm).count()
+        
+        # Calculate total tasks across all agents
+        total_tasks = 0
+        for agent in db.query(Agent).all():
+            agent_images = get_agent_image_files(agent.agent_id)
+            total_tasks += len(agent_images)
+        
+        pending_tasks = max(0, total_tasks - total_submissions)
+        
+        # Get recent activity
+        recent_submissions = db.query(SubmittedForm).order_by(
+            SubmittedForm.submitted_at.desc()
+        ).limit(5).all()
+        
+        recent_logins = db.query(AgentSession).filter(
+            AgentSession.login_time >= datetime.utcnow() - timedelta(hours=24)
+        ).count()
+        
+        return {
+            "total_agents": total_agents,
+            "active_agents": active_agents,
+            "total_tasks": total_tasks,
+            "completed_tasks": total_submissions,
+            "pending_tasks": pending_tasks,
+            "recent_logins_24h": recent_logins,
+            "recent_submissions": [
+                {
+                    "agent_id": sub.agent_id,
+                    "submitted_at": sub.submitted_at.isoformat(),
+                    "id": sub.id
+                } for sub in recent_submissions
+            ],
+            "completion_rate": round((total_submissions / total_tasks * 100), 2) if total_tasks > 0 else 0
+        }
+    except Exception as e:
+        print(f"❌ Error getting statistics: {e}")
+        return {
+            "total_agents": 0,
+            "active_agents": 0,
+            "total_tasks": 0,
+            "completed_tasks": 0,
+            "pending_tasks": 0,
+            "error": str(e)
+        }
 
 @router.get("/api/admin/session-report")
 async def get_session_report(
@@ -838,10 +1258,19 @@ async def get_session_report(
             query = query.filter(AgentSession.agent_id == agent_id)
         
         if date_from:
-            query = query.filter(AgentSession.login_time >= datetime.strptime(date_from, '%Y-%m-%d'))
+            try:
+                from_date = datetime.strptime(date_from, '%Y-%m-%d')
+                query = query.filter(AgentSession.login_time >= from_date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date_from format. Use YYYY-MM-DD")
         
         if date_to:
-            query = query.filter(AgentSession.login_time <= datetime.strptime(date_to, '%Y-%m-%d'))
+            try:
+                to_date = datetime.strptime(date_to, '%Y-%m-%d')
+                to_date = to_date.replace(hour=23, minute=59, second=59)
+                query = query.filter(AgentSession.login_time <= to_date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date_to format. Use YYYY-MM-DD")
         
         sessions = query.order_by(AgentSession.login_time.desc()).all()
         
@@ -855,8 +1284,8 @@ async def get_session_report(
                 "login_time": session.login_time.isoformat() if session.login_time else None,
                 "logout_time": session.logout_time.isoformat() if session.logout_time else None,
                 "duration_minutes": session.duration_minutes,
-            # agent_routes.py - Part 6: Data Export and Final Functions
-
+                "ip_address": getattr(session, 'ip_address', 'N/A'),
+                "user_agent": getattr(session, 'user_agent', 'N/A'),
                 "is_active": session.logout_time is None
             })
         
@@ -864,6 +1293,7 @@ async def get_session_report(
     except Exception as e:
         print(f"❌ Error in session report: {e}")
         raise HTTPException(status_code=500, detail=f"Session report failed: {str(e)}")
+        # agent_routes.py - Part 7: File Upload & Task Assignment
 
 # ===================== FILE UPLOAD AND TASK ASSIGNMENT =====================
 
@@ -904,6 +1334,7 @@ async def upload_task_images(
                     if not safe_filename:
                         continue
                     
+                    # Handle duplicate filenames
                     counter = 1
                     original_name = safe_filename
                     while os.path.exists(os.path.join(agent_dir, safe_filename)):
@@ -917,12 +1348,15 @@ async def upload_task_images(
                     
                     images_processed += 1
                     
+                    # Prevent excessive uploads
                     if images_processed >= 5000:
                         break
         
+        # Reset agent progress to start from beginning
         progress = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).first()
         if progress:
             progress.current_index = 0
+            progress.updated_at = datetime.utcnow()
         else:
             progress = TaskProgress(agent_id=agent_id, current_index=0)
             db.add(progress)
@@ -938,7 +1372,134 @@ async def upload_task_images(
     except zipfile.BadZipFile:
         raise HTTPException(status_code=400, detail="Invalid ZIP file")
     except Exception as e:
+        print(f"❌ Upload error: {e}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+@router.post("/api/admin/bulk-upload-tasks")
+async def bulk_upload_task_images(
+    zip_file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload ZIP file with task images for general distribution"""
+    if not zip_file.filename.endswith('.zip'):
+        raise HTTPException(status_code=400, detail="File must be a ZIP archive")
+    
+    try:
+        general_dir = "static/task_images/crime_records_wide"
+        os.makedirs(general_dir, exist_ok=True)
+        
+        zip_content = await zip_file.read()
+        
+        images_processed = 0
+        supported_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
+        
+        with zipfile.ZipFile(io.BytesIO(zip_content), 'r') as zip_ref:
+            for file_info in zip_ref.filelist:
+                if file_info.is_dir():
+                    continue
+                
+                file_ext = os.path.splitext(file_info.filename.lower())[1]
+                if file_ext not in supported_extensions:
+                    continue
+                
+                with zip_ref.open(file_info) as source_file:
+                    safe_filename = os.path.basename(file_info.filename)
+                    if not safe_filename:
+                        continue
+                    
+                    # Handle duplicate filenames
+                    counter = 1
+                    original_name = safe_filename
+                    while os.path.exists(os.path.join(general_dir, safe_filename)):
+                        name, ext = os.path.splitext(original_name)
+                        safe_filename = f"{name}_{counter}{ext}"
+                        counter += 1
+                    
+                    image_path = os.path.join(general_dir, safe_filename)
+                    with open(image_path, 'wb') as dest_file:
+                        dest_file.write(source_file.read())
+                    
+                    images_processed += 1
+                    
+                    if images_processed >= 10000:  # Higher limit for general upload
+                        break
+        
+        return {
+            "message": "Bulk images uploaded successfully",
+            "images_processed": images_processed,
+            "directory": general_dir,
+            "note": "These images are available to all agents who don't have specific task assignments"
+        }
+    except zipfile.BadZipFile:
+        raise HTTPException(status_code=400, detail="Invalid ZIP file")
+    except Exception as e:
+        print(f"❌ Bulk upload error: {e}")
+        raise HTTPException(status_code=500, detail=f"Bulk upload failed: {str(e)}")
+
+@router.get("/api/admin/task-files/{agent_id}")
+async def get_agent_task_files(agent_id: str, db: Session = Depends(get_db)):
+    """Get list of task files assigned to an agent"""
+    agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    try:
+        image_files = get_agent_image_files(agent_id)
+        progress = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).first()
+        current_index = progress.current_index if progress else 0
+        
+        return {
+            "agent_id": agent_id,
+            "total_files": len(image_files),
+            "current_index": current_index,
+            "files": image_files[:50],  # Return first 50 files to avoid large responses
+            "remaining_files": max(0, len(image_files) - 50),
+            "completed_count": db.query(SubmittedForm).filter(SubmittedForm.agent_id == agent_id).count()
+        }
+    except Exception as e:
+        print(f"❌ Error getting task files: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get task files: {str(e)}")
+
+@router.delete("/api/admin/clear-tasks/{agent_id}")
+async def clear_agent_tasks(agent_id: str, db: Session = Depends(get_db)):
+    """Clear all tasks for a specific agent"""
+    agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    try:
+        agent_dir = f"static/task_images/agent_{agent_id}"
+        files_deleted = 0
+        
+        if os.path.exists(agent_dir):
+            for filename in os.listdir(agent_dir):
+                file_path = os.path.join(agent_dir, filename)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+                    files_deleted += 1
+            
+            # Remove directory if empty
+            try:
+                os.rmdir(agent_dir)
+            except OSError:
+                pass  # Directory not empty or other error
+        
+        # Reset progress
+        progress = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).first()
+        if progress:
+            progress.current_index = 0
+            progress.updated_at = datetime.utcnow()
+            db.commit()
+        
+        return {
+            "message": f"Tasks cleared for agent {agent_id}",
+            "files_deleted": files_deleted,
+            "agent_id": agent_id
+        }
+    except Exception as e:
+        print(f"❌ Error clearing tasks: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to clear tasks: {str(e)}")
+        # agent_routes.py - Part 8: Data Export & Preview Functions
 
 # ===================== DATA EXPORT AND PREVIEW =====================
 
@@ -1025,6 +1586,7 @@ def export_to_excel(
                 workbook = writer.book
                 worksheet = writer.sheets['Crime Records Data']
                 
+                # Auto-adjust column widths
                 for column in worksheet.columns:
                     max_length = 0
                     column_letter = column[0].column_letter
@@ -1064,14 +1626,14 @@ def export_to_excel(
         print(f"Unexpected error in Excel export: {e}")
         raise HTTPException(status_code=500, detail=f"Excel export failed: {str(e)}")
 
-@router.get("/api/admin/preview-data")
-async def preview_data(
+@router.get("/api/admin/export-csv")
+def export_to_csv(
     agent_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """Preview submitted data"""
+    """Export submitted data to CSV"""
     try:
         query = db.query(SubmittedForm)
         
@@ -1079,29 +1641,175 @@ async def preview_data(
             query = query.filter(SubmittedForm.agent_id == agent_id)
         
         if date_from:
-            query = query.filter(SubmittedForm.submitted_at >= datetime.strptime(date_from, '%Y-%m-%d'))
+            try:
+                from_date = datetime.fromisoformat(date_from)
+                query = query.filter(SubmittedForm.submitted_at >= from_date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date_from format. Use YYYY-MM-DD")
         
         if date_to:
-            query = query.filter(SubmittedForm.submitted_at <= datetime.strptime(date_to, '%Y-%m-%d'))
+            try:
+                to_date = datetime.fromisoformat(date_to)
+                to_date = to_date.replace(hour=23, minute=59, second=59)
+                query = query.filter(SubmittedForm.submitted_at <= to_date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date_to format. Use YYYY-MM-DD")
         
-        submissions = query.limit(100).all()
+        submissions = query.order_by(SubmittedForm.submitted_at.desc()).all()
+        
+        if not submissions:
+            raise HTTPException(status_code=404, detail="No data found with current filters")
+        
+        # Create CSV content
+        output = io.StringIO()
+        
+        # Write header
+        headers = [
+            'Submission_ID', 'Agent_ID', 'Submitted_At', 'Image_Name',
+            'DR_NO', 'Date_Rptd', 'DATE_OCC', 'TIME_OCC', 'Unique_Identifier',
+            'AREA_NAME', 'Rpt_Dist_No', 'VIN', 'Crm', 'Crm_Cd_Desc', 'Mocodes',
+            'Vict_Age', 'Geolocation', 'DEPARTMENT', 'Premis_Cd', 'Premis_Desc',
+            'ARREST_KEY', 'PD_DESC', 'CCD_LONCOD', 'Status_Desc', 'LAW_CODE',
+            'SubAgency', 'Charge', 'Race', 'LOCATION', 'SeqID', 'LAT', 'LON',
+            'Point', 'Shape__Area'
+        ]
+        
+        output.write(','.join(headers) + '\n')
+        
+        # Write data rows
+        for submission in submissions:
+            try:
+                form_data = json.loads(submission.form_data)
+                
+                row = [
+                    str(submission.id),
+                    submission.agent_id,
+                    submission.submitted_at.strftime('%Y-%m-%d %H:%M:%S'),
+                    form_data.get('image_name', 'Unknown')
+                ]
+                
+                # Add form fields
+                form_fields = [
+                    'DR_NO', 'Date_Rptd', 'DATE_OCC', 'TIME_OCC', 'Unique_Identifier',
+                    'AREA_NAME', 'Rpt_Dist_No', 'VIN', 'Crm', 'Crm_Cd_Desc', 'Mocodes',
+                    'Vict_Age', 'Geolocation', 'DEPARTMENT', 'Premis_Cd', 'Premis_Desc',
+                    'ARREST_KEY', 'PD_DESC', 'CCD_LONCOD', 'Status_Desc', 'LAW_CODE',
+                    'SubAgency', 'Charge', 'Race', 'LOCATION', 'SeqID', 'LAT', 'LON',
+                    'Point', 'Shape__Area'
+                ]
+                
+                for field in form_fields:
+                    value = form_data.get(field, '')
+                    # Escape commas and quotes in CSV
+                    if ',' in str(value) or '"' in str(value):
+                        value = f'"{str(value).replace('"', '""')}"'
+                    row.append(str(value))
+                
+                output.write(','.join(row) + '\n')
+                
+            except json.JSONDecodeError as e:
+                print(f"JSON decode error for submission {submission.id}: {e}")
+                continue
+        
+        output.seek(0)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"crime_records_export_{timestamp}.csv"
+        
+        headers = {
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Type": "text/csv"
+        }
+        
+        return StreamingResponse(
+            io.StringIO(output.getvalue()),
+            media_type="text/csv",
+            headers=headers
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Unexpected error in CSV export: {e}")
+        raise HTTPException(status_code=500, detail=f"CSV export failed: {str(e)}")
+
+@router.get("/api/admin/preview-data")
+async def preview_data(
+    agent_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """Preview submitted data with pagination"""
+    try:
+        query = db.query(SubmittedForm)
+        
+        if agent_id:
+            query = query.filter(SubmittedForm.agent_id == agent_id)
+        
+        if date_from:
+            try:
+                from_date = datetime.strptime(date_from, '%Y-%m-%d')
+                query = query.filter(SubmittedForm.submitted_at >= from_date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date_from format. Use YYYY-MM-DD")
+        
+        if date_to:
+            try:
+                to_date = datetime.strptime(date_to, '%Y-%m-%d')
+                to_date = to_date.replace(hour=23, minute=59, second=59)
+                query = query.filter(SubmittedForm.submitted_at <= to_date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date_to format. Use YYYY-MM-DD")
+        
+        total_count = query.count()
+        submissions = query.order_by(SubmittedForm.submitted_at.desc()).limit(min(limit, 1000)).all()
         
         result = []
         for submission in submissions:
-            # Handle both JSON and string format
-            if isinstance(submission.form_data, str):
-                form_data = json.loads(submission.form_data)
-            else:
-                form_data = submission.form_data
+            try:
+                # Handle both JSON and string format
+                if isinstance(submission.form_data, str):
+                    form_data = json.loads(submission.form_data)
+                else:
+                    form_data = submission.form_data
                 
-            result.append({
-                "id": submission.id,
-                "agent_id": submission.agent_id,
-                "submitted_at": submission.submitted_at.isoformat(),
-                "form_data": form_data
-            })
+                # Get agent name
+                agent = db.query(Agent).filter(Agent.agent_id == submission.agent_id).first()
+                agent_name = agent.name if agent else "Unknown"
+                
+                result.append({
+                    "id": submission.id,
+                    "agent_id": submission.agent_id,
+                    "agent_name": agent_name,
+                    "submitted_at": submission.submitted_at.isoformat(),
+                    "image_name": form_data.get('image_name', 'Unknown'),
+                    "form_data": form_data,
+                    "data_preview": {
+                        "DR_NO": form_data.get('DR_NO', ''),
+                        "DATE_OCC": form_data.get('DATE_OCC', ''),
+                        "AREA_NAME": form_data.get('AREA_NAME', ''),
+                        "Crm_Cd_Desc": form_data.get('Crm_Cd_Desc', ''),
+                        "LOCATION": form_data.get('LOCATION', '')
+                    }
+                })
+            except Exception as parse_error:
+                print(f"Error parsing submission {submission.id}: {parse_error}")
+                continue
         
-        return result
+        return {
+            "success": True,
+            "data": result,
+            "total_count": total_count,
+            "returned_count": len(result),
+            "filters_applied": {
+                "agent_id": agent_id,
+                "date_from": date_from,
+                "date_to": date_to,
+                "limit": limit
+            }
+        }
         
     except Exception as e:
         print(f"❌ Error in data preview: {e}")
@@ -1109,12 +1817,22 @@ async def preview_data(
 
 @router.get("/api/admin/test-data")
 async def test_data_availability(db: Session = Depends(get_db)):
-    """Test data availability"""
+    """Test data availability and system health"""
     try:
         # Count records in each table
         agent_count = db.query(Agent).count()
         submission_count = db.query(SubmittedForm).count()
         session_count = db.query(AgentSession).count()
+        progress_count = db.query(TaskProgress).count()
+        
+        # Test recent activity
+        recent_submissions = db.query(SubmittedForm).filter(
+            SubmittedForm.submitted_at >= datetime.utcnow() - timedelta(hours=24)
+        ).count()
+        
+        active_sessions = db.query(AgentSession).filter(
+            AgentSession.logout_time.is_(None)
+        ).count()
         
         return {
             "success": True,
@@ -1122,13 +1840,30 @@ async def test_data_availability(db: Session = Depends(get_db)):
             "counts": {
                 "agents": agent_count,
                 "submissions": submission_count,
-                "sessions": session_count
+                "sessions": session_count,
+                "task_progress": progress_count,
+                "recent_submissions_24h": recent_submissions,
+                "active_sessions": active_sessions
+            },
+            "system_health": {
+                "database_connected": True,
+                "timestamp": datetime.utcnow().isoformat(),
+                "tables_accessible": True
             }
         }
         
     except Exception as e:
         print(f"❌ Error testing data: {e}")
-        raise HTTPException(status_code=500, detail=f"Data test failed: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "system_health": {
+                "database_connected": False,
+                "timestamp": datetime.utcnow().isoformat(),
+                "tables_accessible": False
+            }
+        }
+        # agent_routes.py - Part 9: Advanced Admin Functions & Final Endpoints
 
 # ===================== ADVANCED ADMIN FUNCTIONS =====================
 
@@ -1164,11 +1899,15 @@ async def get_agent_details(agent_id: str, db: Session = Depends(get_db)):
         total_images = len(assigned_images)
         progress_percentage = (completed_count / total_images * 100) if total_images > 0 else 0
         
+        # Calculate average session time
+        completed_sessions = [s for s in sessions if s.duration_minutes]
+        avg_session_time = sum(s.duration_minutes for s in completed_sessions) / len(completed_sessions) if completed_sessions else 0
+        
         return {
             "agent_id": agent.agent_id,
             "name": agent.name,
             "email": agent.email,
-            "mobile": agent.mobile,
+            "mobile": getattr(agent, 'mobile', 'N/A'),
             "status": agent.status,
             "created_at": agent.created_at.isoformat() if agent.created_at else None,
             "progress": {
@@ -1178,11 +1917,17 @@ async def get_agent_details(agent_id: str, db: Session = Depends(get_db)):
                 "progress_percentage": round(progress_percentage, 2),
                 "remaining_tasks": max(0, total_images - completed_count)
             },
+            "performance": {
+                "total_sessions": len(sessions),
+                "avg_session_time_minutes": round(avg_session_time, 2),
+                "total_work_time_minutes": sum(s.duration_minutes for s in completed_sessions),
+                "submissions_per_session": round(completed_count / len(sessions), 2) if sessions else 0
+            },
             "recent_submissions": [
                 {
                     "id": sub.id,
                     "submitted_at": sub.submitted_at.isoformat(),
-                    "image_name": json.loads(sub.form_data).get('image_name', 'Unknown')
+                    "image_name": json.loads(sub.form_data).get('image_name', 'Unknown') if sub.form_data else 'Unknown'
                 } for sub in recent_submissions
             ],
             "recent_sessions": [
@@ -1208,16 +1953,35 @@ async def check_system_health(db: Session = Depends(get_db)):
         
         # Check static directory
         static_exists = os.path.exists("static/task_images")
+        general_dir_exists = os.path.exists("static/task_images/crime_records_wide")
         
         # Check for any active sessions
         active_sessions = db.query(AgentSession).filter(AgentSession.logout_time.is_(None)).count()
+        
+        # Check recent activity
+        recent_activity = db.query(SubmittedForm).filter(
+            SubmittedForm.submitted_at >= datetime.utcnow() - timedelta(hours=1)
+        ).count()
+        
+        # Check disk space (basic check)
+        import shutil
+        total, used, free = shutil.disk_usage(".")
+        disk_usage_percent = (used / total) * 100
         
         return {
             "status": "healthy",
             "database_connected": True,
             "static_directory_exists": static_exists,
+            "general_task_directory_exists": general_dir_exists,
             "total_agents": agent_count,
             "active_sessions": active_sessions,
+            "recent_activity_1h": recent_activity,
+            "disk_usage": {
+                "total_gb": round(total / (1024**3), 2),
+                "used_gb": round(used / (1024**3), 2),
+                "free_gb": round(free / (1024**3), 2),
+                "usage_percent": round(disk_usage_percent, 2)
+            },
             "timestamp": datetime.utcnow().isoformat()
         }
         
@@ -1229,3 +1993,390 @@ async def check_system_health(db: Session = Depends(get_db)):
             "timestamp": datetime.utcnow().isoformat()
         }
 
+@router.post("/api/admin/bulk-status-update")
+async def bulk_update_agent_status(
+    request: Request,
+    agent_ids: list = Form(...),
+    status: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Bulk update status for multiple agents"""
+    try:
+        valid_statuses = ["active", "inactive", "pending", "suspended"]
+        if status not in valid_statuses:
+            raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+        
+        # Parse agent_ids if it's a string
+        if isinstance(agent_ids, str):
+            try:
+                agent_ids = json.loads(agent_ids)
+            except:
+                agent_ids = agent_ids.split(',')
+        
+        updated_agents = []
+        failed_agents = []
+        
+        for agent_id in agent_ids:
+            agent_id = agent_id.strip()
+            agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+            
+            if agent:
+                old_status = agent.status
+                agent.status = status
+                
+                # If deactivating, logout any active sessions
+                if status in ["inactive", "suspended"]:
+                    try:
+                        active_sessions = db.query(AgentSession).filter(
+                            AgentSession.agent_id == agent_id,
+                            AgentSession.logout_time.is_(None)
+                        ).all()
+                        
+                        for session in active_sessions:
+                            session.logout_time = datetime.utcnow()
+                            if session.login_time:
+                                duration = (session.logout_time - session.login_time).total_seconds() / 60
+                                session.duration_minutes = round(duration, 2)
+                    except Exception as session_error:
+                        print(f"⚠️ Session cleanup error for {agent_id}: {session_error}")
+                
+                updated_agents.append({
+                    "agent_id": agent_id,
+                    "name": agent.name,
+                    "old_status": old_status,
+                    "new_status": status
+                })
+            else:
+                failed_agents.append(agent_id)
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Updated {len(updated_agents)} agents to status: {status}",
+            "updated_agents": updated_agents,
+            "failed_agents": failed_agents,
+            "total_requested": len(agent_ids),
+            "total_updated": len(updated_agents)
+        }
+        
+    except Exception as e:
+        print(f"❌ Bulk status update error: {e}")
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        raise HTTPException(status_code=500, detail=f"Bulk update failed: {str(e)}")
+
+@router.get("/api/admin/performance-report")
+async def get_performance_report(
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get performance report for all agents"""
+    try:
+        # Set default date range if not provided
+        if not date_from:
+            date_from = (datetime.utcnow() - timedelta(days=30)).strftime('%Y-%m-%d')
+        if not date_to:
+            date_to = datetime.utcnow().strftime('%Y-%m-%d')
+        
+        # Parse dates
+        from_date = datetime.strptime(date_from, '%Y-%m-%d')
+        to_date = datetime.strptime(date_to, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+        
+        agents = db.query(Agent).all()
+        report_data = []
+        
+        for agent in agents:
+            # Get submissions in date range
+            submissions = db.query(SubmittedForm).filter(
+                SubmittedForm.agent_id == agent.agent_id,
+                SubmittedForm.submitted_at >= from_date,
+                SubmittedForm.submitted_at <= to_date
+            ).all()
+            
+            # Get sessions in date range
+            sessions = db.query(AgentSession).filter(
+                AgentSession.agent_id == agent.agent_id,
+                AgentSession.login_time >= from_date,
+                AgentSession.login_time <= to_date
+            ).all()
+            
+            # Calculate metrics
+            total_submissions = len(submissions)
+            total_sessions = len(sessions)
+            total_work_time = sum(s.duration_minutes for s in sessions if s.duration_minutes)
+            avg_session_time = total_work_time / total_sessions if total_sessions > 0 else 0
+            submissions_per_hour = (total_submissions / (total_work_time / 60)) if total_work_time > 0 else 0
+            
+            # Get total assigned tasks
+            assigned_images = get_agent_image_files(agent.agent_id)
+            total_tasks = len(assigned_images)
+            completion_rate = (total_submissions / total_tasks * 100) if total_tasks > 0 else 0
+            
+            # Get first and last activity dates
+            first_submission = db.query(SubmittedForm).filter(
+                SubmittedForm.agent_id == agent.agent_id
+            ).order_by(SubmittedForm.submitted_at.asc()).first()
+            
+            last_submission = db.query(SubmittedForm).filter(
+                SubmittedForm.agent_id == agent.agent_id
+            ).order_by(SubmittedForm.submitted_at.desc()).first()
+            
+            report_data.append({
+                "agent_id": agent.agent_id,
+                "name": agent.name,
+                "email": agent.email,
+                "status": agent.status,
+                "total_submissions": total_submissions,
+                "total_sessions": total_sessions,
+                "total_work_hours": round(total_work_time / 60, 2),
+                "avg_session_minutes": round(avg_session_time, 2),
+                "submissions_per_hour": round(submissions_per_hour, 2),
+                "total_assigned_tasks": total_tasks,
+                "completion_rate_percent": round(completion_rate, 2),
+                "first_submission": first_submission.submitted_at.isoformat() if first_submission else None,
+                "last_submission": last_submission.submitted_at.isoformat() if last_submission else None,
+                "active_in_period": total_submissions > 0 or total_sessions > 0
+            })
+        
+        # Calculate summary statistics
+        active_agents = [a for a in report_data if a['active_in_period']]
+        total_submissions_all = sum(a['total_submissions'] for a in report_data)
+        total_work_hours_all = sum(a['total_work_hours'] for a in report_data)
+        avg_completion_rate = sum(a['completion_rate_percent'] for a in active_agents) / len(active_agents) if active_agents else 0
+        
+        return {
+            "success": True,
+            "date_range": {
+                "from": date_from,
+                "to": date_to
+            },
+            "summary": {
+                "total_agents": len(agents),
+                "active_agents_in_period": len(active_agents),
+                "total_submissions": total_submissions_all,
+                "total_work_hours": round(total_work_hours_all, 2),
+                "avg_completion_rate": round(avg_completion_rate, 2),
+                "avg_submissions_per_agent": round(total_submissions_all / len(active_agents), 2) if active_agents else 0
+            },
+            "agent_performance": sorted(report_data, key=lambda x: x['total_submissions'], reverse=True)
+        }
+        
+    except Exception as e:
+        print(f"❌ Error generating performance report: {e}")
+        raise HTTPException(status_code=500, detail=f"Performance report failed: {str(e)}")
+
+# ===================== FINAL UTILITY ENDPOINTS =====================
+
+@router.get("/api/admin/dashboard-summary")
+async def get_dashboard_summary(db: Session = Depends(get_db)):
+    """Get comprehensive dashboard summary"""
+    try:
+        # Basic counts
+        total_agents = db.query(Agent).count()
+        active_agents = db.query(Agent).filter(Agent.status == "active").count()
+        pending_agents = db.query(Agent).filter(Agent.status == "pending").count()
+        total_submissions = db.query(SubmittedForm).count()
+        
+        # Recent activity (last 24 hours)
+        last_24h = datetime.utcnow() - timedelta(hours=24)
+        recent_submissions = db.query(SubmittedForm).filter(
+            SubmittedForm.submitted_at >= last_24h
+        ).count()
+        
+        recent_logins = db.query(AgentSession).filter(
+            AgentSession.login_time >= last_24h
+        ).count()
+        
+        # Current active sessions
+        active_sessions = db.query(AgentSession).filter(
+            AgentSession.logout_time.is_(None)
+        ).count()
+        
+        # Calculate total tasks across all agents
+        total_tasks = 0
+        for agent in db.query(Agent).all():
+            agent_images = get_agent_image_files(agent.agent_id)
+            total_tasks += len(agent_images)
+        
+        # Top performers (last 7 days)
+        last_week = datetime.utcnow() - timedelta(days=7)
+        top_performers_query = db.query(
+            SubmittedForm.agent_id,
+            db.func.count(SubmittedForm.id).label('submission_count')
+        ).filter(
+            SubmittedForm.submitted_at >= last_week
+        ).group_by(SubmittedForm.agent_id).order_by(
+            db.func.count(SubmittedForm.id).desc()
+        ).limit(5).all()
+        
+        top_performers = []
+        for agent_id, count in top_performers_query:
+            agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+            if agent:
+                top_performers.append({
+                    "agent_id": agent_id,
+                    "name": agent.name,
+                    "submissions_last_week": count
+                })
+        
+        # Recent submissions
+        recent_submissions_details = db.query(SubmittedForm).order_by(
+            SubmittedForm.submitted_at.desc()
+        ).limit(10).all()
+        
+        recent_activity = []
+        for sub in recent_submissions_details:
+            agent = db.query(Agent).filter(Agent.agent_id == sub.agent_id).first()
+            recent_activity.append({
+                "agent_id": sub.agent_id,
+                "agent_name": agent.name if agent else "Unknown",
+                "submitted_at": sub.submitted_at.isoformat(),
+                "image_name": json.loads(sub.form_data).get('image_name', 'Unknown') if sub.form_data else 'Unknown'
+            })
+        
+        return {
+            "success": True,
+            "counts": {
+                "total_agents": total_agents,
+                "active_agents": active_agents,
+                "pending_agents": pending_agents,
+                "total_submissions": total_submissions,
+                "total_tasks": total_tasks,
+                "pending_tasks": max(0, total_tasks - total_submissions)
+            },
+            "recent_activity": {
+                "submissions_24h": recent_submissions,
+                "logins_24h": recent_logins,
+                "active_sessions": active_sessions
+            },
+            "performance": {
+                "completion_rate": round((total_submissions / total_tasks * 100), 2) if total_tasks > 0 else 0,
+                "avg_submissions_per_agent": round(total_submissions / active_agents, 2) if active_agents > 0 else 0
+            },
+            "top_performers": top_performers,
+            "recent_submissions": recent_activity,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"❌ Error generating dashboard summary: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+@router.post("/api/admin/maintenance")
+async def perform_maintenance(
+    request: Request,
+    action: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Perform maintenance actions"""
+    try:
+        if action == "cleanup_old_sessions":
+            # Close sessions older than 24 hours without logout
+            cutoff_time = datetime.utcnow() - timedelta(hours=24)
+            old_sessions = db.query(AgentSession).filter(
+                AgentSession.login_time < cutoff_time,
+                AgentSession.logout_time.is_(None)
+            ).all()
+            
+            for session in old_sessions:
+                session.logout_time = session.login_time + timedelta(hours=8)  # Assume 8-hour session
+                session.duration_minutes = 480  # 8 hours
+            
+            db.commit()
+            
+            return {
+                "success": True,
+                "action": action,
+                "message": f"Cleaned up {len(old_sessions)} old sessions"
+            }
+            
+        elif action == "update_progress":
+            # Recalculate all agent progress
+            agents = db.query(Agent).all()
+            updated_count = 0
+            
+            for agent in agents:
+                completed_count = db.query(SubmittedForm).filter(
+                    SubmittedForm.agent_id == agent.agent_id
+                ).count()
+                
+                progress = db.query(TaskProgress).filter(
+                    TaskProgress.agent_id == agent.agent_id
+                ).first()
+                
+                if progress:
+                    progress.current_index = completed_count
+                    progress.updated_at = datetime.utcnow()
+                    updated_count += 1
+                else:
+                    new_progress = TaskProgress(
+                        agent_id=agent.agent_id,
+                        current_index=completed_count
+                    )
+                    db.add(new_progress)
+                    updated_count += 1
+            
+            db.commit()
+            
+            return {
+                "success": True,
+                "action": action,
+                "message": f"Updated progress for {updated_count} agents"
+            }
+            
+        elif action == "check_data_integrity":
+            # Check for data integrity issues
+            issues = []
+            
+            # Check for agents without progress records
+            agents_without_progress = db.query(Agent).outerjoin(TaskProgress).filter(
+                TaskProgress.agent_id.is_(None)
+            ).count()
+            
+            if agents_without_progress > 0:
+                issues.append(f"{agents_without_progress} agents without progress records")
+            
+            # Check for submissions without agents
+            orphaned_submissions = db.query(SubmittedForm).outerjoin(Agent).filter(
+                Agent.agent_id.is_(None)
+            ).count()
+            
+            if orphaned_submissions > 0:
+                issues.append(f"{orphaned_submissions} submissions without valid agents")
+            
+            return {
+                "success": True,
+                "action": action,
+                "issues_found": len(issues),
+                "issues": issues,
+                "data_integrity": "Good" if len(issues) == 0 else "Issues Found"
+            }
+            
+        else:
+            raise HTTPException(status_code=400, detail="Invalid maintenance action")
+            
+    except Exception as e:
+        print(f"❌ Maintenance error: {e}")
+        if hasattr(db, 'rollback'):
+            db.rollback()
+        raise HTTPException(status_code=500, detail=f"Maintenance failed: {str(e)}")
+
+# ===================== HEALTH CHECK ENDPOINT =====================
+
+@router.get("/api/health")
+async def health_check():
+    """Simple health check endpoint"""
+    return {
+        "status": "healthy",
+        "service": "Agent Task Management System",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "1.0.0"
+    }
+
+# ===================== END OF ROUTES =====================
