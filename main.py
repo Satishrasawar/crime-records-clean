@@ -404,6 +404,11 @@ def validate_agent_data(name, email, mobile, dob, country, gender):
 
 # ===================== MAIN AGENT REGISTRATION ENDPOINT =====================
 
+# FIXED MAIN.PY - Agent Registration Integration
+# Add these fixes to your main.py file
+
+# ===================== FIXED AGENT REGISTRATION ENDPOINT =====================
+
 @app.post("/api/agents/register")
 @limiter.limit("10/minute")
 async def register_new_agent(
@@ -411,14 +416,13 @@ async def register_new_agent(
     name: str = Form(...),
     email: str = Form(...),
     mobile: str = Form(...),
-    dob: str = Form(...),
-    country: str = Form(...),
-    gender: str = Form(...),
+    dob: str = Form(None),  # Make optional for compatibility
+    country: str = Form(None),  # Make optional for compatibility  
+    gender: str = Form(None),  # Make optional for compatibility
     db=Depends(db_dependency)
 ):
     """
-    FIXED Agent Registration Endpoint
-    This version handles all validation and error cases properly
+    FIXED Agent Registration Endpoint - Compatible with both admin panel and agent routes
     """
     
     print(f"🔄 Agent registration attempt - Name: '{name}', Email: '{email}'")
@@ -439,11 +443,40 @@ async def register_new_agent(
         name_clean = name.strip() if name else ''
         email_clean = email.strip().lower() if email else ''
         mobile_clean = re.sub(r'[\s\-\(\)\.]+', '', mobile.strip()) if mobile else ''
-        country_clean = country.strip() if country else ''
-        gender_clean = gender.strip() if gender else ''
         
-        # Validate all fields
-        validation_errors = validate_agent_data(name_clean, email_clean, mobile_clean, dob, country_clean, gender_clean)
+        # Basic validation
+        validation_errors = []
+        
+        if not name_clean or len(name_clean) < 2:
+            validation_errors.append("Name must be at least 2 characters long")
+        
+        if not email_clean:
+            validation_errors.append("Email is required")
+        else:
+            email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+            if not re.match(email_pattern, email_clean):
+                validation_errors.append("Please enter a valid email address")
+        
+        if not mobile_clean:
+            validation_errors.append("Mobile number is required")
+        else:
+            if not re.match(r'^\+?\d{10,15}$', mobile_clean):
+                validation_errors.append("Mobile number must contain 10-15 digits")
+        
+        # Optional field validation
+        if dob:
+            try:
+                dob_date = datetime.strptime(dob, '%Y-%m-%d')
+                age = (datetime.now() - dob_date).days // 365
+                if age < 16:
+                    validation_errors.append("Agent must be at least 16 years old")
+                if age > 100:
+                    validation_errors.append("Please enter a valid date of birth")
+            except ValueError:
+                validation_errors.append("Invalid date format. Please use YYYY-MM-DD")
+        
+        if gender and gender not in ['Male', 'Female', 'Other']:
+            validation_errors.append("Gender must be Male, Female, or Other")
         
         if validation_errors:
             print(f"❌ Validation errors: {validation_errors}")
@@ -472,7 +505,6 @@ async def register_new_agent(
             raise
         except Exception as db_check_error:
             print(f"⚠️ Database check error (continuing): {db_check_error}")
-            # Continue with registration - this might be a temporary DB issue
         
         # ===== CREDENTIAL GENERATION =====
         print("🔑 Generating agent credentials...")
@@ -486,19 +518,26 @@ async def register_new_agent(
         try:
             print("💾 Creating agent record...")
             
-            # Create agent object
-            new_agent = Agent(
-                agent_id=agent_id,
-                name=name_clean,
-                email=email_clean,
-                mobile=mobile_clean,
-                dob=dob,
-                country=country_clean,
-                gender=gender_clean,
-                password=password,  # Store plain password for now
-                status="active",
-                created_at=datetime.utcnow()
-            )
+            # Create agent object with all possible fields
+            agent_data = {
+                'agent_id': agent_id,
+                'name': name_clean,
+                'email': email_clean,
+                'mobile': mobile_clean,
+                'password': password,
+                'status': 'active',
+                'created_at': datetime.utcnow()
+            }
+            
+            # Add optional fields if provided
+            if dob:
+                agent_data['dob'] = dob
+            if country:
+                agent_data['country'] = country.strip()
+            if gender:
+                agent_data['gender'] = gender
+            
+            new_agent = Agent(**agent_data)
             
             # Add to database session
             db.add(new_agent)
@@ -534,6 +573,11 @@ async def register_new_agent(
                         status_code=500,
                         detail="ID generation conflict. Please try again."
                     )
+                elif 'mobile' in error_message:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="This mobile number is already registered. Please use a different mobile number."
+                    )
             
             # Generic database error
             raise HTTPException(
@@ -544,16 +588,17 @@ async def register_new_agent(
         # ===== POST-REGISTRATION SETUP =====
         try:
             print("🔧 Setting up initial task progress...")
-            # Create initial task progress record
-            initial_progress = TaskProgress(
-                agent_id=agent_id,
-                current_index=0,
-                status="pending",
-                assigned_at=datetime.utcnow()
-            )
-            db.add(initial_progress)
-            db.commit()
-            print(f"✅ Created initial task progress for {agent_id}")
+            # Create initial task progress record if TaskProgress model exists
+            if 'TaskProgress' in globals():
+                initial_progress = TaskProgress(
+                    agent_id=agent_id,
+                    current_index=0,
+                    status="pending",
+                    assigned_at=datetime.utcnow()
+                )
+                db.add(initial_progress)
+                db.commit()
+                print(f"✅ Created initial task progress for {agent_id}")
             
         except Exception as progress_error:
             print(f"⚠️ Task progress creation failed (non-critical): {progress_error}")
@@ -573,9 +618,6 @@ async def register_new_agent(
                 "name": name_clean,
                 "email": email_clean,
                 "mobile": mobile_clean,
-                "dob": dob,
-                "country": country_clean,
-                "gender": gender_clean,
                 "status": "active",
                 "created_at": new_agent.created_at.isoformat()
             },
@@ -589,6 +631,14 @@ async def register_new_agent(
             },
             "important_note": "Please save your Agent ID and Password securely. You'll need them to log in."
         }
+        
+        # Add optional fields to response if they were provided
+        if dob:
+            response_data["agent_details"]["dob"] = dob
+        if country:
+            response_data["agent_details"]["country"] = country
+        if gender:
+            response_data["agent_details"]["gender"] = gender
         
         return response_data
         
@@ -617,7 +667,7 @@ async def register_new_agent(
             detail="An unexpected error occurred during registration. Please try again or contact support."
         )
 
-# ===================== ALTERNATIVE REGISTRATION ENDPOINTS =====================
+# ===================== ADMIN REGISTRATION ENDPOINT =====================
 
 @app.post("/api/admin/register-agent")
 @limiter.limit("5/minute")
@@ -626,38 +676,193 @@ async def admin_register_agent(
     name: str = Form(...),
     email: str = Form(...),
     mobile: str = Form(...),
-    dob: str = Form(...),
-    country: str = Form(...),
-    gender: str = Form(...),
+    dob: str = Form(None),
+    country: str = Form(None),
+    gender: str = Form(None),
+    status: str = Form("active"),
     db=Depends(db_dependency)
 ):
-    """Admin version of agent registration - same functionality as main endpoint"""
-    return await register_new_agent(request, name, email, mobile, dob, country, gender, db)
-    # main.py - Part 4: FIXED Test Endpoints and Login (Rate Limiting Fix)
-
-# ===================== TEST AND STATUS ENDPOINTS =====================
-
-@app.post("/api/test/register-agent")
-@limiter.limit("5/minute")
-async def test_register_agent(request: Request, db=Depends(db_dependency)):
-    """Test endpoint to register an agent with sample data"""
+    """Admin-specific agent registration with additional options"""
     try:
-        # Generate unique test data
-        import time
-        timestamp = str(int(time.time()))
+        print(f"🔐 Admin registering agent: {name} ({email})")
         
-        test_data = {
-            "name": "Test Agent Sample",
-            "email": f"test.agent.{timestamp}@example.com",
-            "mobile": "+1234567890",
-            "dob": "1990-01-01",
-            "country": "United States",
-            "gender": "Male"
+        # Validate admin session (simple check)
+        # You might want to add proper admin authentication here
+        
+        # Call the main registration function with additional admin privileges
+        response = await register_new_agent(
+            request=request,
+            name=name,
+            email=email,
+            mobile=mobile,
+            dob=dob,
+            country=country,
+            gender=gender,
+            db=db
+        )
+        
+        # If admin specifies a different status, update it
+        if status != "active" and response.get("success"):
+            try:
+                agent_id = response["agent_id"]
+                agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+                if agent:
+                    agent.status = status
+                    db.commit()
+                    response["agent_details"]["status"] = status
+                    print(f"✅ Admin set agent status to: {status}")
+            except Exception as status_error:
+                print(f"⚠️ Failed to set admin status: {status_error}")
+        
+        return response
+        
+    except Exception as admin_error:
+        print(f"❌ Admin registration error: {admin_error}")
+        raise
+
+# ===================== SIMPLIFIED REGISTRATION FOR COMPATIBILITY =====================
+
+@app.post("/api/agents/register-simple")
+async def register_agent_simple_form(
+    name: str = Form(...),
+    email: str = Form(...),
+    mobile: str = Form(...),
+    db=Depends(db_dependency)
+):
+    """Simplified registration form for basic agent creation"""
+    try:
+        # Create a mock request object
+        class MockRequest:
+            pass
+        
+        request = MockRequest()
+        
+        # Call main registration with minimal required fields
+        return await register_new_agent(
+            request=request,
+            name=name,
+            email=email,
+            mobile=mobile,
+            dob=None,
+            country=None,
+            gender=None,
+            db=db
+        )
+        
+    except Exception as e:
+        print(f"❌ Simple registration error: {e}")
+        return {
+            "success": False,
+            "message": f"Registration failed: {str(e)}",
+            "error": str(e)
+        }
+
+# ===================== ENHANCED CREDENTIAL GENERATION =====================
+
+def generate_unique_agent_id(db):
+    """Enhanced unique agent ID generation"""
+    max_attempts = 50  # Increased attempts
+    
+    for attempt in range(max_attempts):
+        try:
+            # Generate 6-digit number (100000-999999)
+            agent_number = secrets.randbelow(900000) + 100000
+            agent_id = f"AGT{agent_number}"
+            
+            # Check if ID exists in database
+            existing = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+            if not existing:
+                print(f"✅ Generated unique agent ID: {agent_id} (attempt {attempt + 1})")
+                return agent_id
+                
+        except Exception as check_error:
+            print(f"⚠️ ID uniqueness check error (attempt {attempt + 1}): {check_error}")
+            continue
+    
+    # Fallback: use timestamp with random suffix
+    import time
+    timestamp = str(int(time.time()))[-6:]
+    random_suffix = secrets.randbelow(99)
+    fallback_id = f"AGT{timestamp}{random_suffix:02d}"
+    
+    print(f"⚠️ Using fallback agent ID: {fallback_id}")
+    return fallback_id
+
+def generate_secure_password():
+    """Enhanced secure password generation"""
+    # Ensure password has variety and is memorable
+    uppercase = string.ascii_uppercase
+    lowercase = string.ascii_lowercase
+    digits = string.digits
+    special = "!@#$%"
+    
+    # Build password with guaranteed character types
+    password_parts = [
+        secrets.choice(uppercase),     # At least one uppercase
+        secrets.choice(lowercase),     # At least one lowercase  
+        secrets.choice(digits),        # At least one digit
+        secrets.choice(special)        # At least one special char
+    ]
+    
+    # Add more random characters to reach 12 characters total
+    all_chars = uppercase + lowercase + digits + special
+    for _ in range(8):  # 4 + 8 = 12 characters total
+        password_parts.append(secrets.choice(all_chars))
+    
+    # Shuffle to avoid predictable patterns
+    secrets.SystemRandom().shuffle(password_parts)
+    
+    generated_password = ''.join(password_parts)
+    print(f"🔑 Generated secure password: {generated_password[:3]}***")
+    
+    return generated_password
+
+# ===================== TESTING ENDPOINTS =====================
+
+@app.get("/api/agents/test-generation")
+async def test_credential_generation(db=Depends(db_dependency)):
+    """Test credential generation without creating agents"""
+    try:
+        if not database_ready:
+            return {"error": "Database not ready"}
+        
+        # Test ID generation
+        test_agent_id = generate_unique_agent_id(db)
+        test_password = generate_secure_password()
+        
+        return {
+            "success": True,
+            "test_credentials": {
+                "agent_id": test_agent_id,
+                "password": test_password
+            },
+            "message": "Credential generation test successful",
+            "database_ready": database_ready
         }
         
-        print(f"🧪 Testing registration with: {test_data['email']}")
-        
-        # Call the main registration endpoint
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Credential generation test failed"
+        }
+
+@app.post("/api/test/register-agent-full")
+async def test_register_full_agent(request: Request, db=Depends(db_dependency)):
+    """Full test registration with all fields"""
+    import time
+    timestamp = str(int(time.time()))
+    
+    test_data = {
+        "name": f"Test Agent {timestamp}",
+        "email": f"test.agent.{timestamp}@example.com",
+        "mobile": f"+1234567{timestamp[-3:]}",
+        "dob": "1990-01-01",
+        "country": "United States",
+        "gender": "Male"
+    }
+    
+    try:
         return await register_new_agent(
             request=request,
             name=test_data["name"],
@@ -668,67 +873,12 @@ async def test_register_agent(request: Request, db=Depends(db_dependency)):
             gender=test_data["gender"],
             db=db
         )
-        
-    except Exception as test_error:
-        print(f"❌ Test registration error: {test_error}")
+    except Exception as e:
         return {
             "success": False,
-            "error": f"Test registration failed: {str(test_error)}",
-            "error_type": type(test_error).__name__,
-            "message": "Test registration endpoint failed"
+            "error": str(e),
+            "test_data": test_data
         }
-
-@app.get("/api/agents/registration-status")
-@limiter.limit("50/minute")
-async def check_registration_status(request: Request, db=Depends(db_dependency)):
-    """Check if agent registration system is working"""
-    try:
-        status_info = {
-            "timestamp": datetime.now().isoformat(),
-            "database_ready": database_ready,
-            "status": "unknown"
-        }
-        
-        if not database_ready:
-            status_info.update({
-                "status": "unavailable",
-                "message": "Database is not ready for registration",
-                "database_ready": False
-            })
-            return status_info
-        
-        # Test database connectivity
-        try:
-            agent_count = db.query(Agent).count()
-            status_info.update({
-                "status": "available",
-                "message": "Agent registration system is operational",
-                "database_ready": True,
-                "total_agents": agent_count,
-                "endpoints": {
-                    "register": "/api/agents/register",
-                    "login": "/api/agents/login",
-                    "test_register": "/api/test/register-agent"
-                }
-            })
-            
-        except Exception as db_test_error:
-            status_info.update({
-                "status": "database_error",
-                "message": f"Database connectivity issue: {str(db_test_error)[:100]}",
-                "database_ready": False
-            })
-        
-        return status_info
-        
-    except Exception as status_error:
-        return {
-            "status": "error",
-            "message": f"Status check failed: {str(status_error)}",
-            "database_ready": database_ready,
-            "timestamp": datetime.now().isoformat()
-        }
-
 # ===================== FIXED AGENT LOGIN ENDPOINT =====================
 
 @app.post("/api/agents/login")
@@ -1499,3 +1649,4 @@ if __name__ == "__main__":
     print(f"- Registration Test: http://localhost:{port}/api/test/register-agent")
     print("=" * 60)
     uvicorn.run(app, host="0.0.0.0", port=port)
+
