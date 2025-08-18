@@ -53,9 +53,9 @@ def get_agent_image_files(agent_id: str):
         return []
     
     return sorted([f for f in os.listdir(agent_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+    # agent_routes.py - Part 2: Admin Login Functions
 
 # ===================== ADMIN LOGIN ENDPOINTS =====================
-# agent_routes.py - Part 2: Admin Login Functions
 
 @router.post("/api/admin/login")
 @limiter.limit("5/minute")
@@ -153,6 +153,7 @@ async def admin_login(request: Request, db: Session = Depends(get_db)):
         if not password_valid:
             print(f"❌ Invalid password for admin {username}")
             raise HTTPException(status_code=401, detail="Invalid credentials")
+            # agent_routes.py - Part 3: Admin Management and Auth Endpoints
 
         # Create access token
         try:
@@ -292,7 +293,6 @@ async def admin_login_options(request: Request):
             "Access-Control-Allow-Headers": "Content-Type, Authorization",
         }
     )
-    # agent_routes.py - Part 3: Debug Endpoints
 
 # ===================== ADMIN DEBUG ENDPOINTS =====================
 @router.post("/api/admin/debug-create")
@@ -401,142 +401,7 @@ async def debug_check_admin(request: Request, db: Session = Depends(get_db)):
         import traceback
         traceback.print_exc()
         return {"error": str(e)}
-
-@router.post("/api/admin/debug-test-login")
-@limiter.limit("10/minute")
-async def debug_test_login(request: Request, db: Session = Depends(get_db)):
-    """Debug endpoint to test login components"""
-    try:
-        print("🧪 Debug: Testing login components")
-        
-        data = await request.json()
-        username = data.get("username", "admin")
-        password = data.get("password", "admin123")
-        
-        print(f"🧪 Testing with username: {username}, password: {password}")
-        
-        # Step 1: Check if admin exists
-        admin = db.query(Admin).filter(Admin.username == username).first()
-        if not admin:
-            return {
-                "success": False,
-                "step": "user_lookup",
-                "message": f"Admin user '{username}' not found"
-            }
-        
-        print(f"✅ Step 1: User found - {admin.username}")
-        
-        # Step 2: Test password verification
-        try:
-            password_valid = verify_password(password, admin.hashed_password)
-            print(f"✅ Step 2: Password verification - {password_valid}")
-        except Exception as verify_error:
-            return {
-                "success": False,
-                "step": "password_verification",
-                "message": f"Password verification failed: {str(verify_error)}"
-            }
-        
-        if not password_valid:
-            return {
-                "success": False,
-                "step": "password_verification", 
-                "message": "Invalid password"
-            }
-        
-        # Step 3: Check if active
-        if not admin.is_active:
-            return {
-                "success": False,
-                "step": "active_check",
-                "message": "Admin user is not active"
-            }
-        
-        print(f"✅ Step 3: Admin is active")
-        
-        # Step 4: Test JWT creation
-        try:
-            access_token = create_access_token(data={"sub": username})
-            print(f"✅ Step 4: JWT token created")
-        except Exception as token_error:
-            return {
-                "success": False,
-                "step": "token_creation",
-                "message": f"Token creation failed: {str(token_error)}"
-            }
-        
-        return {
-            "success": True,
-            "message": "All login components working!",
-            "test_results": {
-                "user_found": True,
-                "password_valid": True,
-                "user_active": True,
-                "token_created": True
-            },
-            "admin_info": {
-                "username": admin.username,
-                "email": admin.email,
-                "is_active": admin.is_active
-            },
-            "token_preview": access_token[:50] + "..." if access_token else None
-        }
-        
-    except Exception as e:
-        print(f"❌ Debug test error: {e}")
-        import traceback
-        traceback.print_exc()
-        return {"success": False, "error": str(e)}
-
-@router.post("/api/admin/debug-reset")
-@limiter.limit("1/minute")
-async def debug_reset_admin(request: Request, db: Session = Depends(get_db)):
-    """Debug endpoint to reset admin password"""
-    try:
-        print("🔄 Debug: Resetting admin password")
-        
-        admin = db.query(Admin).filter(Admin.username == "admin").first()
-        if not admin:
-            print("❌ Admin user not found for reset")
-            raise HTTPException(status_code=404, detail="Admin user not found")
-        
-        # Reset password
-        new_password = "admin123"
-        new_hash = hash_password(new_password)
-        
-        print(f"🔐 Old hash: {admin.hashed_password[:20]}...")
-        print(f"🔐 New hash: {new_hash[:20]}...")
-        
-        admin.hashed_password = new_hash
-        admin.is_active = True  # Make sure admin is active
-        db.commit()
-        
-        print("✅ Admin password reset successfully")
-        
-        return {
-            "success": True,
-            "message": "Admin password reset successfully!",
-            "credentials": {
-                "username": "admin",
-                "password": "admin123"
-            },
-            "admin_info": {
-                "username": admin.username,
-                "email": admin.email,
-                "is_active": admin.is_active
-            }
-        }
-        
-    except Exception as e:
-        print(f"❌ Error resetting admin: {e}")
-        if hasattr(db, 'rollback'):
-            db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to reset password: {str(e)}")
-
-# ===================== AGENT REGISTRATION - REMOVED/DISABLED =====================
-# NOTE: Agent registration is now handled in main.py to avoid conflicts
-# This section has been removed to prevent duplicate endpoints
-# agent_routes.py - Part 4: Agent Management Functions
+        # agent_routes.py - Part 4: Agent Management Functions
 
 # ===================== AGENT MANAGEMENT ENDPOINTS =====================
 
@@ -653,7 +518,6 @@ def delete_agent(agent_id: int, db: Session = Depends(get_db)):
     db.delete(agent)
     db.commit()
     return {"message": "Agent deleted successfully"}
-    # agent_routes.py - Part 5: Agent Login and Task Management
 
 # ===================== AGENT LOGIN AND SESSION MANAGEMENT =====================
 
@@ -778,6 +642,7 @@ async def force_logout_agent(agent_id: str, db: Session = Depends(get_db)):
         print(f"Force logout error: {e}")
     
     return {"message": "Agent was not logged in"}
+    # agent_routes.py - Part 5: Task Management and Statistics
 
 # ===================== TASK MANAGEMENT =====================
 
@@ -833,7 +698,6 @@ def get_current_task(agent_id: str, db: Session = Depends(get_db)):
         "task_number": progress.current_index + 1,
         "completed": False
     }
-    # agent_routes.py - Part 6: Task Submission and Statistics
 
 # ===================== TASK SUBMISSION =====================
 
@@ -991,6 +855,8 @@ async def get_session_report(
                 "login_time": session.login_time.isoformat() if session.login_time else None,
                 "logout_time": session.logout_time.isoformat() if session.logout_time else None,
                 "duration_minutes": session.duration_minutes,
+            # agent_routes.py - Part 6: Data Export and Final Functions
+
                 "is_active": session.logout_time is None
             })
         
@@ -1073,7 +939,6 @@ async def upload_task_images(
         raise HTTPException(status_code=400, detail="Invalid ZIP file")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
-        # agent_routes.py - Part 7: Data Export and Final Functions
 
 # ===================== DATA EXPORT AND PREVIEW =====================
 
@@ -1333,71 +1198,6 @@ async def get_agent_details(agent_id: str, db: Session = Depends(get_db)):
     except Exception as e:
         print(f"❌ Error getting agent details: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get agent details: {str(e)}")
-
-@router.post("/api/admin/reset-progress/{agent_id}")
-async def reset_agent_progress(agent_id: str, db: Session = Depends(get_db)):
-    """Reset agent's task progress to beginning"""
-    try:
-        # Verify agent exists
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        
-        # Reset progress
-        progress = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).first()
-        if progress:
-            progress.current_index = 0
-            progress.updated_at = datetime.utcnow()
-        else:
-            progress = TaskProgress(agent_id=agent_id, current_index=0)
-            db.add(progress)
-        
-        db.commit()
-        
-        return {
-            "message": f"Progress reset successfully for agent {agent_id}",
-            "agent_id": agent_id,
-            "new_progress_index": 0
-        }
-        
-    except Exception as e:
-        db.rollback()
-        print(f"❌ Error resetting progress: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to reset progress: {str(e)}")
-
-@router.delete("/api/admin/clear-submissions/{agent_id}")
-async def clear_agent_submissions(agent_id: str, db: Session = Depends(get_db)):
-    """Clear all submissions for a specific agent (admin only)"""
-    try:
-        # Verify agent exists
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        
-        # Count current submissions
-        submission_count = db.query(SubmittedForm).filter(SubmittedForm.agent_id == agent_id).count()
-        
-        # Delete all submissions for this agent
-        db.query(SubmittedForm).filter(SubmittedForm.agent_id == agent_id).delete()
-        
-        # Reset progress
-        progress = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).first()
-        if progress:
-            progress.current_index = 0
-            progress.updated_at = datetime.utcnow()
-        
-        db.commit()
-        
-        return {
-            "message": f"Cleared {submission_count} submissions for agent {agent_id}",
-            "agent_id": agent_id,
-            "submissions_cleared": submission_count
-        }
-        
-    except Exception as e:
-        db.rollback()
-        print(f"❌ Error clearing submissions: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to clear submissions: {str(e)}")
 
 @router.get("/api/admin/system-health")
 async def check_system_health(db: Session = Depends(get_db)):
