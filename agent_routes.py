@@ -1228,3 +1228,4 @@ async def check_system_health(db: Session = Depends(get_db)):
             "database_connected": False,
             "timestamp": datetime.utcnow().isoformat()
         }
+
