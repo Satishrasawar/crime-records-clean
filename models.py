@@ -1,4 +1,4 @@
-# app/models.py - COMPLETE FIXED VERSION
+# app/models.py
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
