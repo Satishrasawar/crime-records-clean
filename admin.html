@@ -413,6 +413,8 @@
                 <button class="debug-button" onclick="checkAdminStatus()">Check Admin</button>
                 <button class="debug-button" onclick="createAdminUser()">Create Admin</button>
                 <button class="debug-button" onclick="testSimpleLogin()">Test Login</button>
+                <button class="debug-button" onclick="testRegistration()">Test Registration</button>
+                <button class="debug-button" onclick="checkSystemStatus()">Check System Status</button>
                 <div id="debugOutput" class="debug-output hidden"></div>
             </div>
 
@@ -621,17 +623,17 @@
                         
                         <div class="form-group">
                             <label for="agentDob">Date of Birth:</label>
-                            <input type="date" id="agentDob" name="dob" required>
+                            <input type="date" id="agentDob" name="dob">
                         </div>
                         
                         <div class="form-group">
                             <label for="agentCountry">Country:</label>
-                            <input type="text" id="agentCountry" name="country" required>
+                            <input type="text" id="agentCountry" name="country">
                         </div>
                         
                         <div class="form-group">
                             <label for="agentGender">Gender:</label>
-                            <select id="agentGender" name="gender" required>
+                            <select id="agentGender" name="gender">
                                 <option value="">Select Gender</option>
                                 <option value="Male">Male</option>
                                 <option value="Female">Female</option>
@@ -1002,6 +1004,57 @@
             }
         }
 
+        async function testRegistration() {
+            try {
+                console.log('🧪 Testing agent registration...');
+                const formData = new FormData();
+                const timestamp = Date.now();
+                formData.append('name', `Test Agent ${timestamp}`);
+                formData.append('email', `test${timestamp}@example.com`);
+                formData.append('mobile', `+1234567${String(timestamp).slice(-3)}`);
+                formData.append('dob', '1990-01-01');
+                formData.append('country', 'Test Country');
+                formData.append('gender', 'Other');
+                
+                const response = await fetch(`${BASE_URL}/api/agents/register`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                showDebugOutput(data, 'Registration Test');
+                console.log('🧪 Registration test result:', data);
+                
+                if (data.success) {
+                    showAlert(`Registration test successful! Agent ID: ${data.agent_id}`, 'success');
+                } else {
+                    showAlert(`Registration test failed: ${data.detail || data.message}`, 'error');
+                }
+            } catch (error) {
+                showDebugOutput({error: error.message}, 'Registration Test Error');
+                console.error('❌ Registration test error:', error);
+                showAlert('Registration test failed due to network error', 'error');
+            }
+        }
+
+        async function checkSystemStatus() {
+            try {
+                const response = await fetch(`${BASE_URL}/status`);
+                const data = await response.json();
+                showDebugOutput(data, 'System Status');
+                console.log('🧪 System status:', data);
+                
+                if (data.database === 'ready' && data.routes === 'ready') {
+                    showAlert('System is fully operational', 'success');
+                } else {
+                    showAlert(`System issues detected: Database ${data.database}, Routes ${data.routes}`, 'error');
+                }
+            } catch (error) {
+                showDebugOutput({error: error.message}, 'System Status Error');
+                showAlert('Failed to check system status', 'error');
+            }
+        }
+
         // Create session
         function createSession(rememberMe = false) {
             const session = {
@@ -1163,365 +1216,134 @@
             }
         }
 
-     // FIXED ADMIN HTML - Registration Function
-// Replace the registerNewAgent function in your admin.html with this:
+        // Register new agent
+        async function registerNewAgent() {
+            const name = document.getElementById('agentName').value.trim();
+            const email = document.getElementById('agentEmail').value.trim();
+            const mobile = document.getElementById('agentMobile').value.trim();
+            const dob = document.getElementById('agentDob').value;
+            const country = document.getElementById('agentCountry').value.trim();
+            const gender = document.getElementById('agentGender').value;
 
-async function registerNewAgent() {
-    const name = document.getElementById('agentName').value.trim();
-    const email = document.getElementById('agentEmail').value.trim();
-    const mobile = document.getElementById('agentMobile').value.trim();
-    const dob = document.getElementById('agentDob').value;
-    const country = document.getElementById('agentCountry').value.trim();
-    const gender = document.getElementById('agentGender').value;
+            // Enhanced validation
+            if (!name || !email || !mobile) {
+                showAlert('Name, email, and mobile are required fields', 'error');
+                return;
+            }
 
-    // Enhanced validation
-    if (!name || !email || !mobile) {
-        showAlert('Name, email, and mobile are required fields', 'error');
-        return;
-    }
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showAlert('Please enter a valid email address', 'error');
+                return;
+            }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-        showAlert('Please enter a valid email address', 'error');
-        return;
-    }
+            const mobileRegex = /^\+?\d{10,15}$/;
+            const cleanMobile = mobile.replace(/[\s\-\(\)\.]/g, '');
+            if (!mobileRegex.test(cleanMobile)) {
+                showAlert('Please enter a valid mobile number (10-15 digits)', 'error');
+                return;
+            }
 
-    const mobileRegex = /^\+?\d{10,15}$/;
-    const cleanMobile = mobile.replace(/[\s\-\(\)\.]/g, '');
-    if (!mobileRegex.test(cleanMobile)) {
-        showAlert('Please enter a valid mobile number (10-15 digits)', 'error');
-        return;
-    }
+            if (dob) {
+                const dobDate = new Date(dob);
+                const today = new Date();
+                const age = Math.floor((today - dobDate) / (365.25 * 24 * 60 * 60 * 1000));
+                if (age < 16 || age > 80) {
+                    showAlert('Agent must be between 16 and 80 years old', 'error');
+                    return;
+                }
+            }
 
-    // Age validation if DOB is provided
-    if (dob) {
-        const dobDate = new Date(dob);
-        const today = new Date();
-        const age = Math.floor((today - dobDate) / (365.25 * 24 * 60 * 60 * 1000));
-        if (age < 16 || age > 80) {
-            showAlert('Agent must be between 16 and 80 years old', 'error');
-            return;
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('email', email);
+            formData.append('mobile', cleanMobile);
+            if (dob) formData.append('dob', dob);
+            if (country) formData.append('country', country);
+            if (gender) formData.append('gender', gender);
+
+            const submitBtn = document.querySelector('#agentRegistrationForm button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.innerHTML = '<div class="loading-spinner"></div>Registering...';
+            submitBtn.disabled = true;
+
+            try {
+                console.log('🔄 Attempting agent registration...');
+                const response = await fetch(`${BASE_URL}/api/agents/register`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                console.log(`📊 Registration response: ${response.status}`);
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    console.log('✅ Registration successful');
+                    handleRegistrationSuccess(result);
+                    showAlert(`Registration successful! Agent ID: ${result.agent_id}`, 'success');
+                } else {
+                    const errorMessage = result.detail || result.message || 'Unknown error';
+                    switch (response.status) {
+                        case 400:
+                            showAlert(`Validation Error: ${errorMessage}`, 'error');
+                            break;
+                        case 409:
+                            showAlert(`Agent Already Exists: ${errorMessage}`, 'error');
+                            break;
+                        case 429:
+                            showAlert('Too many attempts. Please wait a minute and try again.', 'error');
+                            break;
+                        case 500:
+                            showAlert(`Server Error: ${errorMessage}. Please try again later or contact support.`, 'error');
+                            break;
+                        default:
+                            showAlert(`Registration Failed: ${errorMessage}`, 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Registration failure:', error);
+                showAlert('Registration failed due to a network error. Check your connection and try again.', 'error');
+            } finally {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
         }
-    }
 
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('email', email);
-    formData.append('mobile', cleanMobile);
-    
-    // Add optional fields only if provided
-    if (dob) formData.append('dob', dob);
-    if (country) formData.append('country', country);
-    if (gender) formData.append('gender', gender);
-
-    const submitBtn = document.querySelector('#agentRegistrationForm button[type="submit"]');
-    const originalText = submitBtn.textContent;
-    submitBtn.innerHTML = '<div class="loading-spinner"></div>Registering...';
-    submitBtn.disabled = true;
-
-    try {
-        console.log('🔄 Attempting agent registration...');
-        
-        // Try multiple registration endpoints for compatibility
-        let response;
-        let result;
-        
-        // First try: Main registration endpoint
-        try {
-            console.log('📡 Trying main registration endpoint...');
-            response = await fetch(`${BASE_URL}/api/agents/register`, {
-                method: 'POST',
-                body: formData
+        // Handle successful registration
+        function handleRegistrationSuccess(result) {
+            console.log('🎉 Registration successful:', result);
+            
+            const passwordElement = document.getElementById('newAgentPassword');
+            passwordElement.textContent = '••••••••';
+            passwordElement.dataset.password = result.password;
+            passwordElement.classList.add('hidden-password');
+            
+            document.getElementById('newAgentId').textContent = result.agent_id;
+            document.getElementById('newAgentCredentials').classList.remove('hidden');
+            
+            // Reset form
+            document.getElementById('agentRegistrationForm').reset();
+            
+            // Refresh data
+            Promise.all([
+                loadAgents(),
+                populateAgentSelects()
+            ]).catch(error => {
+                console.log('⚠️ Failed to refresh data:', error);
             });
             
-            console.log(`📊 Main registration response: ${response.status}`);
-            result = await response.json();
-            
-            if (response.ok && result.success) {
-                console.log('✅ Main registration successful');
-                handleRegistrationSuccess(result);
-                return;
-            } else {
-                console.log('⚠️ Main registration failed:', result);
-            }
-        } catch (mainError) {
-            console.log('❌ Main registration error:', mainError.message);
-        }
-
-        // Second try: Admin registration endpoint
-        try {
-            console.log('📡 Trying admin registration endpoint...');
-            response = await fetch(`${BASE_URL}/api/admin/register-agent`, {
-                method: 'POST',
-                body: formData
+            // Scroll to credentials
+            document.getElementById('newAgentCredentials').scrollIntoView({ 
+                behavior: 'smooth',
+                block: 'center'
             });
             
-            console.log(`📊 Admin registration response: ${response.status}`);
-            result = await response.json();
-            
-            if (response.ok && result.success) {
-                console.log('✅ Admin registration successful');
-                handleRegistrationSuccess(result);
-                return;
-            } else {
-                console.log('⚠️ Admin registration failed:', result);
-            }
-        } catch (adminError) {
-            console.log('❌ Admin registration error:', adminError.message);
+            // Auto-hide credentials after 2 minutes
+            setTimeout(() => {
+                document.getElementById('newAgentCredentials').classList.add('hidden');
+            }, 120000);
         }
 
-        // Third try: Simple registration endpoint
-        try {
-            console.log('📡 Trying simple registration endpoint...');
-            const simpleFormData = new FormData();
-            simpleFormData.append('name', name);
-            simpleFormData.append('email', email);
-            simpleFormData.append('mobile', cleanMobile);
-            
-            response = await fetch(`${BASE_URL}/api/agents/register-simple`, {
-                method: 'POST',
-                body: simpleFormData
-            });
-            
-            console.log(`📊 Simple registration response: ${response.status}`);
-            result = await response.json();
-            
-            if (response.ok && result.success) {
-                console.log('✅ Simple registration successful');
-                handleRegistrationSuccess(result);
-                return;
-            } else {
-                console.log('⚠️ Simple registration failed:', result);
-            }
-        } catch (simpleError) {
-            console.log('❌ Simple registration error:', simpleError.message);
-        }
-
-        // Fourth try: Test registration endpoint
-        try {
-            console.log('📡 Trying test registration endpoint...');
-            response = await fetch(`${BASE_URL}/api/test/register-agent-full`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    name: name,
-                    email: email,
-                    mobile: cleanMobile,
-                    dob: dob || '1990-01-01',
-                    country: country || 'Unknown',
-                    gender: gender || 'Other'
-                })
-            });
-            
-            console.log(`📊 Test registration response: ${response.status}`);
-            result = await response.json();
-            
-            if (response.ok && result.success) {
-                console.log('✅ Test registration successful');
-                handleRegistrationSuccess(result);
-                return;
-            } else {
-                console.log('⚠️ Test registration failed:', result);
-            }
-        } catch (testError) {
-            console.log('❌ Test registration error:', testError.message);
-        }
-
-        // If all methods failed, show the last error message
-        if (result) {
-            const errorMessage = result.detail || result.message || 'Registration failed';
-            
-            if (response.status === 400) {
-                showAlert(`Validation Error: ${errorMessage}`, 'error');
-            } else if (response.status === 409) {
-                showAlert(`Agent Already Exists: ${errorMessage}`, 'error');
-            } else if (response.status === 503) {
-                showAlert('Service temporarily unavailable. Please try again later.', 'error');
-            } else {
-                showAlert(`Registration Failed: ${errorMessage}`, 'error');
-            }
-        } else {
-            showAlert('All registration methods failed. Please check the console for details.', 'error');
-        }
-
-    } catch (error) {
-        console.error('❌ Complete registration failure:', error);
-        showAlert('Registration failed due to a network error. Please try again.', 'error');
-    } finally {
-        submitBtn.textContent = originalText;
-        submitBtn.disabled = false;
-    }
-}
-
-// Handle successful registration
-function handleRegistrationSuccess(result) {
-    console.log('🎉 Registration successful:', result);
-    
-    // Update credentials display
-    const passwordElement = document.getElementById('newAgentPassword');
-    passwordElement.textContent = '••••••••';
-    passwordElement.dataset.password = result.password;
-    passwordElement.classList.add('hidden-password');
-    
-    document.getElementById('newAgentId').textContent = result.agent_id;
-    document.getElementById('newAgentCredentials').classList.remove('hidden');
-    
-    // Reset form
-    document.getElementById('agentRegistrationForm').reset();
-    
-    // Refresh data
-    Promise.all([
-        loadAgents(),
-        populateAgentSelects()
-    ]).catch(error => {
-        console.log('⚠️ Failed to refresh data:', error);
-    });
-    
-    showAlert(`Agent registered successfully! ID: ${result.agent_id}`, 'success');
-    
-    // Scroll to credentials
-    document.getElementById('newAgentCredentials').scrollIntoView({ 
-        behavior: 'smooth',
-        block: 'center'
-    });
-    
-    // Auto-hide credentials after 2 minutes
-    setTimeout(() => {
-        document.getElementById('newAgentCredentials').classList.add('hidden');
-    }, 120000);
-}
-
-// Add debug test function
-async function testCredentialGeneration() {
-    try {
-        console.log('🧪 Testing credential generation...');
-        const response = await fetch(`${BASE_URL}/api/agents/test-generation`);
-        const result = await response.json();
-        
-        console.log('🧪 Test result:', result);
-        
-        if (result.success) {
-            showAlert(`Test successful! Generated ID: ${result.test_credentials.agent_id}`, 'success');
-        } else {
-            showAlert(`Test failed: ${result.error}`, 'error');
-        }
-    } catch (error) {
-        console.error('❌ Test error:', error);
-        showAlert('Test failed due to network error', 'error');
-    }
-}
-
-// Enhanced error handling for makeAuthenticatedRequest
-async function makeAuthenticatedRequest(url, options = {}) {
-    // Remove authentication requirement for registration endpoints
-    if (url.includes('/api/agents/register') || url.includes('/api/test/')) {
-        return fetch(url, options);
-    }
-    
-    // For other endpoints, use session-based auth
-    const session = getSession();
-    
-    if (!session || session.expiry <= Date.now()) {
-        console.log('⚠️ Session expired, but continuing request...');
-        // Don't immediately logout for registration requests
-        if (!url.includes('/register')) {
-            showAlert('Session expired. Please login again.', 'error');
-            logout();
-            throw new Error('Session expired');
-        }
-    }
-    
-    const authOptions = {
-        ...options,
-        headers: {
-            ...options.headers,
-            'Authorization': session ? `Bearer ${session.username}` : undefined,
-            }
-    };
-    
-    try {
-        const response = await fetch(url, authOptions);
-        
-        if (response.status === 401 || response.status === 403) {
-            if (!url.includes('/register')) {
-                showAlert('Authentication failed. Please login again.', 'error');
-                logout();
-                throw new Error('Authentication failed');
-            }
-        }
-        
-        return response;
-    } catch (error) {
-        if (error.message !== 'Authentication failed' && error.message !== 'Session expired') {
-            console.log('⚠️ Network error:', error.message);
-            // Don't show error for registration requests
-            if (!url.includes('/register')) {
-                showAlert('Network error. Please check your connection.', 'error');
-            }
-        }
-        throw error;
-    }
-}
-
-// Add this button to the admin panel for testing (add to HTML)
-/*
-<div class="debug-section">
-    <strong>🧪 Registration Testing:</strong><br>
-    <button class="debug-button" onclick="testCredentialGeneration()">Test Credentials</button>
-    <button class="debug-button" onclick="testDatabaseConnection()">Test Database</button>
-    <button class="debug-button" onclick="registerTestAgent()">Register Test Agent</button>
-</div>
-*/
-
-// Additional test functions
-async function testDatabaseConnection() {
-    try {
-        console.log('🔗 Testing database connection...');
-        const response = await fetch(`${BASE_URL}/health`);
-        const result = await response.json();
-        
-        console.log('🔗 Database test result:', result);
-        showAlert(`Database status: ${result.database || 'unknown'}`, 'info');
-    } catch (error) {
-        console.error('❌ Database test error:', error);
-        showAlert('Database test failed', 'error');
-    }
-}
-
-async function registerTestAgent() {
-    try {
-        console.log('🧪 Registering test agent...');
-        const timestamp = Date.now();
-        
-        const formData = new FormData();
-        formData.append('name', `Test Agent ${timestamp}`);
-        formData.append('email', `test${timestamp}@example.com`);
-        formData.append('mobile', `+1234567${String(timestamp).slice(-3)}`);
-        formData.append('dob', '1990-01-01');
-        formData.append('country', 'Test Country');
-        formData.append('gender', 'Other');
-        
-        const response = await fetch(`${BASE_URL}/api/agents/register`, {
-            method: 'POST',
-            body: formData
-        });
-        
-        const result = await response.json();
-        console.log('🧪 Test registration result:', result);
-        
-        if (result.success) {
-            showAlert(`Test agent created! ID: ${result.agent_id}, Password: ${result.password}`, 'success');
-            await loadAgents();
-        } else {
-            showAlert(`Test registration failed: ${result.detail || result.message}`, 'error');
-        }
-    } catch (error) {
-        console.error('❌ Test registration error:', error);
-        showAlert('Test registration failed', 'error');
-    }
-}
         // Load agents list
         async function loadAgents() {
             try {
@@ -1594,7 +1416,7 @@ async function registerTestAgent() {
                     <td>${agent.email}</td>
                     <td>
                         <span style="font-family: monospace; background: #f0f0f0; padding: 4px; border-radius: 4px;">
-                            ${agent.password || '••••••••'}
+                            ••••••••
                         </span>
                         <button class="btn btn-sm" style="padding: 2px 6px; margin-left: 5px;" 
                                 onclick="showPassword('${agent.agent_id}')" title="Show Password">
@@ -2098,7 +1920,7 @@ async function registerTestAgent() {
                 const data = await response.json();
 
                 if (response.ok) {
-                    displayDataPreview(data);
+                    displayDataPreview(data.data);
                     document.getElementById('dataPreviewSection').classList.remove('hidden');
                 } else {
                     showAlert(`Preview failed: ${data.detail}`, 'error');
@@ -2226,7 +2048,18 @@ async function registerTestAgent() {
                 alert.remove();
             }, 5000);
         }
+
+        // Load dashboard data (stub - implement as needed)
+        async function loadDashboardData() {
+            await loadAgents();
+            populateAgentSelects();
+            // Add more data loading as needed
+        }
+        
+        // Stub for loadStatistics - implement if needed
+        async function loadStatistics() {
+            // Fetch and update stats
+        }
     </script>
 </body>
 </html>
-
