@@ -1,4 +1,3 @@
-# agent_routes.py
 from fastapi import APIRouter, Form, Depends, HTTPException, UploadFile, File, Request, Security
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.security import OAuth2PasswordBearer
@@ -93,7 +92,7 @@ def get_agent_image_files(agent_id: str):
 # ===================== AGENT REGISTRATION ENDPOINTS =====================
 
 @router.post("/api/agents/register")
-@limiter.limit("3/minute")
+@limiter.limit("10/minute")
 async def register_agent(
     request: Request,
     name: str = Form(...),
@@ -156,6 +155,7 @@ async def register_agent(
         # Generate unique agent credentials
         agent_id = generate_unique_agent_id(db)
         password = generate_secure_password()
+        hashed_password = hash_password(password)
         
         # Create new agent
         agent_data = {
@@ -163,7 +163,7 @@ async def register_agent(
             'name': name,
             'email': email,
             'mobile': mobile,
-            'password': password,  # Store plain text for now, as per model
+            'hashed_password': hashed_password,
             'status': "pending",  # Align with original
             'created_at': datetime.utcnow()
         }
@@ -219,6 +219,57 @@ async def register_agent(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+@router.post("/api/agents/login")
+@limiter.limit("5/minute")
+async def agent_login(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Agent login endpoint"""
+    try:
+        data = await request.json()
+        agent_id = data.get("agent_id", "").strip()
+        password = data.get("password", "").strip()
+
+        if not agent_id or not password:
+            raise HTTPException(status_code=400, detail="Agent ID and password are required")
+
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not agent or not verify_password(password, agent.hashed_password):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        if agent.status != "active":
+            raise HTTPException(status_code=403, detail="Account is not active")
+
+        access_token = create_access_token(data={"sub": agent.agent_id, "role": "agent"})
+        
+        # Log the session
+        session = AgentSession(
+            agent_id=agent.agent_id,
+            login_time=datetime.utcnow(),
+            is_active=True
+        )
+        db.add(session)
+        db.commit()
+
+        return {
+            "success": True,
+            "message": "Login successful",
+            "access_token": access_token,
+            "token_type": "bearer",
+            "agent": {
+                "agent_id": agent.agent_id,
+                "name": agent.name,
+                "email": agent.email,
+                "role": "agent"
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Agent login error: {e}")
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 @router.post("/api/agents/check-availability")
 @limiter.limit("10/minute")
