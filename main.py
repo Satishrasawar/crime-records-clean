@@ -1,4 +1,3 @@
-# main.py
 import os
 import sys
 import uuid
@@ -13,6 +12,9 @@ from datetime import datetime, date
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv  # Add this import
+
+load_dotenv()  # Load .env variables
 
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -111,13 +113,13 @@ else:
         "http://localhost:3000",
         "http://localhost:8000",
         "http://127.0.0.1:8000",
-        "https://web-production-b3ef2.up.railway.app"
+        "https://web-production-b3ef2.up.railway.app",
+        "http://localhost:5173"  # Added for Vite dev server
     ]
 
 # Rate limiting setup
 limiter = Limiter(key_func=get_remote_address)
 
-# main.py - Part 2: Admin Setup and App Initialization
 def create_default_admin():
     """Create default admin user with proper error handling"""
     try:
@@ -257,7 +259,6 @@ try:
 except Exception as e:
     print(f"❌ Static files setup failed: {e}")
 
-# main.py - Part 3: Cleanup and Static Serving
 async def periodic_cleanup():
     """Clean up old upload sessions every hour"""
     while True:
@@ -376,7 +377,6 @@ async def serve_agent_panel(request: Request):
     except Exception as e:
         return JSONResponse({"error": f"Could not serve agent panel: {e}"}, status_code=500)
 
-# main.py - Part 4: Debug and Status Endpoints
 @app.get("/debug")
 @limiter.limit("50/minute")
 async def debug_info(request: Request):
@@ -450,7 +450,6 @@ async def root(request: Request):
         ]
     }
 
-# main.py - Part 5: Main Entry Point
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
