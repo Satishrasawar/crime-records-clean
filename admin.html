@@ -1004,57 +1004,6 @@
             }
         }
 
-        async function testRegistration() {
-            try {
-                console.log('🧪 Testing agent registration...');
-                const formData = new FormData();
-                const timestamp = Date.now();
-                formData.append('name', `Test Agent ${timestamp}`);
-                formData.append('email', `test${timestamp}@example.com`);
-                formData.append('mobile', `+1234567${String(timestamp).slice(-3)}`);
-                formData.append('dob', '1990-01-01');
-                formData.append('country', 'Test Country');
-                formData.append('gender', 'Other');
-                
-                const response = await fetch(`${BASE_URL}/api/agents/register`, {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                showDebugOutput(data, 'Registration Test');
-                console.log('🧪 Registration test result:', data);
-                
-                if (data.success) {
-                    showAlert(`Registration test successful! Agent ID: ${data.agent_id}`, 'success');
-                } else {
-                    showAlert(`Registration test failed: ${data.detail || data.message}`, 'error');
-                }
-            } catch (error) {
-                showDebugOutput({error: error.message}, 'Registration Test Error');
-                console.error('❌ Registration test error:', error);
-                showAlert('Registration test failed due to network error', 'error');
-            }
-        }
-
-        async function checkSystemStatus() {
-            try {
-                const response = await fetch(`${BASE_URL}/status`);
-                const data = await response.json();
-                showDebugOutput(data, 'System Status');
-                console.log('🧪 System status:', data);
-                
-                if (data.database === 'ready' && data.routes === 'ready') {
-                    showAlert('System is fully operational', 'success');
-                } else {
-                    showAlert(`System issues detected: Database ${data.database}, Routes ${data.routes}`, 'error');
-                }
-            } catch (error) {
-                showDebugOutput({error: error.message}, 'System Status Error');
-                showAlert('Failed to check system status', 'error');
-            }
-        }
-
         // Create session
         function createSession(rememberMe = false) {
             const session = {
@@ -1268,14 +1217,16 @@
             submitBtn.disabled = true;
 
             try {
-                console.log('🔄 Attempting agent registration...');
+                console.log(`🔄 Sending registration request to: ${BASE_URL}/api/agents/register`);
+                console.log('📤 Form Data:', { name, email, mobile, dob, country, gender });
                 const response = await fetch(`${BASE_URL}/api/agents/register`, {
                     method: 'POST',
                     body: formData
                 });
 
-                console.log(`📊 Registration response: ${response.status}`);
+                console.log(`📊 Registration response: ${response.status} ${response.statusText}`);
                 const result = await response.json();
+                console.log('📥 Response Data:', result);
 
                 if (response.ok && result.success) {
                     console.log('✅ Registration successful');
@@ -1286,6 +1237,9 @@
                     switch (response.status) {
                         case 400:
                             showAlert(`Validation Error: ${errorMessage}`, 'error');
+                            break;
+                        case 404:
+                            showAlert(`Registration Failed: Endpoint not found at ${BASE_URL}/api/agents/register. Check if backend is running.`, 'error');
                             break;
                         case 409:
                             showAlert(`Agent Already Exists: ${errorMessage}`, 'error');
@@ -1302,7 +1256,7 @@
                 }
             } catch (error) {
                 console.error('❌ Registration failure:', error);
-                showAlert('Registration failed due to a network error. Check your connection and try again.', 'error');
+                showAlert(`Registration failed: ${error.message}. Check network and backend status.`, 'error');
             } finally {
                 submitBtn.textContent = originalText;
                 submitBtn.disabled = false;
@@ -2047,18 +2001,6 @@
             setTimeout(() => {
                 alert.remove();
             }, 5000);
-        }
-
-        // Load dashboard data (stub - implement as needed)
-        async function loadDashboardData() {
-            await loadAgents();
-            populateAgentSelects();
-            // Add more data loading as needed
-        }
-        
-        // Stub for loadStatistics - implement if needed
-        async function loadStatistics() {
-            // Fetch and update stats
         }
     </script>
 </body>
