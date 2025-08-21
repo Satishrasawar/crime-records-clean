@@ -12,9 +12,9 @@ from datetime import datetime, date
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 from contextlib import asynccontextmanager
-from dotenv import load_dotenv  # Add this import
+from dotenv import load_dotenv
 
-load_dotenv()  # Load .env variables
+load_dotenv()
 
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
