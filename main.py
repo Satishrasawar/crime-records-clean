@@ -242,16 +242,82 @@ async def enhanced_request_middleware(request, call_next):
     
     return response
 
-try:
-    print("📦 Importing agent routes...")
-    from agent_routes import router as agent_router
-    app.include_router(agent_router)
-    print("✅ Agent routes included successfully!")
-    routes_ready = True
-except Exception as e:
-    print(f"❌ Agent routes failed: {e}")
-    routes_ready = False
+# FIXED ROUTER INCLUSION - More robust error handling and debugging
+def include_agent_routes():
+    """Separate function to include agent routes with detailed error reporting"""
+    global routes_ready
+    try:
+        print("📦 Attempting to import agent routes...")
+        
+        # Import the router
+        from agent_routes import router as agent_router
+        print("✅ Agent routes imported successfully!")
+        
+        # Include the router
+        app.include_router(agent_router)
+        print("✅ Agent routes included successfully!")
+        
+        # Verify routes were added
+        route_paths = [route.path for route in app.routes]
+        agent_routes = [path for path in route_paths if path.startswith('/api/agents')]
+        print(f"✅ Found {len(agent_routes)} agent routes:")
+        for route in agent_routes:
+            print(f"  - {route}")
+        
+        routes_ready = True
+        return True
+        
+    except ImportError as e:
+        print(f"❌ Import error for agent_routes: {e}")
+        print("   Make sure agent_routes.py is in the same directory as main.py")
+        routes_ready = False
+        return False
+    except Exception as e:
+        print(f"❌ Failed to include agent routes: {e}")
+        import traceback
+        traceback.print_exc()
+        routes_ready = False
+        return False
 
+# Include agent routes
+router_success = include_agent_routes()
+
+# ADD FALLBACK ROUTES IF MAIN ROUTER FAILS
+if not router_success:
+    print("⚠️ Main router failed, adding fallback registration endpoint...")
+    
+    @app.post("/api/agents/register")
+    @limiter.limit("10/minute")
+    async def fallback_register_agent(request: Request):
+        """Fallback registration endpoint"""
+        try:
+            data = await request.json()
+            return {
+                "success": False,
+                "message": "Registration system is temporarily unavailable",
+                "error": "Main router not loaded",
+                "data_received": list(data.keys()) if data else [],
+                "fallback_active": True
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Fallback registration error: {str(e)}",
+                "fallback_active": True
+            }
+    
+    @app.get("/api/agents/test-registration")
+    @limiter.limit("5/minute")
+    async def fallback_test_registration(request: Request):
+        """Fallback test endpoint"""
+        return {
+            "system_status": "fallback_mode",
+            "database_connected": database_ready,
+            "router_status": "failed_to_load",
+            "message": "Main agent routes failed to load, using fallback endpoints"
+        }
+
+# Static files setup
 try:
     os.makedirs("static/task_images", exist_ok=True)
     app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -381,6 +447,15 @@ async def serve_agent_panel(request: Request):
 @limiter.limit("50/minute")
 async def debug_info(request: Request):
     """Enhanced debug endpoint with domain information"""
+    # List all registered routes for debugging
+    all_routes = []
+    for route in app.routes:
+        if hasattr(route, 'path') and hasattr(route, 'methods'):
+            all_routes.append({
+                "path": route.path,
+                "methods": list(route.methods) if route.methods else ["GET"]
+            })
+    
     return {
         "environment": {
             "domain": os.environ.get("DOMAIN", "not_set"),
@@ -393,7 +468,13 @@ async def debug_info(request: Request):
             "files": os.listdir("."),
             "python_version": sys.version,
             "database_ready": database_ready,
-            "routes_ready": routes_ready
+            "routes_ready": routes_ready,
+            "router_success": router_success
+        },
+        "routes": {
+            "total_routes": len(all_routes),
+            "agent_routes": [r for r in all_routes if r["path"].startswith("/api/agents")],
+            "all_routes": all_routes
         },
         "features": {
             "upload_sessions": len(upload_sessions),
@@ -411,6 +492,7 @@ async def system_status(request: Request):
         "status": "operational",
         "database": "ready" if database_ready else "failed",
         "routes": "ready" if routes_ready else "failed",
+        "router_included": router_success,
         "domain": os.environ.get("DOMAIN", "railway"),
         "health": "ok",
         "active_uploads": len(upload_sessions),
@@ -441,6 +523,7 @@ async def root(request: Request):
         "health_check": "/health",
         "admin_panel": "/admin.html",
         "agent_panel": "/agent.html",
+        "routes_loaded": routes_ready,
         "features": [
             "agent_registration",
             "task_management",
@@ -460,6 +543,7 @@ if __name__ == "__main__":
     print(f"🔗 CORS Origins: {len(ALLOWED_ORIGINS)} configured")
     print(f"💾 Database ready: {database_ready}")
     print(f"🛣️ Routes ready: {routes_ready}")
+    print(f"🔗 Router included: {router_success}")
     print(f"🏃 Starting server on port {port}")
     print("=" * 60)
     print("🔐 ADMIN CREDENTIALS:")
@@ -470,5 +554,6 @@ if __name__ == "__main__":
     print(f"- Agent Panel: http://localhost:{port}/agent.html")
     print(f"- Health Check: http://localhost:{port}/health")
     print(f"- Registration Test: http://localhost:{port}/api/agents/test-registration")
+    print(f"- Debug Info: http://localhost:{port}/debug")
     print("=" * 60)
     uvicorn.run(app, host="0.0.0.0", port=port)
