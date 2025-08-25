@@ -210,8 +210,7 @@ async def register_agent(
         
         return response_data
         
-    except HTTPException as he:
-        print(f"❌ HTTPException in registration: {he.detail}")
+    except HTTPException:
         raise
     except Exception as e:
         print(f"❌ Registration error: {e}")
