@@ -33,8 +33,7 @@ from sqlalchemy.orm import sessionmaker, Session
 # Additional imports
 import pandas as pd
 from PIL import Image
-import jwt
-from jwt.exceptions import InvalidTokenError
+from jose import jwt, JWTError  # Changed from 'jwt' to 'jose'
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -329,7 +328,7 @@ async def get_current_admin(
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
-    except InvalidTokenError:
+    except JWTError:
         raise credentials_exception
     
     admin = db.query(Admin).filter(Admin.username == username).first()
@@ -591,7 +590,7 @@ async def register_agent(
 ):
     """Register new agent with proper credentials"""
     try:
-        print(f"🆕 Agent registration attempt: {name}, {email}")
+        logger.info(f"🆕 Agent registration attempt: {name}, {email}")
         
         # Clean inputs
         name = name.strip()
@@ -667,7 +666,7 @@ async def register_agent(
         db.commit()
         db.refresh(new_agent)
         
-        print(f"✅ Agent registered successfully: {agent_id}")
+        logger.info(f"✅ Agent registered successfully: {agent_id}")
         
         # Build response
         response_data = {
@@ -1006,7 +1005,6 @@ async def submit_task_form(
         logger.error(f"Form submission error: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to submit form")
-
 # Data Export Routes
 @app.get("/api/admin/export-excel")
 async def export_excel(
