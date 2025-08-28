@@ -10,7 +10,8 @@ import string
 import hashlib
 import tempfile
 import json
-from datetime import datetime, timedelta
+import re
+from datetime import datetime, timedelta, date
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -18,7 +19,7 @@ from io import BytesIO
 import logging
 
 # FastAPI and related imports
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Request
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -32,6 +33,8 @@ from sqlalchemy.orm import sessionmaker, Session
 # Additional imports
 import pandas as pd
 from PIL import Image
+import jwt
+from jwt.exceptions import InvalidTokenError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -53,6 +56,11 @@ else:
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+# JWT Configuration
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", secrets.token_urlsafe(32))
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 120
 
 # Database Models
 class Admin(Base):
@@ -173,13 +181,53 @@ def generate_password(length: int = 8) -> str:
     characters = string.ascii_letters + string.digits
     return ''.join(secrets.choice(characters) for _ in range(length))
 
-def generate_agent_id() -> str:
-    """Generate unique agent ID"""
-    return f"AGT{secrets.randbelow(100000):05d}"
+def validate_email(email: str) -> bool:
+    """Validate email format"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
 
-def generate_task_id(agent_id: str) -> str:
-    """Generate unique task ID"""
-    return f"TASK_{agent_id}_{uuid.uuid4().hex[:8].upper()}"
+def validate_mobile(mobile: str) -> bool:
+    """Validate mobile number format"""
+    clean_mobile = re.sub(r'[\s\-\(\)]', '', mobile)
+    return re.match(r'^\+?\d{10,15}$', clean_mobile) is not None
+
+def generate_unique_agent_id(db: Session):
+    """Generate a unique agent ID"""
+    max_attempts = 100
+    for attempt in range(max_attempts):
+        agent_number = secrets.randbelow(900000) + 100000
+        agent_id = f"AGT{agent_number}"
+        existing = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not existing:
+            return agent_id
+    
+    # Fallback to timestamp-based ID
+    import time
+    fallback_id = f"AGT{str(int(time.time()))[-6:]}"
+    existing_fallback = db.query(Agent).filter(Agent.agent_id == fallback_id).first()
+    if existing_fallback:
+        raise HTTPException(status_code=500, detail="Failed to generate unique agent ID")
+    return fallback_id
+
+def generate_secure_password():
+    """Generate a secure password ensuring variety"""
+    characters = string.ascii_letters + string.digits + "!@#$%"
+    password_parts = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+        secrets.choice("!@#$%")
+    ]
+    for _ in range(6):  # Total length 10
+        password_parts.append(secrets.choice(characters))
+    secrets.SystemRandom().shuffle(password_parts)
+    return ''.join(password_parts)
+
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 # Database setup
 def get_db():
@@ -262,6 +310,33 @@ if os.environ.get("RAILWAY_STATIC_URL"):
     ALLOWED_ORIGINS.append(f"https://{os.environ.get('RAILWAY_STATIC_URL')}")
 if os.environ.get("RAILWAY_PUBLIC_DOMAIN"):
     ALLOWED_ORIGINS.append(f"https://{os.environ.get('RAILWAY_PUBLIC_DOMAIN')}")
+
+# Security
+security = HTTPBearer()
+
+async def get_current_admin(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except InvalidTokenError:
+        raise credentials_exception
+    
+    admin = db.query(Admin).filter(Admin.username == username).first()
+    if admin is None or not admin.is_active:
+        raise credentials_exception
+    
+    return admin
 
 # Cleanup function
 async def periodic_cleanup():
@@ -391,11 +466,14 @@ async def admin_login(credentials: dict, db: Session = Depends(get_db)):
             admin.last_login = datetime.utcnow()
             db.commit()
             
+            access_token = create_access_token(data={"sub": username})
+            
             return {
                 "success": True,
                 "message": "Login successful",
-                "username": username,
-                "access_token": f"admin_{admin.id}_{datetime.utcnow().timestamp()}"
+                "access_token": access_token,
+                "token_type": "bearer",
+                "username": username
             }
         else:
             raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -417,20 +495,49 @@ async def simple_admin_login(credentials: dict):
     
     return {"success": False, "message": "Invalid credentials"}
 
+@app.post("/api/admin/test-login")
+async def test_admin_login(credentials: dict, db: Session = Depends(get_db)):
+    """Test admin login endpoint"""
+    return await admin_login(credentials, db)
+
+@app.get("/api/admin/check-admin")
+async def check_admin_status(db: Session = Depends(get_db)):
+    """Check admin status"""
+    try:
+        admin_count = db.query(Admin).count()
+        admin = db.query(Admin).filter(Admin.username == "admin").first()
+        
+        return {
+            "admin_exists": admin is not None,
+            "admin_count": admin_count,
+            "admin_active": admin.is_active if admin else False,
+            "last_login": admin.last_login.isoformat() if admin and admin.last_login else None,
+            "database_ready": database_ready
+        }
+    except Exception as e:
+        return {"error": str(e), "database_ready": database_ready}
+
+@app.post("/api/admin/create-admin")
+async def create_admin_endpoint(db: Session = Depends(get_db)):
+    """Create admin user endpoint"""
+    success = create_default_admin()
+    return {
+        "success": success,
+        "message": "Admin user setup completed" if success else "Admin setup failed"
+    }
+
 # System Status Routes
 @app.get("/api/admin/statistics")
 async def get_statistics(db: Session = Depends(get_db)):
     """Get system statistics"""
     try:
         total_agents = db.query(Agent).count()
-        active_agents = db.query(Agent).filter(Agent.status == "active").count()
         total_tasks = db.query(TaskProgress).count()
         completed_tasks = db.query(TaskProgress).filter(TaskProgress.status == "completed").count()
         pending_tasks = total_tasks - completed_tasks
         
         return {
             "total_agents": total_agents,
-            "active_agents": active_agents,  
             "total_tasks": total_tasks,
             "completed_tasks": completed_tasks,
             "pending_tasks": pending_tasks
@@ -439,7 +546,6 @@ async def get_statistics(db: Session = Depends(get_db)):
         logger.error(f"Statistics error: {e}")
         return {
             "total_agents": 0,
-            "active_agents": 0,
             "total_tasks": 0,
             "completed_tasks": 0,
             "pending_tasks": 0
@@ -483,47 +589,110 @@ async def register_agent(
     gender: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
-    """Register new agent"""
+    """Register new agent with proper credentials"""
     try:
-        # Check if email already exists
-        existing_agent = db.query(Agent).filter(Agent.email == email).first()
+        print(f"🆕 Agent registration attempt: {name}, {email}")
+        
+        # Clean inputs
+        name = name.strip()
+        email = email.strip().lower()
+        mobile = re.sub(r'[\s\-\(\)]', '', mobile)
+        
+        # Collect all validation errors
+        validation_errors = []
+        
+        if not name or len(name) < 2:
+            validation_errors.append("Name must be at least 2 characters long")
+        
+        if not validate_email(email):
+            validation_errors.append("Invalid email format")
+        
+        if not validate_mobile(mobile):
+            validation_errors.append("Invalid mobile number format. Use 10-15 digits")
+        
+        # Validate optional fields
+        dob_date = None
+        if dob:
+            try:
+                dob_date = datetime.strptime(dob, '%Y-%m-%d').date()
+                age = (date.today() - dob_date).days // 365
+                if age < 16 or age > 80:
+                    validation_errors.append("Agent must be between 16 and 80 years old")
+            except ValueError:
+                validation_errors.append("Invalid date format. Use YYYY-MM-DD")
+        
+        if gender and gender not in ['Male', 'Female', 'Other']:
+            validation_errors.append("Gender must be Male, Female, or Other")
+        
+        if validation_errors:
+            raise HTTPException(status_code=400, detail="Validation errors: " + "; ".join(validation_errors))
+        
+        # Check if agent already exists
+        existing_agent = db.query(Agent).filter(
+            (Agent.email == email) | (Agent.mobile == mobile)
+        ).first()
+        
         if existing_agent:
-            raise HTTPException(status_code=409, detail="Email already registered")
+            if existing_agent.email == email:
+                raise HTTPException(status_code=409, detail="Email already registered")
+            else:
+                raise HTTPException(status_code=409, detail="Mobile number already registered")
         
-        # Generate unique agent ID
-        while True:
-            agent_id = generate_agent_id()
-            if not db.query(Agent).filter(Agent.agent_id == agent_id).first():
-                break
+        # Generate unique agent credentials
+        agent_id = generate_unique_agent_id(db)
+        password = generate_secure_password()
+        hashed_password = hash_password(password)
         
-        # Generate password
-        password = generate_password(8)
+        # Create new agent
+        agent_data = {
+            'agent_id': agent_id,
+            'name': name,
+            'email': email,
+            'mobile': mobile,
+            'hashed_password': hashed_password,
+            'status': "active",
+            'created_at': datetime.utcnow()
+        }
         
-        # Create agent
-        agent = Agent(
-            agent_id=agent_id,
-            name=name,
-            email=email,
-            mobile=mobile,
-            hashed_password=hash_password(password),
-            dob=dob,
-            country=country,
-            gender=gender,
-            status="active"
-        )
+        if dob:
+            agent_data['dob'] = dob
+        if country:
+            agent_data['country'] = country.strip()
+        if gender:
+            agent_data['gender'] = gender
         
-        db.add(agent)
+        new_agent = Agent(**agent_data)
+        
+        db.add(new_agent)
         db.commit()
-        db.refresh(agent)
+        db.refresh(new_agent)
         
-        logger.info(f"✅ Agent registered: {agent_id} - {name}")
+        print(f"✅ Agent registered successfully: {agent_id}")
         
-        return {
+        # Build response
+        response_data = {
             "success": True,
+            "message": "Registration successful! Please save your credentials.",
             "agent_id": agent_id,
             "password": password,
-            "message": f"Agent {name} registered successfully"
+            "name": name,
+            "email": email,
+            "mobile": mobile,
+            "status": "active",
+            "instructions": [
+                "Save your Agent ID and Password securely",
+                "You can now log in with these credentials"
+            ]
         }
+        
+        if dob:
+            response_data["dob"] = dob
+        if country:
+            response_data["country"] = country
+        if gender:
+            response_data["gender"] = gender
+        
+        return response_data
         
     except HTTPException:
         raise
@@ -531,6 +700,68 @@ async def register_agent(
         logger.error(f"❌ Registration error: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+@app.post("/api/agents/check-availability")
+async def check_availability(
+    email: Optional[str] = Form(None),
+    mobile: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """Check if email or mobile is available for registration"""
+    try:
+        result = {"available": True, "message": "Available"}
+        
+        if email:
+            email = email.strip().lower()
+            if not validate_email(email):
+                return {"available": False, "message": "Invalid email format"}
+            
+            existing_email = db.query(Agent).filter(Agent.email == email).first()
+            if existing_email:
+                return {"available": False, "message": "Email already registered"}
+        
+        if mobile:
+            mobile = re.sub(r'[\s\-\(\)]', '', mobile)
+            if not validate_mobile(mobile):
+                return {"available": False, "message": "Invalid mobile format"}
+            
+            existing_mobile = db.query(Agent).filter(Agent.mobile == mobile).first()
+            if existing_mobile:
+                return {"available": False, "message": "Mobile number already registered"}
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Availability check error: {e}")
+        return {"available": False, "message": "Check failed"}
+
+@app.get("/api/agents/test-registration")
+async def test_registration_system(db: Session = Depends(get_db)):
+    """Test the registration system"""
+    try:
+        agent_count = db.query(Agent).count()
+        test_agent_id = generate_unique_agent_id(db)
+        test_password = generate_secure_password()
+        
+        return {
+            "system_status": "healthy",
+            "database_connected": True,
+            "current_agent_count": agent_count,
+            "sample_credentials": {
+                "agent_id": test_agent_id,
+                "password": test_password
+            },
+            "registration_endpoint": "/api/agents/register",
+            "required_fields": ["name", "email", "mobile"],
+            "optional_fields": ["dob", "country", "gender"]
+        }
+        
+    except Exception as e:
+        return {
+            "system_status": "error",
+            "error": str(e),
+            "database_connected": False
+        }
 
 # Agent Authentication Routes
 @app.post("/api/agents/login")
@@ -607,7 +838,7 @@ async def upload_tasks(
                     shutil.move(extracted_path, final_path)
                     
                     # Create task
-                    task_id = generate_task_id(agent_id)
+                    task_id = f"TASK_{agent_id}_{uuid.uuid4().hex[:8].upper()}"
                     task = TaskProgress(
                         task_id=task_id,
                         agent_id=agent_id,
@@ -895,7 +1126,7 @@ async def debug_info(db: Session = Depends(get_db)):
         return {"error": str(e), "database_ready": database_ready}
 
 # Additional admin routes
-@app.get("/api/admin/agents/{agent_id}/password")
+@app.get("/api/admin/agent-password/{agent_id}")
 async def get_agent_password_info(agent_id: str, db: Session = Depends(get_db)):
     """Get agent password information"""
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
@@ -909,7 +1140,7 @@ async def get_agent_password_info(agent_id: str, db: Session = Depends(get_db)):
         "email": agent.email
     }
 
-@app.post("/api/admin/agents/{agent_id}/reset-password")
+@app.post("/api/admin/reset-password/{agent_id}")
 async def reset_agent_password(agent_id: str, db: Session = Depends(get_db)):
     """Reset agent password"""
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
@@ -917,7 +1148,7 @@ async def reset_agent_password(agent_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Agent not found")
     
     # Generate new password
-    new_password = generate_password(8)
+    new_password = generate_secure_password()
     agent.hashed_password = hash_password(new_password)
     
     db.commit()
@@ -972,7 +1203,7 @@ async def preview_data(
             date_to_obj = datetime.fromisoformat(date_to + "T23:59:59")
             query = query.filter(SubmittedForm.submitted_at <= date_to_obj)
         
-        submissions = query.limit(50).all()  # Limit for preview
+        submissions = query.limit(50).all()
         
         data = []
         for sub in submissions:
@@ -983,15 +1214,22 @@ async def preview_data(
                 "crime_type": sub.crime_type,
                 "location": sub.location,
                 "date_time": sub.date_time,
-                "description": sub.description[:100] + "..." if sub.description and len(sub.description) > 100 else sub.description,
+                "description": sub.description,
+                "suspect_info": sub.suspect_info,
+                "witness_info": sub.witness_info,
+                "evidence_details": sub.evidence_details,
                 "priority_level": sub.priority_level,
+                "reporter_name": sub.reporter_name,
+                "reporter_contact": sub.reporter_contact,
+                "case_number": sub.case_number,
+                "investigating_officer": sub.investigating_officer,
                 "submitted_at": sub.submitted_at.isoformat() if sub.submitted_at else None
             })
         
         return {"data": data, "total_count": query.count()}
         
     except Exception as e:
-        logger.error(f"Data preview error: {e}")
+        logger.error(f"Admin data preview error: {e}")
         raise HTTPException(status_code=500, detail="Preview failed")
 
 @app.get("/api/admin/test-data")
@@ -1001,15 +1239,15 @@ async def test_data_availability(db: Session = Depends(get_db)):
         submission_count = db.query(SubmittedForm).count()
         agent_count = db.query(Agent).count()
         task_count = db.query(TaskProgress).count()
+        completed_task_count = db.query(TaskProgress).filter(TaskProgress.status == "completed").count()
         
         return {
             "success": True,
             "message": f"Data available: {submission_count} submissions, {agent_count} agents, {task_count} tasks",
-            "counts": {
-                "submissions": submission_count,
-                "agents": agent_count,
-                "tasks": task_count
-            }
+            "submission_count": submission_count,
+            "agent_count": agent_count,
+            "task_count": task_count,
+            "completed_task_count": completed_task_count
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1068,9 +1306,9 @@ async def upload_chunk(
         chunk_dir = CHUNK_UPLOAD_DIR / upload_id
         chunk_path = chunk_dir / f"chunk_{chunk_index:04d}"
         
-        with open(chunk_path, "wb") as buffer:
+        async with aiofiles.open(chunk_path, 'wb') as buffer:
             content = await chunk.read()
-            buffer.write(content)
+            await buffer.write(content)
         
         # Update progress
         chunked_upload.chunks_received += 1
@@ -1127,7 +1365,7 @@ async def finalize_chunked_upload(
                     final_image_path = agent_dir / image_name
                     shutil.move(extracted_path, final_image_path)
                     
-                    task_id = generate_task_id(chunked_upload.agent_id)
+                    task_id = f"TASK_{chunked_upload.agent_id}_{uuid.uuid4().hex[:8].upper()}"
                     task = TaskProgress(
                         task_id=task_id,
                         agent_id=chunked_upload.agent_id,
@@ -1208,44 +1446,6 @@ async def get_agent_dashboard(agent_id: str, db: Session = Depends(get_db)):
         logger.error(f"Dashboard error: {e}")
         raise HTTPException(status_code=500, detail="Failed to load dashboard")
 
-# Testing and system check routes
-@app.get("/api/test-registration")
-async def test_registration_system():
-    """Test registration system"""
-    return {
-        "system_status": "operational",
-        "database_connected": database_ready,
-        "registration_endpoint": "/api/agents/register",
-        "message": "Registration system is ready",
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-@app.post("/api/admin/create-admin")
-async def create_admin_endpoint():
-    """Create admin user endpoint"""
-    success = create_default_admin()
-    return {
-        "success": success,
-        "message": "Admin user setup completed" if success else "Admin setup failed"
-    }
-
-@app.get("/api/admin/check-admin")
-async def check_admin_status(db: Session = Depends(get_db)):
-    """Check admin status"""
-    try:
-        admin_count = db.query(Admin).count()
-        admin = db.query(Admin).filter(Admin.username == "admin").first()
-        
-        return {
-            "admin_exists": admin is not None,
-            "admin_count": admin_count,
-            "admin_active": admin.is_active if admin else False,
-            "last_login": admin.last_login.isoformat() if admin and admin.last_login else None,
-            "database_ready": database_ready
-        }
-    except Exception as e:
-        return {"error": str(e), "database_ready": database_ready}
-
 # Error handlers
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc: HTTPException):
@@ -1270,9 +1470,9 @@ if __name__ == "__main__":
     print("=" * 60)
     print("🚀 CLIENT RECORDS DATA ENTRY SYSTEM v2.0")
     print("=" * 60)
-    print(f"🌍 Environment: {'Production' if DATABASE_URL.startswith('postgresql') else 'Development'}")
+    print(f"🌍 Environment: {'Production' if DATABASE_URL and DATABASE_URL.startswith('postgresql') else 'Development'}")
     print(f"🔗 CORS Origins: {len(ALLOWED_ORIGINS)} configured")
-    print(f"💾 Database: {'PostgreSQL' if DATABASE_URL.startswith('postgresql') else 'SQLite'}")
+    print(f"💾 Database: {'PostgreSQL' if DATABASE_URL and DATABASE_URL.startswith('postgresql') else 'SQLite'}")
     print(f"📊 Database Ready: {database_ready}")
     print(f"🏃 Starting server on port {port}")
     print("=" * 60)
@@ -1291,6 +1491,6 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=port,
-        reload=False,  # Disable reload for production
+        reload=False,
         log_level="info"
     )
