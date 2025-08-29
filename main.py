@@ -33,7 +33,7 @@ from sqlalchemy.orm import sessionmaker, Session
 # Additional imports
 import pandas as pd
 from PIL import Image
-from jose import jwt, JWTError  # Changed from 'jwt' to 'jose'
+from jose import jwt, JWTError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -187,8 +187,19 @@ def validate_email(email: str) -> bool:
 
 def validate_mobile(mobile: str) -> bool:
     """Validate mobile number format"""
-    clean_mobile = re.sub(r'[\s\-\(\)]', '', mobile)
-    return re.match(r'^\+?\d{10,15}$', clean_mobile) is not None
+    if not mobile:
+        return False
+        
+    # Remove all non-digit characters except leading +
+    clean_mobile = re.sub(r'[^\d+]', '', mobile)
+    
+    # Check if it has a country code (starts with +) or is just digits
+    if clean_mobile.startswith('+'):
+        # International format: + followed by 10-15 digits
+        return re.match(r'^\+\d{10,15}$', clean_mobile) is not None
+    else:
+        # Local format: 10-15 digits
+        return re.match(r'^\d{10,15}$', clean_mobile) is not None
 
 def generate_unique_agent_id(db: Session):
     """Generate a unique agent ID"""
@@ -426,6 +437,10 @@ try:
 except Exception as e:
     logger.warning(f"⚠️ Static files mount failed: {e}")
 
+# Import agent routes
+from agent_routes import router as agent_router
+app.include_router(agent_router, prefix="/api")
+
 # Root routes
 @app.get("/")
 async def root():
@@ -549,253 +564,6 @@ async def get_statistics(db: Session = Depends(get_db)):
             "completed_tasks": 0,
             "pending_tasks": 0
         }
-
-# Agent Management Routes
-@app.get("/api/agents")
-async def get_agents(db: Session = Depends(get_db)):
-    """Get all agents"""
-    try:
-        agents = db.query(Agent).all()
-        return [
-            {
-                "id": agent.id,
-                "agent_id": agent.agent_id,
-                "name": agent.name,
-                "email": agent.email,
-                "mobile": agent.mobile,
-                "status": agent.status,
-                "created_at": agent.created_at.isoformat() if agent.created_at else None,
-                "last_login": agent.last_login.isoformat() if agent.last_login else None,
-                "is_currently_logged_in": agent.is_currently_logged_in,
-                "tasks_completed": agent.tasks_completed,
-                "dob": agent.dob,
-                "country": agent.country,
-                "gender": agent.gender
-            }
-            for agent in agents
-        ]
-    except Exception as e:
-        logger.error(f"Get agents error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch agents")
-
-@app.post("/api/agents/register")
-async def register_agent(
-    name: str = Form(...),
-    email: str = Form(...),
-    mobile: str = Form(...),
-    dob: Optional[str] = Form(None),
-    country: Optional[str] = Form(None),
-    gender: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
-):
-    """Register new agent with proper credentials"""
-    try:
-        logger.info(f"🆕 Agent registration attempt: {name}, {email}")
-        
-        # Clean inputs
-        name = name.strip()
-        email = email.strip().lower()
-        mobile = re.sub(r'[\s\-\(\)]', '', mobile)
-        
-        # Collect all validation errors
-        validation_errors = []
-        
-        if not name or len(name) < 2:
-            validation_errors.append("Name must be at least 2 characters long")
-        
-        if not validate_email(email):
-            validation_errors.append("Invalid email format")
-        
-        if not validate_mobile(mobile):
-            validation_errors.append("Invalid mobile number format. Use 10-15 digits")
-        
-        # Validate optional fields
-        dob_date = None
-        if dob:
-            try:
-                dob_date = datetime.strptime(dob, '%Y-%m-%d').date()
-                age = (date.today() - dob_date).days // 365
-                if age < 16 or age > 80:
-                    validation_errors.append("Agent must be between 16 and 80 years old")
-            except ValueError:
-                validation_errors.append("Invalid date format. Use YYYY-MM-DD")
-        
-        if gender and gender not in ['Male', 'Female', 'Other']:
-            validation_errors.append("Gender must be Male, Female, or Other")
-        
-        if validation_errors:
-            raise HTTPException(status_code=400, detail="Validation errors: " + "; ".join(validation_errors))
-        
-        # Check if agent already exists
-        existing_agent = db.query(Agent).filter(
-            (Agent.email == email) | (Agent.mobile == mobile)
-        ).first()
-        
-        if existing_agent:
-            if existing_agent.email == email:
-                raise HTTPException(status_code=409, detail="Email already registered")
-            else:
-                raise HTTPException(status_code=409, detail="Mobile number already registered")
-        
-        # Generate unique agent credentials
-        agent_id = generate_unique_agent_id(db)
-        password = generate_secure_password()
-        hashed_password = hash_password(password)
-        
-        # Create new agent
-        agent_data = {
-            'agent_id': agent_id,
-            'name': name,
-            'email': email,
-            'mobile': mobile,
-            'hashed_password': hashed_password,
-            'status': "active",
-            'created_at': datetime.utcnow()
-        }
-        
-        if dob:
-            agent_data['dob'] = dob
-        if country:
-            agent_data['country'] = country.strip()
-        if gender:
-            agent_data['gender'] = gender
-        
-        new_agent = Agent(**agent_data)
-        
-        db.add(new_agent)
-        db.commit()
-        db.refresh(new_agent)
-        
-        logger.info(f"✅ Agent registered successfully: {agent_id}")
-        
-        # Build response
-        response_data = {
-            "success": True,
-            "message": "Registration successful! Please save your credentials.",
-            "agent_id": agent_id,
-            "password": password,
-            "name": name,
-            "email": email,
-            "mobile": mobile,
-            "status": "active",
-            "instructions": [
-                "Save your Agent ID and Password securely",
-                "You can now log in with these credentials"
-            ]
-        }
-        
-        if dob:
-            response_data["dob"] = dob
-        if country:
-            response_data["country"] = country
-        if gender:
-            response_data["gender"] = gender
-        
-        return response_data
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Registration error: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
-
-@app.post("/api/agents/check-availability")
-async def check_availability(
-    email: Optional[str] = Form(None),
-    mobile: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
-):
-    """Check if email or mobile is available for registration"""
-    try:
-        result = {"available": True, "message": "Available"}
-        
-        if email:
-            email = email.strip().lower()
-            if not validate_email(email):
-                return {"available": False, "message": "Invalid email format"}
-            
-            existing_email = db.query(Agent).filter(Agent.email == email).first()
-            if existing_email:
-                return {"available": False, "message": "Email already registered"}
-        
-        if mobile:
-            mobile = re.sub(r'[\s\-\(\)]', '', mobile)
-            if not validate_mobile(mobile):
-                return {"available": False, "message": "Invalid mobile format"}
-            
-            existing_mobile = db.query(Agent).filter(Agent.mobile == mobile).first()
-            if existing_mobile:
-                return {"available": False, "message": "Mobile number already registered"}
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"❌ Availability check error: {e}")
-        return {"available": False, "message": "Check failed"}
-
-@app.get("/api/agents/test-registration")
-async def test_registration_system(db: Session = Depends(get_db)):
-    """Test the registration system"""
-    try:
-        agent_count = db.query(Agent).count()
-        test_agent_id = generate_unique_agent_id(db)
-        test_password = generate_secure_password()
-        
-        return {
-            "system_status": "healthy",
-            "database_connected": True,
-            "current_agent_count": agent_count,
-            "sample_credentials": {
-                "agent_id": test_agent_id,
-                "password": test_password
-            },
-            "registration_endpoint": "/api/agents/register",
-            "required_fields": ["name", "email", "mobile"],
-            "optional_fields": ["dob", "country", "gender"]
-        }
-        
-    except Exception as e:
-        return {
-            "system_status": "error",
-            "error": str(e),
-            "database_connected": False
-        }
-
-# Agent Authentication Routes
-@app.post("/api/agents/login")
-async def agent_login(
-    agent_id: str = Form(...),
-    password: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    """Agent login"""
-    try:
-        agent = db.query(Agent).filter(
-            Agent.agent_id == agent_id,
-            Agent.status == "active"
-        ).first()
-        
-        if not agent or not verify_password(password, agent.hashed_password):
-            raise HTTPException(status_code=401, detail="Invalid credentials")
-        
-        # Update login status
-        agent.last_login = datetime.utcnow()
-        agent.is_currently_logged_in = True
-        db.commit()
-        
-        return {
-            "success": True,
-            "agent_id": agent.agent_id,
-            "name": agent.name,
-            "message": "Login successful"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Agent login error: {e}")
-        raise HTTPException(status_code=500, detail="Login failed")
 
 # Task Management Routes
 @app.post("/api/admin/upload-tasks")
