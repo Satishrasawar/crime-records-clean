@@ -17,6 +17,7 @@ import shutil
 import aiofiles
 from io import BytesIO
 import logging
+import hashlib
 
 # Import from your main application
 from app.database import get_db
@@ -38,8 +39,19 @@ def validate_email(email: str) -> bool:
 
 def validate_mobile(mobile: str) -> bool:
     """Validate mobile number format"""
-    clean_mobile = re.sub(r'[\s\-\(\)]', '', mobile)
-    return re.match(r'^\+?\d{10,15}$', clean_mobile) is not None
+    if not mobile:
+        return False
+        
+    # Remove all non-digit characters except leading +
+    clean_mobile = re.sub(r'[^\d+]', '', mobile)
+    
+    # Check if it has a country code (starts with +) or is just digits
+    if clean_mobile.startswith('+'):
+        # International format: + followed by 10-15 digits
+        return re.match(r'^\+\d{10,15}$', clean_mobile) is not None
+    else:
+        # Local format: 10-15 digits
+        return re.match(r'^\d{10,15}$', clean_mobile) is not None
 
 def generate_unique_agent_id(db: Session):
     """Generate a unique agent ID"""
@@ -96,12 +108,14 @@ async def register_agent(
 ):
     """Register a new agent with proper credentials"""
     try:
-        logger.info(f"🆕 Agent registration attempt: {name}, {email}")
+        logger.info(f"🆕 Agent registration attempt: {name}, {email}, {mobile}")
         
         # Clean inputs
         name = name.strip()
         email = email.strip().lower()
         mobile = re.sub(r'[\s\-\(\)]', '', mobile)
+        
+        logger.info(f"Cleaned inputs - Name: {name}, Email: {email}, Mobile: {mobile}")
         
         # Collect all validation errors
         validation_errors = []
@@ -113,7 +127,7 @@ async def register_agent(
             validation_errors.append("Invalid email format")
         
         if not validate_mobile(mobile):
-            validation_errors.append("Invalid mobile number format. Use 10-15 digits")
+            validation_errors.append(f"Invalid mobile number format: {mobile}. Use 10-15 digits")
         
         # Validate optional fields
         dob_date = None
@@ -130,6 +144,7 @@ async def register_agent(
             validation_errors.append("Gender must be Male, Female, or Other")
         
         if validation_errors:
+            logger.error(f"Validation errors: {validation_errors}")
             raise HTTPException(status_code=400, detail="Validation errors: " + "; ".join(validation_errors))
         
         # Check if agent already exists
@@ -139,14 +154,18 @@ async def register_agent(
         
         if existing_agent:
             if existing_agent.email == email:
+                logger.error(f"Email already registered: {email}")
                 raise HTTPException(status_code=409, detail="Email already registered")
             else:
+                logger.error(f"Mobile number already registered: {mobile}")
                 raise HTTPException(status_code=409, detail="Mobile number already registered")
         
         # Generate unique agent credentials
         agent_id = generate_unique_agent_id(db)
         password = generate_secure_password()
         hashed_password = hash_password(password)
+        
+        logger.info(f"Generated credentials - Agent ID: {agent_id}, Password: {password}")
         
         # Create new agent
         agent_data = {
@@ -202,7 +221,7 @@ async def register_agent(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Registration error: {e}")
+        logger.error(f"❌ Registration error: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
@@ -563,7 +582,7 @@ async def get_agent_profile(agent_id: str, db: Session = Depends(get_db)):
                 "last_login": agent.last_login.isoformat() if agent.last_login else None,
                 "tasks_completed": agent.tasks_completed,
                 "dob": agent.dob,
-                "country": agent.country,
+                "country": agent.count country,
                 "gender": agent.gender
             },
             "stats": {
