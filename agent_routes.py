@@ -19,11 +19,9 @@ from io import BytesIO
 import logging
 import hashlib
 
-# Import from your main application
+# Database and model imports
 from app.database import get_db
-from app.models import Agent, TaskProgress, SubmittedForm, AgentSession, Admin, ChunkedUpload
-from app.security import hash_password, verify_password, create_access_token, SECRET_KEY, ALGORITHM
-from app.main import UPLOAD_DIR, TASKS_DIR, TEMP_DIR, CHUNK_UPLOAD_DIR
+from app.models import Agent, TaskProgress, SubmittedForm, AgentSession
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -32,6 +30,14 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer()
 
 # Utility functions
+def hash_password(password: str) -> str:
+    """Hash password using SHA256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(password: str, hashed: str) -> bool:
+    """Verify password against hash"""
+    return hash_password(password) == hashed
+
 def validate_email(email: str) -> bool:
     """Validate email format"""
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
@@ -85,18 +91,9 @@ def generate_secure_password():
     secrets.SystemRandom().shuffle(password_parts)
     return ''.join(password_parts)
 
-def get_agent_image_files(agent_id: str):
-    """Get all image files assigned to a specific agent"""
-    agent_folder = f"static/task_images/{agent_id}"
-    if not os.path.exists(agent_folder):
-        agent_folder = "static/task_images/crime_records_wide"
-    if not os.path.exists(agent_folder):
-        return []
-    return sorted([f for f in os.listdir(agent_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
-
 # ===================== AGENT REGISTRATION ENDPOINTS =====================
 
-@router.post("/api/agents/register")
+@router.post("/agents/register")
 async def register_agent(
     name: str = Form(...),
     email: str = Form(...),
@@ -225,7 +222,7 @@ async def register_agent(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
-@router.post("/api/agents/check-availability")
+@router.post("/agents/check-availability")
 async def check_availability(
     email: Optional[str] = Form(None),
     mobile: Optional[str] = Form(None),
@@ -259,7 +256,7 @@ async def check_availability(
         logger.error(f"❌ Availability check error: {e}")
         return {"available": False, "message": "Check failed"}
 
-@router.get("/api/agents/test-registration")
+@router.get("/agents/test-registration")
 async def test_registration_system(db: Session = Depends(get_db)):
     """Test the registration system"""
     try:
@@ -289,7 +286,7 @@ async def test_registration_system(db: Session = Depends(get_db)):
 
 # ===================== AGENT AUTHENTICATION ENDPOINTS =====================
 
-@router.post("/api/agents/login")
+@router.post("/agents/login")
 async def agent_login(
     agent_id: str = Form(...),
     password: str = Form(...),
@@ -338,7 +335,7 @@ async def agent_login(
         logger.error(f"❌ Agent login error: {e}")
         raise HTTPException(status_code=500, detail="Login failed")
 
-@router.post("/api/agents/logout")
+@router.post("/agents/logout")
 async def agent_logout(
     agent_id: str = Form(...),
     session_token: str = Form(...),
@@ -375,7 +372,7 @@ async def agent_logout(
 
 # ===================== AGENT TASK ENDPOINTS =====================
 
-@router.get("/api/agents/{agent_id}/tasks")
+@router.get("/agents/{agent_id}/tasks")
 async def get_agent_tasks(
     agent_id: str,
     status: Optional[str] = None,
@@ -414,7 +411,7 @@ async def get_agent_tasks(
         logger.error(f"Tasks fetch error: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch tasks")
 
-@router.get("/api/agents/{agent_id}/current-task")
+@router.get("/agents/{agent_id}/current-task")
 async def get_current_task(agent_id: str, db: Session = Depends(get_db)):
     """Get current task for an agent"""
     try:
@@ -448,110 +445,9 @@ async def get_current_task(agent_id: str, db: Session = Depends(get_db)):
         logger.error(f"❌ Error getting current task: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get task: {str(e)}")
 
-@router.post("/api/agents/{agent_id}/submit")
-async def submit_task_form(
-    agent_id: str,
-    task_id: str = Form(...),
-    crime_type: Optional[str] = Form(None),
-    location: Optional[str] = Form(None),
-    date_time: Optional[str] = Form(None),
-    description: Optional[str] = Form(None),
-    suspect_info: Optional[str] = Form(None),
-    witness_info: Optional[str] = Form(None),
-    evidence_details: Optional[str] = Form(None),
-    priority_level: Optional[str] = Form(None),
-    reporter_name: Optional[str] = Form(None),
-    reporter_contact: Optional[str] = Form(None),
-    case_number: Optional[str] = Form(None),
-    investigating_officer: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
-):
-    """Submit completed task form"""
-    try:
-        # Verify agent and task
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        task = db.query(TaskProgress).filter(
-            TaskProgress.task_id == task_id,
-            TaskProgress.agent_id == agent_id
-        ).first()
-        
-        if not task:
-            raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-        
-        # Check if already submitted
-        existing_submission = db.query(SubmittedForm).filter(
-            SubmittedForm.task_id == task_id,
-            SubmittedForm.agent_id == agent_id
-        ).first()
-        
-        if existing_submission:
-            # Update existing submission
-            existing_submission.crime_type = crime_type
-            existing_submission.location = location
-            existing_submission.date_time = date_time
-            existing_submission.description = description
-            existing_submission.suspect_info = suspect_info
-            existing_submission.witness_info = witness_info
-            existing_submission.evidence_details = evidence_details
-            existing_submission.priority_level = priority_level
-            existing_submission.reporter_name = reporter_name
-            existing_submission.reporter_contact = reporter_contact
-            existing_submission.case_number = case_number
-            existing_submission.investigating_officer = investigating_officer
-            existing_submission.submitted_at = datetime.utcnow()
-            message = "Form updated successfully"
-        else:
-            # Create new submission
-            submission = SubmittedForm(
-                agent_id=agent_id,
-                task_id=task_id,
-                image_name=task.image_name,
-                crime_type=crime_type,
-                location=location,
-                date_time=date_time,
-                description=description,
-                suspect_info=suspect_info,
-                witness_info=witness_info,
-                evidence_details=evidence_details,
-                priority_level=priority_level,
-                reporter_name=reporter_name,
-                reporter_contact=reporter_contact,
-                case_number=case_number,
-                investigating_officer=investigating_officer
-            )
-            db.add(submission)
-            
-            # Update task status
-            task.status = "completed"
-            task.completed_at = datetime.utcnow()
-            
-            # Update agent task count
-            agent.tasks_completed += 1
-            
-            message = "Form submitted successfully"
-        
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": message,
-            "agent_id": agent_id,
-            "task_id": task_id
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Error submitting task: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Task submission failed: {str(e)}")
-
 # ===================== AGENT PROFILE ENDPOINTS =====================
 
-@router.get("/api/agents/{agent_id}/profile")
+@router.get("/agents/{agent_id}/profile")
 async def get_agent_profile(agent_id: str, db: Session = Depends(get_db)):
     """Get agent profile information"""
     try:
@@ -582,7 +478,7 @@ async def get_agent_profile(agent_id: str, db: Session = Depends(get_db)):
                 "last_login": agent.last_login.isoformat() if agent.last_login else None,
                 "tasks_completed": agent.tasks_completed,
                 "dob": agent.dob,
-                "country": agent.count country,
+                "country": agent.country,
                 "gender": agent.gender
             },
             "stats": {
@@ -606,223 +502,9 @@ async def get_agent_profile(agent_id: str, db: Session = Depends(get_db)):
         logger.error(f"❌ Error getting agent profile: {e}")
         raise HTTPException(status_code=500, detail="Failed to get agent profile")
 
-@router.put("/api/agents/{agent_id}/profile")
-async def update_agent_profile(
-    agent_id: str,
-    name: Optional[str] = Form(None),
-    email: Optional[str] = Form(None),
-    mobile: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
-):
-    """Update agent profile information"""
-    try:
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        
-        # Validate inputs if provided
-        if email and not validate_email(email):
-            raise HTTPException(status_code=400, detail="Invalid email format")
-        
-        if mobile and not validate_mobile(mobile):
-            raise HTTPException(status_code=400, detail="Invalid mobile number format")
-        
-        # Check for duplicate email
-        if email and email != agent.email:
-            existing_agent = db.query(Agent).filter(Agent.email == email).first()
-            if existing_agent:
-                raise HTTPException(status_code=409, detail="Email already registered")
-        
-        # Check for duplicate mobile
-        if mobile and mobile != agent.mobile:
-            existing_agent = db.query(Agent).filter(Agent.mobile == mobile).first()
-            if existing_agent:
-                raise HTTPException(status_code=409, detail="Mobile number already registered")
-        
-        # Update fields
-        if name:
-            agent.name = name.strip()
-        if email:
-            agent.email = email.strip().lower()
-        if mobile:
-            agent.mobile = re.sub(r'[\s\-\(\)]', '', mobile)
-        
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": "Profile updated successfully",
-            "agent_id": agent_id
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Error updating agent profile: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to update profile")
-
-@router.post("/api/agents/{agent_id}/change-password")
-async def change_agent_password(
-    agent_id: str,
-    current_password: str = Form(...),
-    new_password: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    """Change agent password"""
-    try:
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        
-        # Verify current password
-        if not verify_password(current_password, agent.hashed_password):
-            raise HTTPException(status_code=401, detail="Current password is incorrect")
-        
-        # Update password
-        agent.hashed_password = hash_password(new_password)
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": "Password changed successfully",
-            "agent_id": agent_id
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Error changing password: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to change password")
-
-# ===================== AGENT DASHBOARD ENDPOINTS =====================
-
-@router.get("/api/agents/{agent_id}/dashboard")
-async def get_agent_dashboard(agent_id: str, db: Session = Depends(get_db)):
-    """Get agent dashboard data"""
-    try:
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        
-        # Get task statistics
-        total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).count()
-        completed_tasks = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id,
-            TaskProgress.status == "completed"
-        ).count()
-        
-        # Get recent activity
-        recent_submissions = db.query(SubmittedForm).filter(
-            SubmittedForm.agent_id == agent_id
-        ).order_by(SubmittedForm.submitted_at.desc()).limit(5).all()
-        
-        # Get performance metrics (last 7 days)
-        seven_days_ago = datetime.utcnow() - timedelta(days=7)
-        recent_completed = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id,
-            TaskProgress.status == "completed",
-            TaskProgress.completed_at >= seven_days_ago
-        ).count()
-        
-        return {
-            "agent": {
-                "agent_id": agent.agent_id,
-                "name": agent.name,
-                "email": agent.email,
-                "tasks_completed": agent.tasks_completed
-            },
-            "stats": {
-                "total_tasks": total_tasks,
-                "completed_tasks": completed_tasks,
-                "pending_tasks": total_tasks - completed_tasks,
-                "completion_rate": round((completed_tasks / total_tasks * 100), 2) if total_tasks > 0 else 0,
-                "recent_completed": recent_completed
-            },
-            "recent_submissions": [
-                {
-                    "task_id": sub.task_id,
-                    "image_name": sub.image_name,
-                    "crime_type": sub.crime_type,
-                    "submitted_at": sub.submitted_at.isoformat() if sub.submitted_at else None
-                }
-                for sub in recent_submissions
-            ]
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Error getting dashboard: {e}")
-        raise HTTPException(status_code=500, detail="Failed to load dashboard")
-
-# ===================== AGENT SESSION MANAGEMENT =====================
-
-@router.get("/api/agents/{agent_id}/sessions")
-async def get_agent_sessions(agent_id: str, db: Session = Depends(get_db)):
-    """Get agent session history"""
-    try:
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        
-        sessions = db.query(AgentSession).filter(
-            AgentSession.agent_id == agent_id
-        ).order_by(AgentSession.created_at.desc()).limit(20).all()
-        
-        return {
-            "sessions": [
-                {
-                    "session_token": session.session_token,
-                    "created_at": session.created_at.isoformat() if session.created_at else None,
-                    "expires_at": session.expires_at.isoformat() if session.expires_at else None,
-                    "is_active": session.is_active,
-                    "duration_minutes": (
-                        (session.expires_at - session.created_at).total_seconds() / 60 
-                        if session.expires_at and session.created_at else None
-                    )
-                }
-                for session in sessions
-            ]
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Error getting sessions: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get sessions")
-
-@router.post("/api/agents/{agent_id}/invalidate-session")
-async def invalidate_agent_session(
-    agent_id: str,
-    session_token: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    """Invalidate a specific agent session"""
-    try:
-        session = db.query(AgentSession).filter(
-            AgentSession.agent_id == agent_id,
-            AgentSession.session_token == session_token
-        ).first()
-        
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
-        
-        session.is_active = False
-        session.expires_at = datetime.utcnow()
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": "Session invalidated successfully",
-            "agent_id": agent_id
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Error invalidating session: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to invalidate session")
-
 # ===================== HEALTH CHECK ENDPOINT =====================
 
-@router.get("/api/agents/health")
+@router.get("/agents/health")
 async def agent_health_check():
     """Agent service health check"""
     return {
@@ -833,7 +515,6 @@ async def agent_health_check():
             "/api/agents/register",
             "/api/agents/login",
             "/api/agents/{agent_id}/tasks",
-            "/api/agents/{agent_id}/profile",
-            "/api/agents/{agent_id}/dashboard"
+            "/api/agents/{agent_id}/profile"
         ]
     }
