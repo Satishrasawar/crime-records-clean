@@ -219,7 +219,7 @@ async def check_availability(
                 return {"available": False, "message": "Email already registered"}
         
         if mobile:
-                        mobile = re.sub(r'[\s\-\(\)]', '', mobile)
+            mobile = re.sub(r'[\s\-\(\)]', '', mobile)
             if not validate_mobile(mobile):
                 return {"available": False, "message": "Invalid mobile format"}
             
