@@ -1,16 +1,16 @@
 from fastapi import APIRouter, Form, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 import uuid
 import secrets
 import string
 import re
 import logging
-import hashlib
+import bcrypt
 
 # Import from main directly
-from main import get_db, Agent, TaskProgress, SubmittedForm, AgentSession, hash_password, verify_password
+from main import get_db, Agent, AgentSession, hash_password, verify_password
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ async def register_agent(
         if dob:
             try:
                 dob_date = datetime.strptime(dob, '%Y-%m-%d').date()
-                age = (date.today() - dob_date).days // 365
+                age = (datetime.now().date() - dob_date).days // 365
                 if age < 16 or age > 80:
                     validation_errors.append("Agent must be between 16 and 80 years old")
             except ValueError:
@@ -219,7 +219,7 @@ async def check_availability(
                 return {"available": False, "message": "Email already registered"}
         
         if mobile:
-            mobile = re.sub(r'[\s\-\(\)]', '', mobile)
+                        mobile = re.sub(r'[\s\-\(\)]', '', mobile)
             if not validate_mobile(mobile):
                 return {"available": False, "message": "Invalid mobile format"}
             
@@ -269,17 +269,43 @@ async def agent_login(
     password: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """Agent login"""
+    """Agent login with proper authentication"""
     try:
-        agent = db.query(Agent).filter(
-            Agent.agent_id == agent_id,
-            Agent.status == "active"
-        ).first()
+        # Check if agent is locked
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
         
-        if not agent or not verify_password(password, agent.hashed_password):
+        if not agent:
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
-        # Update login status
+        # Check if account is locked
+        if agent.locked_until and agent.locked_until > datetime.utcnow():
+            remaining_time = (agent.locked_until - datetime.utcnow()).seconds
+            raise HTTPException(
+                status_code=423, 
+                detail=f"Account locked. Try again in {remaining_time} seconds"
+            )
+        
+        # Verify password
+        if not verify_password(password, agent.hashed_password):
+            # Increment failed attempts
+            agent.login_attempts += 1
+            
+            # Lock account after 3 failed attempts for 5 minutes
+            if agent.login_attempts >= 3:
+                agent.locked_until = datetime.utcnow() + timedelta(minutes=5)
+                agent.login_attempts = 0
+                db.commit()
+                raise HTTPException(
+                    status_code=423, 
+                    detail="Account locked for 5 minutes due to multiple failed attempts"
+                )
+            
+            db.commit()
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        # Reset login attempts on successful login
+        agent.login_attempts = 0
+        agent.locked_until = None
         agent.last_login = datetime.utcnow()
         agent.is_currently_logged_in = True
         db.commit()
@@ -347,6 +373,79 @@ async def agent_logout(
         logger.error(f"❌ Agent logout error: {e}")
         raise HTTPException(status_code=500, detail="Logout failed")
 
+# ===================== AGENT MANAGEMENT ENDPOINTS =====================
+
+@router.get("/agents")
+async def get_agents(db: Session = Depends(get_db)):
+    """Get all agents"""
+    try:
+        agents = db.query(Agent).all()
+        return [
+            {
+                "id": agent.id,
+                "agent_id": agent.agent_id,
+                "name": agent.name,
+                "email": agent.email,
+                "mobile": agent.mobile,
+                "status": agent.status,
+                "created_at": agent.created_at.isoformat() if agent.created_at else None,
+                "last_login": agent.last_login.isoformat() if agent.last_login else None,
+                "is_currently_logged_in": agent.is_currently_logged_in,
+                "tasks_completed": agent.tasks_completed,
+                "dob": agent.dob,
+                "country": agent.country,
+                "gender": agent.gender,
+                "login_attempts": agent.login_attempts,
+                "locked_until": agent.locked_until.isoformat() if agent.locked_until else None
+            }
+            for agent in agents
+        ]
+    except Exception as e:
+        logger.error(f"Get agents error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch agents")
+
+@router.patch("/agents/{agent_id}/status")
+async def update_agent_status(
+    agent_id: str,
+    status_data: dict,
+    db: Session = Depends(get_db)
+):
+    """Update agent status"""
+    agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    new_status = status_data.get("status")
+    if new_status not in ["active", "inactive"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    
+    agent.status = new_status
+    db.commit()
+    
+    return {"success": True, "message": f"Agent status updated to {new_status}"}
+
+@router.post("/agents/{agent_id}/reset-password")
+async def reset_agent_password(agent_id: str, db: Session = Depends(get_db)):
+    """Reset agent password"""
+    agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    # Generate new password
+    new_password = generate_secure_password()
+    agent.hashed_password = hash_password(new_password)
+    agent.login_attempts = 0
+    agent.locked_until = None
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "agent_id": agent_id,
+        "new_password": new_password,
+        "message": f"Password reset for {agent.name}"
+    }
+
 # ===================== HEALTH CHECK ENDPOINT =====================
 
 @router.get("/agents/health")
@@ -359,6 +458,127 @@ async def agent_health_check():
         "endpoints_available": [
             "/api/agents/register",
             "/api/agents/login",
-            "/api/agents/logout"
+            "/api/agents/logout",
+            "/api/agents",
+            "/api/agents/{agent_id}/status",
+            "/api/agents/{agent_id}/reset-password"
         ]
     }
+
+# ===================== AGENT PROFILE ENDPOINTS =====================
+
+@router.get("/agents/{agent_id}/profile")
+async def get_agent_profile(agent_id: str, db: Session = Depends(get_db)):
+    """Get agent profile information"""
+    try:
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        
+        return {
+            "agent_id": agent.agent_id,
+            "name": agent.name,
+            "email": agent.email,
+            "mobile": agent.mobile,
+            "status": agent.status,
+            "created_at": agent.created_at.isoformat() if agent.created_at else None,
+            "last_login": agent.last_login.isoformat() if agent.last_login else None,
+            "tasks_completed": agent.tasks_completed,
+            "dob": agent.dob,
+            "country": agent.country,
+            "gender": agent.gender
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting agent profile: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get agent profile")
+
+@router.put("/agents/{agent_id}/profile")
+async def update_agent_profile(
+    agent_id: str,
+    name: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
+    mobile: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """Update agent profile information"""
+    try:
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        
+        # Validate inputs if provided
+        if email and not validate_email(email):
+            raise HTTPException(status_code=400, detail="Invalid email format")
+        
+        if mobile and not validate_mobile(mobile):
+            raise HTTPException(status_code=400, detail="Invalid mobile number format")
+        
+        # Check for duplicate email
+        if email and email != agent.email:
+            existing_agent = db.query(Agent).filter(Agent.email == email).first()
+            if existing_agent:
+                raise HTTPException(status_code=409, detail="Email already registered")
+        
+        # Check for duplicate mobile
+        if mobile and mobile != agent.mobile:
+            existing_agent = db.query(Agent).filter(Agent.mobile == mobile).first()
+            if existing_agent:
+                raise HTTPException(status_code=409, detail="Mobile number already registered")
+        
+        # Update fields
+        if name:
+            agent.name = name.strip()
+        if email:
+            agent.email = email.strip().lower()
+        if mobile:
+            agent.mobile = re.sub(r'[\s\-\(\)]', '', mobile)
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Profile updated successfully",
+            "agent_id": agent_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error updating agent profile: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update profile")
+
+@router.post("/agents/{agent_id}/change-password")
+async def change_agent_password(
+    agent_id: str,
+    current_password: str = Form(...),
+    new_password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Change agent password"""
+    try:
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        
+        # Verify current password
+        if not verify_password(current_password, agent.hashed_password):
+            raise HTTPException(status_code=401, detail="Current password is incorrect")
+        
+        # Update password
+        agent.hashed_password = hash_password(new_password)
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Password changed successfully",
+            "agent_id": agent_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error changing password: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to change password")
