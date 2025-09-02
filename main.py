@@ -438,8 +438,16 @@ except Exception as e:
     logger.warning(f"⚠️ Static files mount failed: {e}")
 
 # Import agent routes
-from agent_routes import router as agent_router
-app.include_router(agent_router, prefix="/api")
+try:
+    from agent_routes import router as agent_router
+    app.include_router(agent_router, prefix="/api")
+    logger.info("✅ Agent routes imported successfully")
+except ImportError as e:
+    logger.error(f"❌ Failed to import agent routes: {e}")
+    # Create basic agent routes if import fails
+    @app.post("/api/agents/register")
+    async def register_agent_fallback():
+        return {"error": "Agent routes not properly configured"}
 
 # Root routes
 @app.get("/")
@@ -739,7 +747,7 @@ async def submit_task_form(
                 date_time=date_time,
                 description=description,
                 suspect_info=suspect_info,
-                witness_info=witness_info,
+                witness_info=suspect_info,
                 evidence_details=evidence_details,
                 priority_level=priority_level,
                 reporter_name=reporter_name,
@@ -773,6 +781,7 @@ async def submit_task_form(
         logger.error(f"Form submission error: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to submit form")
+
 # Data Export Routes
 @app.get("/api/admin/export-excel")
 async def export_excel(
