@@ -34,6 +34,7 @@ from sqlalchemy.orm import sessionmaker, Session
 import pandas as pd
 from PIL import Image
 from jose import jwt, JWTError
+import bcrypt
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -90,6 +91,8 @@ class Agent(Base):
     last_login = Column(DateTime, nullable=True)
     is_currently_logged_in = Column(Boolean, default=False)
     tasks_completed = Column(Integer, default=0)
+    login_attempts = Column(Integer, default=0)
+    locked_until = Column(DateTime, nullable=True)
 
 class TaskProgress(Base):
     __tablename__ = "task_progress"
@@ -168,12 +171,13 @@ for directory in [UPLOAD_DIR, TASKS_DIR, TEMP_DIR, CHUNK_UPLOAD_DIR]:
 
 # Security functions
 def hash_password(password: str) -> str:
-    """Hash password using SHA256"""
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Hash password using bcrypt"""
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode(), salt).decode()
 
 def verify_password(password: str, hashed: str) -> bool:
-    """Verify password against hash"""
-    return hash_password(password) == hashed
+    """Verify password against bcrypt hash"""
+    return bcrypt.checkpw(password.encode(), hashed.encode())
 
 def generate_password(length: int = 8) -> str:
     """Generate secure random password"""
@@ -582,10 +586,17 @@ async def upload_tasks(
 ):
     """Upload ZIP file and create tasks"""
     try:
-        # Validate agent
+        # Validate agent exists and is active
         agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
+        
+        if agent.status != "active":
+            raise HTTPException(status_code=400, detail="Agent is not active")
+        
+        # Validate file type
+        if not zip_file.filename.lower().endswith('.zip'):
+            raise HTTPException(status_code=400, detail="Only ZIP files are allowed")
         
         # Create agent directory
         agent_dir = TASKS_DIR / agent_id
@@ -599,38 +610,67 @@ async def upload_tasks(
             buffer.write(content)
         
         images_processed = 0
+        supported_extensions = ('.jpg', '.jpeg', '.png', '.gif')
         
         # Extract and process images
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             for file_info in zip_ref.filelist:
-                if file_info.filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
-                    # Extract image
-                    extracted_path = zip_ref.extract(file_info, TEMP_DIR)
-                    
-                    # Move to agent directory
-                    image_name = os.path.basename(file_info.filename)
-                    final_path = agent_dir / image_name
-                    shutil.move(extracted_path, final_path)
-                    
-                    # Create task
-                    task_id = f"TASK_{agent_id}_{uuid.uuid4().hex[:8].upper()}"
-                    task = TaskProgress(
-                        task_id=task_id,
-                        agent_id=agent_id,
-                        image_path=str(final_path),
-                        image_name=image_name,
-                        status="pending"
-                    )
-                    db.add(task)
-                    images_processed += 1
+                if file_info.filename.lower().endswith(supported_extensions):
+                    try:
+                        # Extract image
+                        extracted_path = zip_ref.extract(file_info, TEMP_DIR)
+                        
+                        # Validate image file
+                        try:
+                            with Image.open(extracted_path) as img:
+                                img.verify()  # Verify it's a valid image
+                        except (IOError, SyntaxError):
+                            logger.warning(f"Skipping invalid image: {file_info.filename}")
+                            continue
+                        
+                        # Move to agent directory
+                        image_name = os.path.basename(file_info.filename)
+                        final_path = agent_dir / image_name
+                        
+                        # Ensure unique filename
+                        counter = 1
+                        original_name = final_path.stem
+                        original_ext = final_path.suffix
+                        while final_path.exists():
+                            final_path = agent_dir / f"{original_name}_{counter}{original_ext}"
+                            counter += 1
+                        
+                        shutil.move(extracted_path, final_path)
+                        
+                        # Create task
+                        task_id = f"TASK_{agent_id}_{uuid.uuid4().hex[:8].upper()}"
+                        task = TaskProgress(
+                            task_id=task_id,
+                            agent_id=agent_id,
+                            image_path=str(final_path),
+                            image_name=final_path.name,
+                            status="pending"
+                        )
+                        db.add(task)
+                        images_processed += 1
+                        
+                    except Exception as e:
+                        logger.error(f"Error processing image {file_info.filename}: {e}")
+                        continue
         
         # Clean up
-        os.remove(zip_path)
+        try:
+            os.remove(zip_path)
+        except:
+            pass
         
         # Remove extracted directories in temp
         for item in TEMP_DIR.iterdir():
             if item.is_dir() and str(item.name).startswith('tmp'):
-                shutil.rmtree(item, ignore_errors=True)
+                try:
+                    shutil.rmtree(item, ignore_errors=True)
+                except:
+                    pass
         
         db.commit()
         
@@ -639,7 +679,8 @@ async def upload_tasks(
         return {
             "success": True,
             "images_processed": images_processed,
-            "agent_id": agent_id
+            "agent_id": agent_id,
+            "message": f"Successfully assigned {images_processed} tasks to agent"
         }
         
     except HTTPException:
@@ -656,8 +697,13 @@ async def get_agent_tasks(
     status: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """Get tasks for agent"""
+    """Get tasks for agent with proper validation"""
     try:
+        # Verify agent exists
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        
         query = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id)
         
         if status:
@@ -677,7 +723,9 @@ async def get_agent_tasks(
                 }
                 for task in tasks
             ],
-            "total": len(tasks)
+            "total": len(tasks),
+            "agent_id": agent_id,
+            "agent_name": agent.name
         }
         
     except Exception as e:
@@ -747,7 +795,7 @@ async def submit_task_form(
                 date_time=date_time,
                 description=description,
                 suspect_info=suspect_info,
-                witness_info=suspect_info,
+                witness_info=witness_info,
                 evidence_details=evidence_details,
                 priority_level=priority_level,
                 reporter_name=reporter_name,
@@ -925,6 +973,8 @@ async def reset_agent_password(agent_id: str, db: Session = Depends(get_db)):
     # Generate new password
     new_password = generate_secure_password()
     agent.hashed_password = hash_password(new_password)
+    agent.login_attempts = 0
+    agent.locked_until = None
     
     db.commit()
     
@@ -1220,6 +1270,147 @@ async def get_agent_dashboard(agent_id: str, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Dashboard error: {e}")
         raise HTTPException(status_code=500, detail="Failed to load dashboard")
+
+# Agent login endpoint
+@app.post("/api/agents/login")
+async def agent_login(
+    agent_id: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Agent login with proper authentication"""
+    try:
+        # Check if agent is locked
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        
+        if not agent:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        # Check if account is locked
+        if agent.locked_until and agent.locked_until > datetime.utcnow():
+            remaining_time = (agent.locked_until - datetime.utcnow()).seconds
+            raise HTTPException(
+                status_code=423, 
+                detail=f"Account locked. Try again in {remaining_time} seconds"
+            )
+        
+        # Verify password
+        if not verify_password(password, agent.hashed_password):
+            # Increment failed attempts
+            agent.login_attempts += 1
+            
+            # Lock account after 3 failed attempts for 5 minutes
+            if agent.login_attempts >= 3:
+                agent.locked_until = datetime.utcnow() + timedelta(minutes=5)
+                agent.login_attempts = 0
+                db.commit()
+                raise HTTPException(
+                    status_code=423, 
+                    detail="Account locked for 5 minutes due to multiple failed attempts"
+                )
+            
+            db.commit()
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        # Reset login attempts on successful login
+        agent.login_attempts = 0
+        agent.locked_until = None
+        agent.last_login = datetime.utcnow()
+        agent.is_currently_logged_in = True
+        db.commit()
+        
+        # Create session token
+        session_token = str(uuid.uuid4())
+        expires_at = datetime.utcnow() + timedelta(hours=8)
+        
+        agent_session = AgentSession(
+            agent_id=agent_id,
+            session_token=session_token,
+            expires_at=expires_at,
+            is_active=True
+        )
+        db.add(agent_session)
+        db.commit()
+        
+        return {
+            "success": True,
+            "agent_id": agent.agent_id,
+            "name": agent.name,
+            "session_token": session_token,
+            "expires_at": expires_at.isoformat(),
+            "message": "Login successful"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Agent login error: {e}")
+        raise HTTPException(status_code=500, detail="Login failed")
+
+@app.post("/api/agents/logout")
+async def agent_logout(
+    agent_id: str = Form(...),
+    session_token: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Agent logout"""
+    try:
+        # Find and invalidate session
+        session = db.query(AgentSession).filter(
+            AgentSession.agent_id == agent_id,
+            AgentSession.session_token == session_token,
+            AgentSession.is_active == True
+        ).first()
+        
+        if session:
+            session.is_active = False
+            session.expires_at = datetime.utcnow()
+        
+        # Update agent status
+        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
+        if agent:
+            agent.is_currently_logged_in = False
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Logout successful"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Agent logout error: {e}")
+        raise HTTPException(status_code=500, detail="Logout failed")
+
+# Get all agents endpoint
+@app.get("/api/agents")
+async def get_agents(db: Session = Depends(get_db)):
+    """Get all agents"""
+    try:
+        agents = db.query(Agent).all()
+        return [
+            {
+                "id": agent.id,
+                "agent_id": agent.agent_id,
+                "name": agent.name,
+                "email": agent.email,
+                "mobile": agent.mobile,
+                "status": agent.status,
+                "created_at": agent.created_at.isoformat() if agent.created_at else None,
+                "last_login": agent.last_login.isoformat() if agent.last_login else None,
+                "is_currently_logged_in": agent.is_currently_logged_in,
+                "tasks_completed": agent.tasks_completed,
+                "dob": agent.dob,
+                "country": agent.country,
+                "gender": agent.gender,
+                "login_attempts": agent.login_attempts,
+                "locked_until": agent.locked_until.isoformat() if agent.locked_until else None
+            }
+            for agent in agents
+        ]
+    except Exception as e:
+        logger.error(f"Get agents error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch agents")
 
 # Error handlers
 @app.exception_handler(404)
