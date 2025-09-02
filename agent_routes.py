@@ -1,43 +1,21 @@
-from fastapi import APIRouter, Form, Depends, HTTPException, UploadFile, File, Request, status, BackgroundTasks
-from fastapi.responses import JSONResponse, StreamingResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import APIRouter, Form, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime, timedelta, date
-import os
 import uuid
 import secrets
 import string
 import re
-import json
-import zipfile
-import io
-import pandas as pd
-import shutil
-import aiofiles
-from io import BytesIO
 import logging
 import hashlib
 
-# Database and model imports
-from app.database import get_db
-from app.models import Agent, TaskProgress, SubmittedForm, AgentSession
+# Import from main directly
+from main import get_db, Agent, TaskProgress, SubmittedForm, AgentSession, hash_password, verify_password
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Security
-security = HTTPBearer()
-
 # Utility functions
-def hash_password(password: str) -> str:
-    """Hash password using SHA256"""
-    return hashlib.sha256(password.encode()).hexdigest()
-
-def verify_password(password: str, hashed: str) -> bool:
-    """Verify password against hash"""
-    return hash_password(password) == hashed
-
 def validate_email(email: str) -> bool:
     """Validate email format"""
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
@@ -186,7 +164,6 @@ async def register_agent(
         
         db.add(new_agent)
         db.commit()
-        db.refresh(new_agent)
         
         logger.info(f"✅ Agent registered successfully: {agent_id}")
         
@@ -370,138 +347,6 @@ async def agent_logout(
         logger.error(f"❌ Agent logout error: {e}")
         raise HTTPException(status_code=500, detail="Logout failed")
 
-# ===================== AGENT TASK ENDPOINTS =====================
-
-@router.get("/agents/{agent_id}/tasks")
-async def get_agent_tasks(
-    agent_id: str,
-    status: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    """Get tasks for agent"""
-    try:
-        # Verify agent exists
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        
-        query = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id)
-        
-        if status:
-            query = query.filter(TaskProgress.status == status)
-        
-        tasks = query.order_by(TaskProgress.created_at.desc()).all()
-        
-        return {
-            "tasks": [
-                {
-                    "task_id": task.task_id,
-                    "image_name": task.image_name,
-                    "image_path": f"/static/task_images/{agent_id}/{task.image_name}",
-                    "status": task.status,
-                    "created_at": task.created_at.isoformat() if task.created_at else None,
-                    "completed_at": task.completed_at.isoformat() if task.completed_at else None
-                }
-                for task in tasks
-            ],
-            "total": len(tasks)
-        }
-        
-    except Exception as e:
-        logger.error(f"Tasks fetch error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch tasks")
-
-@router.get("/agents/{agent_id}/current-task")
-async def get_current_task(agent_id: str, db: Session = Depends(get_db)):
-    """Get current task for an agent"""
-    try:
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
-        
-        # Get the first pending task
-        task = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id,
-            TaskProgress.status == "pending"
-        ).first()
-        
-        if not task:
-            return {
-                "completed": True,
-                "message": "No tasks available",
-                "agent_id": agent_id
-            }
-        
-        return {
-            "completed": False,
-            "message": "Task available",
-            "agent_id": agent_id,
-            "task_id": task.task_id,
-            "image_name": task.image_name,
-            "image_url": f"/static/task_images/{agent_id}/{task.image_name}"
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Error getting current task: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get task: {str(e)}")
-
-# ===================== AGENT PROFILE ENDPOINTS =====================
-
-@router.get("/agents/{agent_id}/profile")
-async def get_agent_profile(agent_id: str, db: Session = Depends(get_db)):
-    """Get agent profile information"""
-    try:
-        agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        
-        # Get task statistics
-        total_tasks = db.query(TaskProgress).filter(TaskProgress.agent_id == agent_id).count()
-        completed_tasks = db.query(TaskProgress).filter(
-            TaskProgress.agent_id == agent_id,
-            TaskProgress.status == "completed"
-        ).count()
-        
-        # Get recent submissions
-        recent_submissions = db.query(SubmittedForm).filter(
-            SubmittedForm.agent_id == agent_id
-        ).order_by(SubmittedForm.submitted_at.desc()).limit(5).all()
-        
-        return {
-            "agent": {
-                "agent_id": agent.agent_id,
-                "name": agent.name,
-                "email": agent.email,
-                "mobile": agent.mobile,
-                "status": agent.status,
-                "created_at": agent.created_at.isoformat() if agent.created_at else None,
-                "last_login": agent.last_login.isoformat() if agent.last_login else None,
-                "tasks_completed": agent.tasks_completed,
-                "dob": agent.dob,
-                "country": agent.country,
-                "gender": agent.gender
-            },
-            "stats": {
-                "total_tasks": total_tasks,
-                "completed_tasks": completed_tasks,
-                "pending_tasks": total_tasks - completed_tasks,
-                "completion_rate": round((completed_tasks / total_tasks * 100), 2) if total_tasks > 0 else 0
-            },
-            "recent_submissions": [
-                {
-                    "task_id": sub.task_id,
-                    "image_name": sub.image_name,
-                    "crime_type": sub.crime_type,
-                    "submitted_at": sub.submitted_at.isoformat() if sub.submitted_at else None
-                }
-                for sub in recent_submissions
-            ]
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Error getting agent profile: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get agent profile")
-
 # ===================== HEALTH CHECK ENDPOINT =====================
 
 @router.get("/agents/health")
@@ -514,7 +359,6 @@ async def agent_health_check():
         "endpoints_available": [
             "/api/agents/register",
             "/api/agents/login",
-            "/api/agents/{agent_id}/tasks",
-            "/api/agents/{agent_id}/profile"
+            "/api/agents/logout"
         ]
     }
