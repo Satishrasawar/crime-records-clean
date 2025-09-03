@@ -323,7 +323,7 @@ ALLOWED_ORIGINS = [
 if os.environ.get("RAILWAY_STATIC_URL"):
     ALLOWED_ORIGINS.append(f"https://{os.environ.get('RAILWAY_STATIC_URL')}")
 if os.environ.get("RAILWAY_PUBLIC_DOMAIN"):
-    ALLOWED_ORIGINS.append(f"https://{os.environ.get('RAILWAY_PUBLIC_DOMAIN')}")
+    ALLOWED_ORIGINS.append(f"https://{os.environ.get('RAILWAY_PUBLIC_Domain')}")
 
 # Security
 security = HTTPBearer()
@@ -335,7 +335,6 @@ async def get_current_admin(
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
     )
     
     try:
@@ -577,96 +576,117 @@ async def get_statistics(db: Session = Depends(get_db)):
             "pending_tasks": 0
         }
 
-# Task Management Routes
+# Task Management Routes - FIXED ZIP UPLOAD
 @app.post("/api/admin/upload-tasks")
 async def upload_tasks(
     zip_file: UploadFile = File(...),
     agent_id: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """Upload ZIP file and create tasks"""
+    """Upload ZIP file and create tasks - FIXED VERSION"""
     try:
+        logger.info(f"📦 Starting ZIP upload for agent: {agent_id}")
+        
         # Validate agent exists and is active
         agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
         if not agent:
+            logger.error(f"Agent not found: {agent_id}")
             raise HTTPException(status_code=404, detail="Agent not found")
         
         if agent.status != "active":
+            logger.error(f"Agent not active: {agent_id}")
             raise HTTPException(status_code=400, detail="Agent is not active")
         
         # Validate file type
         if not zip_file.filename.lower().endswith('.zip'):
+            logger.error(f"Invalid file type: {zip_file.filename}")
             raise HTTPException(status_code=400, detail="Only ZIP files are allowed")
         
         # Create agent directory
         agent_dir = TASKS_DIR / agent_id
-        agent_dir.mkdir(exist_ok=True)
+        agent_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Created agent directory: {agent_dir}")
         
         # Save ZIP file temporarily
         zip_path = TEMP_DIR / f"{uuid.uuid4()}.zip"
+        logger.info(f"Saving ZIP to: {zip_path}")
         
+        # Read and save file content
+        content = await zip_file.read()
         with open(zip_path, "wb") as buffer:
-            content = await zip_file.read()
             buffer.write(content)
         
         images_processed = 0
-        supported_extensions = ('.jpg', '.jpeg', '.png', '.gif')
+        supported_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp')
         
         # Extract and process images
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            for file_info in zip_ref.filelist:
-                if file_info.filename.lower().endswith(supported_extensions):
-                    try:
-                        # Extract image
-                        extracted_path = zip_ref.extract(file_info, TEMP_DIR)
-                        
-                        # Validate image file
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                file_list = zip_ref.namelist()
+                logger.info(f"ZIP contains {len(file_list)} files")
+                
+                for file_info in file_list:
+                    if any(file_info.lower().endswith(ext) for ext in supported_extensions):
                         try:
-                            with Image.open(extracted_path) as img:
-                                img.verify()  # Verify it's a valid image
-                        except (IOError, SyntaxError):
-                            logger.warning(f"Skipping invalid image: {file_info.filename}")
+                            logger.info(f"Processing image: {file_info}")
+                            
+                            # Extract image
+                            extracted_path = zip_ref.extract(file_info, TEMP_DIR)
+                            
+                            # Validate image file
+                            try:
+                                with Image.open(extracted_path) as img:
+                                    img.verify()  # Verify it's a valid image
+                            except (IOError, SyntaxError) as img_error:
+                                logger.warning(f"Skipping invalid image {file_info}: {img_error}")
+                                os.remove(extracted_path)
+                                continue
+                            
+                            # Move to agent directory
+                            image_name = os.path.basename(file_info)
+                            final_path = agent_dir / image_name
+                            
+                            # Ensure unique filename
+                            counter = 1
+                            original_name = final_path.stem
+                            original_ext = final_path.suffix
+                            while final_path.exists():
+                                final_path = agent_dir / f"{original_name}_{counter}{original_ext}"
+                                counter += 1
+                            
+                            shutil.move(extracted_path, final_path)
+                            
+                            # Create task
+                            task_id = f"TASK_{agent_id}_{uuid.uuid4().hex[:8].upper()}"
+                            task = TaskProgress(
+                                task_id=task_id,
+                                agent_id=agent_id,
+                                image_path=str(final_path.relative_to(TASKS_DIR)),
+                                image_name=final_path.name,
+                                status="pending"
+                            )
+                            db.add(task)
+                            images_processed += 1
+                            logger.info(f"Created task {task_id} for image {final_path.name}")
+                            
+                        except Exception as e:
+                            logger.error(f"Error processing image {file_info}: {e}")
                             continue
-                        
-                        # Move to agent directory
-                        image_name = os.path.basename(file_info.filename)
-                        final_path = agent_dir / image_name
-                        
-                        # Ensure unique filename
-                        counter = 1
-                        original_name = final_path.stem
-                        original_ext = final_path.suffix
-                        while final_path.exists():
-                            final_path = agent_dir / f"{original_name}_{counter}{original_ext}"
-                            counter += 1
-                        
-                        shutil.move(extracted_path, final_path)
-                        
-                        # Create task
-                        task_id = f"TASK_{agent_id}_{uuid.uuid4().hex[:8].upper()}"
-                        task = TaskProgress(
-                            task_id=task_id,
-                            agent_id=agent_id,
-                            image_path=str(final_path),
-                            image_name=final_path.name,
-                            status="pending"
-                        )
-                        db.add(task)
-                        images_processed += 1
-                        
-                    except Exception as e:
-                        logger.error(f"Error processing image {file_info.filename}: {e}")
-                        continue
+        
+        except zipfile.BadZipFile:
+            logger.error("Invalid ZIP file")
+            raise HTTPException(status_code=400, detail="Invalid ZIP file format")
         
         # Clean up
         try:
             os.remove(zip_path)
-        except:
-            pass
+            logger.info(f"Cleaned up temporary ZIP: {zip_path}")
+        except Exception as e:
+            logger.warning(f"Could not remove temp ZIP: {e}")
         
         # Remove extracted directories in temp
         for item in TEMP_DIR.iterdir():
-            if item.is_dir() and str(item.name).startswith('tmp'):
+            if item.is_dir():
                 try:
                     shutil.rmtree(item, ignore_errors=True)
                 except:
@@ -674,7 +694,7 @@ async def upload_tasks(
         
         db.commit()
         
-        logger.info(f"✅ Processed {images_processed} images for agent {agent_id}")
+        logger.info(f"✅ Successfully processed {images_processed} images for agent {agent_id}")
         
         return {
             "success": True,
@@ -686,7 +706,7 @@ async def upload_tasks(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Upload error: {e}")
+        logger.error(f"❌ Upload error: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
@@ -963,7 +983,7 @@ async def get_agent_password_info(agent_id: str, db: Session = Depends(get_db)):
         "email": agent.email
     }
 
-@app.post("/api/admin/reset-password/{agent_id}")
+@app.post("/api/admin/reset-password/{agent_id")
 async def reset_agent_password(agent_id: str, db: Session = Depends(get_db)):
     """Reset agent password"""
     agent = db.query(Agent).filter(Agent.agent_id == agent_id).first()
@@ -1076,152 +1096,6 @@ async def test_data_availability(db: Session = Depends(get_db)):
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
-
-# Chunked upload routes for large files
-@app.post("/api/admin/init-chunked-upload")
-async def init_chunked_upload(
-    filename: str = Form(...),
-    filesize: int = Form(...),
-    total_chunks: int = Form(...),
-    agent_id: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    """Initialize chunked upload"""
-    try:
-        upload_id = str(uuid.uuid4())
-        
-        chunked_upload = ChunkedUpload(
-            upload_id=upload_id,
-            filename=filename,
-            filesize=filesize,
-            total_chunks=total_chunks,
-            agent_id=agent_id
-        )
-        
-        db.add(chunked_upload)
-        db.commit()
-        
-        # Create directory for chunks
-        chunk_dir = CHUNK_UPLOAD_DIR / upload_id
-        chunk_dir.mkdir(exist_ok=True)
-        
-        return {"upload_id": upload_id}
-        
-    except Exception as e:
-        logger.error(f"Chunked upload init error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to initialize upload")
-
-@app.post("/api/admin/upload-chunk")
-async def upload_chunk(
-    upload_id: str = Form(...),
-    chunk_index: int = Form(...),
-    chunk: UploadFile = File(...),
-    db: Session = Depends(get_db)
-):
-    """Upload individual chunk"""
-    try:
-        chunked_upload = db.query(ChunkedUpload).filter(
-            ChunkedUpload.upload_id == upload_id
-        ).first()
-        
-        if not chunked_upload:
-            raise HTTPException(status_code=404, detail="Upload session not found")
-        
-        # Save chunk
-        chunk_dir = CHUNK_UPLOAD_DIR / upload_id
-        chunk_path = chunk_dir / f"chunk_{chunk_index:04d}"
-        
-        async with aiofiles.open(chunk_path, 'wb') as buffer:
-            content = await chunk.read()
-            await buffer.write(content)
-        
-        # Update progress
-        chunked_upload.chunks_received += 1
-        db.commit()
-        
-        return {"success": True, "chunk_index": chunk_index}
-        
-    except Exception as e:
-        logger.error(f"Chunk upload error: {e}")
-        raise HTTPException(status_code=500, detail="Chunk upload failed")
-
-@app.post("/api/admin/finalize-chunked-upload")
-async def finalize_chunked_upload(
-    upload_id: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    """Finalize chunked upload and process file"""
-    try:
-        chunked_upload = db.query(ChunkedUpload).filter(
-            ChunkedUpload.upload_id == upload_id
-        ).first()
-        
-        if not chunked_upload:
-            raise HTTPException(status_code=404, detail="Upload session not found")
-        
-        # Reassemble file
-        chunk_dir = CHUNK_UPLOAD_DIR / upload_id
-        final_path = TEMP_DIR / chunked_upload.filename
-        
-        with open(final_path, "wb") as outfile:
-            for i in range(chunked_upload.total_chunks):
-                chunk_path = chunk_dir / f"chunk_{i:04d}"
-                if chunk_path.exists():
-                    with open(chunk_path, "rb") as chunk_file:
-                        outfile.write(chunk_file.read())
-        
-        # Process as normal ZIP file
-        agent = db.query(Agent).filter(Agent.agent_id == chunked_upload.agent_id).first()
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        
-        agent_dir = TASKS_DIR / chunked_upload.agent_id
-        agent_dir.mkdir(exist_ok=True)
-        
-        images_processed = 0
-        
-        # Extract and process images
-        with zipfile.ZipFile(final_path, 'r') as zip_ref:
-            for file_info in zip_ref.filelist:
-                if file_info.filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
-                    extracted_path = zip_ref.extract(file_info, TEMP_DIR)
-                    
-                    image_name = os.path.basename(file_info.filename)
-                    final_image_path = agent_dir / image_name
-                    shutil.move(extracted_path, final_image_path)
-                    
-                    task_id = f"TASK_{chunked_upload.agent_id}_{uuid.uuid4().hex[:8].upper()}"
-                    task = TaskProgress(
-                        task_id=task_id,
-                        agent_id=chunked_upload.agent_id,
-                        image_path=str(final_image_path),
-                        image_name=image_name,
-                        status="pending"
-                    )
-                    db.add(task)
-                    images_processed += 1
-        
-        # Mark upload as completed
-        chunked_upload.completed = True
-        db.commit()
-        
-        # Clean up
-        shutil.rmtree(chunk_dir, ignore_errors=True)
-        if final_path.exists():
-            os.remove(final_path)
-        
-        logger.info(f"✅ Chunked upload completed: {images_processed} images for {chunked_upload.agent_id}")
-        
-        return {
-            "success": True,
-            "images_processed": images_processed,
-            "agent_id": chunked_upload.agent_id
-        }
-        
-    except Exception as e:
-        logger.error(f"Finalize chunked upload error: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to finalize upload")
 
 # Agent dashboard and profile routes
 @app.get("/api/agents/{agent_id}/dashboard")
